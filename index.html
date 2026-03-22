@@ -293,8 +293,8 @@ function draw() {
     html += "<input type='number' id='weight-input' step='0.1' min='50' max='500' placeholder='0.0' value='" + (day.weight || "") + "' style='width:120px;font-size:22px;font-weight:700;text-align:center'>";
     html += "<span style='font-size:14px;color:#555'>lbs</span></div>";
     if (day.weight) html += "<div style='font-size:10px;color:#10b981;margin-bottom:10px'>Logged!</div>";
-    html += "<div style='font-size:9px;letter-spacing:2px;color:#444;text-transform:uppercase;margin:12px 0 10px'>Progress Photos</div>";
-    html += "<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px'>";
+    html += "<button onclick=\"var s=document.getElementById('pgrid');var b=document.getElementById('pgtoggle');if(s.style.display==='none'){s.style.display='grid';b.textContent='Hide Progress Photos';}else{s.style.display='none';b.textContent='View Progress Photos';}\" id='pgtoggle' style='margin:12px 0 10px;background:transparent;border:1px solid #252525;border-radius:8px;padding:6px 14px;color:#555;font-size:11px;cursor:pointer;width:100%'>View Progress Photos</button>";
+    html += "<div id='pgrid' style='display:none;grid-template-columns:1fr 1fr;gap:10px'>";
     html += "<input type='file' id='photo-front' accept='image/*' style='display:none' onchange='handleProgressPhoto(event,\"front\")'>";
     html += "<input type='file' id='photo-side' accept='image/*' style='display:none' onchange='handleProgressPhoto(event,\"side\")'>";
 
