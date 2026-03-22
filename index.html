@@ -12,7 +12,6 @@
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 body{background:#0a0a0a;color:#ccc;font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;max-width:480px;margin:0 auto;padding-bottom:100px;min-height:100vh;}
 button,textarea,input{font-family:inherit;}
-#root{min-height:100vh;}
 .hdr{padding:44px 20px 12px;background:#0d0d0d;border-bottom:1px solid #1c1c1c;position:sticky;top:0;z-index:100;}
 .hlbl{font-size:9px;letter-spacing:3px;color:#e8322a;text-transform:uppercase;margin-bottom:2px;}
 .hrow{display:flex;justify-content:space-between;align-items:center;}
@@ -125,7 +124,7 @@ button,textarea,input{font-family:inherit;}
 .wbar{width:100%;border-radius:3px 3px 0 0;min-height:2px;}
 .wbard{font-size:7px;color:#3a3a3a;}
 .wbarv{font-size:7px;color:#f59e0b;}
-.cbox{background:#0c0c0c;border-radius:10px;padding:12px;font-size:11px;color:#666;line-height:2;border:1px solid #181818;font-family:monospace;word-break:break-word;}
+.cbox{background:#0c0c0c;border-radius:10px;padding:12px;font-size:11px;color:#666;line-height:2;border:1px solid #181818;word-break:break-word;}
 .ctitle{color:#e8322a;font-weight:600;margin-bottom:4px;}
 .cnote{padding-left:8px;color:#4a4a4a;}
 .cpbtn{width:100%;background:#181818;border:1px solid #252525;border-radius:8px;padding:8px 0;color:#888;font-size:12px;margin-top:10px;cursor:pointer;}
@@ -138,15 +137,15 @@ button,textarea,input{font-family:inherit;}
 var PG=140,CG=1900,WG=10;
 var DAYS=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 var DT={"Sun":"Rest","Mon":"Upper A","Tue":"Lower+Abs","Wed":"Cardio","Thu":"Upper B","Fri":"Lower+Abs","Sat":"Rest"};
-var RT=["💀 Brutal","🔥 Hard","✅ Solid","😐 Okay","😴 Easy"];
+var RT=["Brutal","Hard","Solid","Okay","Easy"];
 var WS=new Date(2026,2,22).getTime();
 var AW={};
 var S={wo:0,ad:0,view:"log",smf:false,mt:"",mp:null,mpp:null,ld:false,ae:"",cp:false};
 
 function wlbl(o){
-var s=new Date(WS+o*7*86400000);
-var e=new Date(WS+o*7*86400000+6*86400000);
 var mo=[“Jan”,“Feb”,“Mar”,“Apr”,“May”,“Jun”,“Jul”,“Aug”,“Sep”,“Oct”,“Nov”,“Dec”];
+var s=new Date(WS+o*604800000);
+var e=new Date(WS+o*604800000+518400000);
 return mo[s.getMonth()]+” “+s.getDate()+” - “+mo[e.getMonth()]+” “+e.getDate();
 }
 
@@ -155,62 +154,70 @@ return{meals:[],water:0,weight:””,photoFront:null,photoSide:null,
 workout:{completed:false,rating:””,notes:””},
 totalProtein:0,totalCalories:0,totalCarbs:0,totalFat:0};
 }
-function ew(){
-return[ed(),ed(),ed(),ed(),ed(),ed(),ed()];
+
+function gw(o){
+if(!AW[o]){
+AW[o]=[ed(),ed(),ed(),ed(),ed(),ed(),ed()];
+}
+return AW[o];
+}
+
+function lsSave(){
+try{localStorage.setItem(“trk6”,JSON.stringify(AW));}catch(ex){}
 }
 
 function lsLoad(){
 try{
-var d=localStorage.getItem(“trk5”);
-if(d)AW=JSON.parse(d);
-}catch(e){}
-}
-function lsSave(){
-try{localStorage.setItem(“trk5”,JSON.stringify(AW));}catch(e){}
+var raw=localStorage.getItem(“trk6”);
+if(raw){AW=JSON.parse(raw);}
+}catch(ex){}
 }
 
-function gw(o){
-if(!AW[o])AW[o]=ew();
-return AW[o];
+function cpDay(d){
+var m2=[];
+for(var x=0;x<d.meals.length;x++){m2.push(d.meals[x]);}
+return{meals:m2,water:d.water,weight:d.weight,
+photoFront:d.photoFront,photoSide:d.photoSide,
+workout:{completed:d.workout.completed,rating:d.workout.rating,notes:d.workout.notes},
+totalProtein:d.totalProtein,totalCalories:d.totalCalories,
+totalCarbs:d.totalCarbs,totalFat:d.totalFat};
 }
 
 function upd(di,fn){
-var wo=S.wo;
-var wk=gw(wo);
-var d=fn(wk[di]);
-wk[di]=d;
-AW[wo]=wk;
+var wk=gw(S.wo);
+wk[di]=fn(wk[di]);
+AW[S.wo]=wk;
 lsSave();
 render();
 }
 
-function setS(key,val){S[key]=val;render();}
-
 function hph(e,type){
 var f=e.target.files[0];
-if(!f)return;
+if(!f){return;}
 var r=new FileReader();
 r.onload=function(){
 upd(S.ad,function(d){
-var nd=copyDay(d);
-if(type===“front”)nd.photoFront=r.result;
-else nd.photoSide=r.result;
+var nd=cpDay(d);
+if(type===“front”){nd.photoFront=r.result;}
+else{nd.photoSide=r.result;}
 return nd;
 });
 };
 r.readAsDataURL(f);
 }
+
 function rph(type){
 upd(S.ad,function(d){
-var nd=copyDay(d);
-if(type===“front”)nd.photoFront=null;
-else nd.photoSide=null;
+var nd=cpDay(d);
+if(type===“front”){nd.photoFront=null;}
+else{nd.photoSide=null;}
 return nd;
 });
 }
+
 function hmph(e){
 var f=e.target.files[0];
-if(!f)return;
+if(!f){return;}
 var r=new FileReader();
 r.onload=function(){
 S.mp=r.result.split(”,”)[1];
@@ -220,376 +227,354 @@ render();
 r.readAsDataURL(f);
 }
 
-function copyDay(d){
-return{meals:d.meals.slice(),water:d.water,weight:d.weight,
-photoFront:d.photoFront,photoSide:d.photoSide,
-workout:{completed:d.workout.completed,rating:d.workout.rating,notes:d.workout.notes},
-totalProtein:d.totalProtein,totalCalories:d.totalCalories,
-totalCarbs:d.totalCarbs,totalFat:d.totalFat};
-}
-
-function analyze(){
+function doAnalyze(){
 var ta=document.getElementById(“mta”);
-if(ta)S.mt=ta.value;
-if(!S.mt&&!S.mp)return;
+if(ta){S.mt=ta.value;}
+if(!S.mt&&!S.mp){return;}
 S.ld=true;S.ae=””;render();
 var content=[];
 if(S.mp){
 content.push({type:“image”,source:{type:“base64”,media_type:“image/jpeg”,data:S.mp}});
 }
 var prompt=S.mp
-?“Analyze this food photo”+(S.mt?” plus description: "”+S.mt+”"”:””)+”. Return ONLY raw JSON no markdown: {"name":"short name","protein":0,"carbs":0,"fat":0,"calories":0}. Fill in realistic numbers.”
-:“Analyze this meal: "”+S.mt+”". Return ONLY raw JSON no markdown: {"name":"short name","protein":0,"carbs":0,"fat":0,"calories":0}. Fill in realistic standard portion numbers.”;
+?“Analyze this food photo”+(S.mt?” plus: "”+S.mt+”"”:””)+”. Return ONLY raw JSON: {"name":"meal name","protein":0,"carbs":0,"fat":0,"calories":0}”
+:“Analyze: "”+S.mt+”". Return ONLY raw JSON: {"name":"meal name","protein":0,"carbs":0,"fat":0,"calories":0}”;
 content.push({type:“text”,text:prompt});
 fetch(“https://api.anthropic.com/v1/messages”,{
 method:“POST”,
 headers:{“Content-Type”:“application/json”},
-body:JSON.stringify({model:“claude-sonnet-4-20250514”,max_tokens:500,messages:[{role:“user”,content:content}]})
+body:JSON.stringify({model:“claude-sonnet-4-20250514”,max_tokens:300,messages:[{role:“user”,content:content}]})
 }).then(function(res){return res.json();}).then(function(data){
 var txt=””;
 if(data.content){
-for(var i=0;i<data.content.length;i++){
-if(data.content[i].type===“text”){txt=data.content[i].text;break;}
+for(var xi=0;xi<data.content.length;xi++){
+if(data.content[xi].type===“text”){txt=data.content[xi].text;break;}
 }
 }
 txt=txt.replace(/`json/g,"").replace(/`/g,””).trim();
 var p=JSON.parse(txt);
-var preview=S.mpp,input=S.mt;
+var prev=S.mpp,inp=S.mt;
 upd(S.ad,function(d){
-var nd=copyDay(d);
-nd.meals=d.meals.concat([{name:p.name,protein:p.protein,carbs:p.carbs,fat:p.fat,calories:p.calories,input:input,photoPreview:preview}]);
-nd.totalProtein=d.totalProtein+(p.protein||0);
-nd.totalCalories=d.totalCalories+(p.calories||0);
-nd.totalCarbs=d.totalCarbs+(p.carbs||0);
-nd.totalFat=d.totalFat+(p.fat||0);
+var nd=cpDay(d);
+nd.meals=nd.meals.concat([{name:p.name||“Meal”,protein:p.protein||0,carbs:p.carbs||0,fat:p.fat||0,calories:p.calories||0,input:inp,photoPreview:prev}]);
+nd.totalProtein+=p.protein||0;
+nd.totalCalories+=p.calories||0;
+nd.totalCarbs+=p.carbs||0;
+nd.totalFat+=p.fat||0;
 return nd;
 });
 S.mt=””;S.mp=null;S.mpp=null;S.smf=false;S.ld=false;S.ae=””;
 render();
-}).catch(function(err){
-S.ld=false;S.ae=“Could not analyze. Check internet and try again.”;render();
+}).catch(function(){
+S.ld=false;S.ae=“Could not analyze. Try again.”;render();
 });
 }
 
-function rmeal(i){
+function rmeal(idx){
 upd(S.ad,function(d){
-var m=d.meals[i];
-var nd=copyDay(d);
-nd.meals=d.meals.filter(function(_,j){return j!==i;});
-nd.totalProtein=d.totalProtein-(m.protein||0);
-nd.totalCalories=d.totalCalories-(m.calories||0);
-nd.totalCarbs=d.totalCarbs-(m.carbs||0);
-nd.totalFat=d.totalFat-(m.fat||0);
+var m=d.meals[idx];
+var nd=cpDay(d);
+var nm=[];
+for(var xi=0;xi<d.meals.length;xi++){if(xi!==idx){nm.push(d.meals[xi]);}}
+nd.meals=nm;
+nd.totalProtein-=m.protein||0;
+nd.totalCalories-=m.calories||0;
+nd.totalCarbs-=m.carbs||0;
+nd.totalFat-=m.fat||0;
 return nd;
 });
 }
 
-function cpclick(){
+function doCopy(){
 var week=gw(S.wo);
-var wkts=0,sumP=0,sumCal=0,pdays=0,notes=[];
-var wts=[];
-for(var i=0;i<7;i++){
-var d=week[i];
-if(d.workout.completed)wkts++;
-sumP+=d.totalProtein;
-sumCal+=d.totalCalories;
-if(d.totalProtein>=PG)pdays++;
-if(d.workout.notes)notes.push(DAYS[i]+”: “+d.workout.notes);
-wts.push(parseFloat(d.weight)||0);
+var wkts=0,sumP=0,pdays=0,notes=[];
+var wts2=[];
+for(var xi=0;xi<7;xi++){
+if(week[xi].workout.completed){wkts++;}
+sumP+=week[xi].totalProtein;
+if(week[xi].totalProtein>=PG){pdays++;}
+if(week[xi].workout.notes){notes.push(DAYS[xi]+”: “+week[xi].workout.notes);}
+wts2.push(parseFloat(week[xi].weight)||0);
 }
-var lwts=wts.filter(function(w){return w>0;});
+var lwts=[];
+for(var xi=0;xi<wts2.length;xi++){if(wts2[xi]>0){lwts.push(wts2[xi]);}}
 var avgWt=lwts.length?(lwts.reduce(function(a,b){return a+b;},0)/lwts.length).toFixed(1):”–”;
 var txt=“WEEKLY CHECK-IN - “+wlbl(S.wo)+
 “\nWorkouts: “+wkts+”/5”+
 “\nAvg protein: “+Math.round(sumP/7)+“g (goal: “+PG+“g)”+
-“\nProtein goal days: “+pdays+”/7”+
-“\nAvg calories: “+Math.round(sumCal/7)+
+“\nProtein days: “+pdays+”/7”+
 “\nAvg weight: “+avgWt+” lbs”+
-“\nNotes: “+(notes.length?notes.join(”, “):“None”);
+“\nNotes: “+(notes.length?notes.join(” | “):“None”);
 navigator.clipboard.writeText(txt).then(function(){
 S.cp=true;render();
 setTimeout(function(){S.cp=false;render();},2500);
-}).catch(function(){S.cp=true;render();setTimeout(function(){S.cp=false;render();},2500);});
-}
-
-function cc2(v,g){
-if(v>=g)return”#10b981”;
-if(v>0)return”#f59e0b”;
-return”#2a2a2a”;
+}).catch(function(){alert(“Copied!”);});
 }
 
 function mkRing(val,max,color){
-var size=64,sw=6;
-var r=(size-sw*2)/2;
-var c=2*Math.PI*r;
-var pct=val/max;if(pct>1)pct=1;if(pct<0)pct=0;
-var off=c*(1-pct);
-return ‘<svg width="'+size+'" height="'+size+'" style="transform:rotate(-90deg)">’+
-‘<circle cx="'+size/2+'" cy="'+size/2+'" r="'+r+'" fill="none" stroke="#181818" stroke-width="'+sw+'"/>’+
-‘<circle cx=”’+size/2+’” cy=”’+size/2+’” r=”’+r+’” fill=“none” stroke=”’+color+’” stroke-width=”’+sw+’”’+
-’ stroke-dasharray=”’+c+’” stroke-dashoffset=”’+off+’” stroke-linecap=“round”/>’+
-‘</svg>’;
+var sz=64,sw=6,r=(sz-sw*2)/2,c=2*Math.PI*r;
+var pct=val/max;if(pct>1){pct=1;}if(pct<0){pct=0;}
+return ‘<svg width="'+sz+'" height="'+sz+'" style="transform:rotate(-90deg)">’+
+‘<circle cx="'+sz/2+'" cy="'+sz/2+'" r="'+r+'" fill="none" stroke="#181818" stroke-width="'+sw+'"/>’+
+‘<circle cx=”’+sz/2+’” cy=”’+sz/2+’” r=”’+r+’” fill=“none” stroke=”’+color+’” stroke-width=”’+sw+’”’+
+’ stroke-dasharray=”’+c+’” stroke-dashoffset=”’+(c*(1-pct))+’” stroke-linecap=“round”/></svg>’;
 }
 
 function mkBar(lbl,val,max,color){
 var unit=lbl===“Calories”?””:“g”;
-var pct=val/max*100;if(pct>100)pct=100;
-return ‘<div class="bar">’+
-‘<div class="blr"><span>’+lbl+’</span><span class="blrv">’+val+unit+’ / ‘+max+unit+’</span></div>’+
-‘<div class="bt"><div class="bf" style="width:'+pct+'%;background:'+color+'"></div></div>’+
-‘</div>’;
+var pct=val/max*100;if(pct>100){pct=100;}if(pct<0){pct=0;}
+return ‘<div class="bar"><div class="blr"><span>’+lbl+’</span><span class="blrv">’+val+unit+’ / ‘+max+unit+’</span></div>’+
+‘<div class="bt"><div class="bf" style="width:'+pct+'%;background:'+color+'"></div></div></div>’;
 }
 
-function render(){
-var week=gw(S.wo);
-var day=week[S.ad];
-var dt=DT[DAYS[S.ad]];
-var sumP=0,sumCal=0,wkts=0,pdays=0;
-var wts=[];
-for(var i=0;i<7;i++){
-sumP+=week[i].totalProtein;
-sumCal+=week[i].totalCalories;
-if(week[i].workout.completed)wkts++;
-if(week[i].totalProtein>=PG)pdays++;
-wts.push(parseFloat(week[i].weight)||0);
+function cc2(v,g){
+if(v>=g){return”#10b981”;}
+if(v>0){return”#f59e0b”;}
+return”#2a2a2a”;
 }
-var avgP=Math.round(sumP/7);
-var avgCal=Math.round(sumCal/7);
-var lwts=wts.filter(function(w){return w>0;});
-var avgWt=lwts.length?(lwts.reduce(function(a,b){return a+b;},0)/lwts.length).toFixed(1):”–”;
 
-var html=””;
+function buildLog(week,day,dt){
+var h=””;
 
-// HEADER
-html+=’<div class="hdr">’+
-‘<div class="hlbl">Daily Tracker</div>’+
-‘<div class="hrow">’+
-‘<div class="htitle">’+wlbl(S.wo)+’</div>’+
-‘<div class="navb">’+
-‘<button class="nbtn" onclick="S.wo--;render()">‹</button>’+
-‘<button class="nbtn" onclick="S.wo++;render()">›</button>’+
-‘</div></div>’+
-(S.wo!==0?’<button class="bklnk" onclick="S.wo=0;render()">← Current week</button>’:””)+
-‘</div>’;
-
-// TABS
-html+=’<div class="tabs">’;
-for(var i=0;i<7;i++){
-var d=DAYS[i];
-var rest=DT[d]===“Rest”;
-var act=i===S.ad;
-var today=S.wo===0&&i===0;
-html+=’<div class=“tab’+(act?” on”:””)+(rest?” rest”:””)+(today&&!act?” today”:””)+’” onclick=“S.ad=’+i+’;render()”>’;
-html+=’<div class="tday">’+d+’</div>’;
-html+=’<div class="ttype">’+DT[d]+’</div>’;
-if(week[i].workout.completed)html+=’<div class="tdone">✓</div>’;
-html+=’</div>’;
-}
-html+=’</div>’;
-
-// VIEW TOGGLE
-html+=’<div class="vtog">’+
-‘<button class=“vbtn’+(S.view===“log”?” on”:””)+’” onclick=“S.view='log';render()”>Daily Log</button>’+
-‘<button class=“vbtn’+(S.view===“week”?” on”:””)+’” onclick=“S.view='week';render()”>Week Summary</button>’+
-‘</div>’;
-
-html+=’<div class="pg">’;
-
-if(S.view===“log”){
-// WEIGHT & PROGRESS
-html+=’<div class="card">’+
-‘<div class="slbl">Daily Weight & Progress</div>’+
+// WEIGHT & PROGRESS PHOTOS
+h+=’<div class="card"><div class="slbl">Daily Weight & Progress</div>’+
 ‘<div style="display:flex;align-items:center;margin-bottom:4px">’+
-‘<input class=“winp” type=“number” step=“0.1” min=“50” max=“500” id=“winp” placeholder=“0.0” value=”’+(day.weight||””)+’” onchange=“upd(S.ad,function(d){var nd=copyDay(d);nd.weight=document.getElementById('winp').value;return nd;})”>’+
-‘<span class="wunit">lbs</span>’+
-‘</div>’+
-(day.weight?’<div class="wok">✓ Logged</div>’:’’)+
+‘<input class=“winp” type=“number” step=“0.1” min=“50” max=“500” id=“winp” placeholder=“0.0” value=”’+(day.weight||””)+’”>’+
+‘<span class="wunit">lbs</span></div>’+
+(day.weight?’<div class="wok">Logged!</div>’:’’)+
 ‘<div style="margin-top:14px">’+
 ‘<div style="font-size:9px;letter-spacing:2px;color:#444;text-transform:uppercase;margin-bottom:10px">Progress Photos</div>’+
 ‘<div class="pgrid">’+
 ‘<input type="file" id="pf" accept="image/*" style="display:none" onchange="hph(event,\'front\')">’+
-‘<input type="file" id="ps" accept="image/*" style="display:none" onchange="hph(event,\'side\')">’+
-(day.photoFront
-?’<div class="pslot has"><img src="'+day.photoFront+'" class="pimg"><button class="prem" onclick="rph(\'front\')">✕</button><div class="ptyp">front</div></div>’
-:’<div class="pslot" onclick="document.getElementById(\'pf\').click()"><div class="pinner"><div class="picon">📷</div><div class="plbl">Front View<br><span style="color:#2a2a2a;font-size:9px">tap to add</span></div></div></div>’)+
-(day.photoSide
-?’<div class="pslot has"><img src="'+day.photoSide+'" class="pimg"><button class="prem" onclick="rph(\'side\')">✕</button><div class="ptyp">side</div></div>’
-:’<div class="pslot" onclick="document.getElementById(\'ps\').click()"><div class="pinner"><div class="picon">📷</div><div class="plbl">Side View<br><span style="color:#2a2a2a;font-size:9px">tap to add</span></div></div></div>’)+
-‘</div></div></div>’;
+‘<input type="file" id="ps" accept="image/*" style="display:none" onchange="hph(event,\'side\')">’;
 
-```
+if(day.photoFront){
+h+=’<div class="pslot has"><img src="'+day.photoFront+'" class="pimg"><button class="prem" onclick="rph(\'front\')">X</button><div class="ptyp">front</div></div>’;
+}else{
+h+=’<div class="pslot" onclick="document.getElementById(\'pf\').click()"><div class="pinner"><div class="picon">📷</div><div class="plbl">Front View<br><span style="color:#2a2a2a;font-size:9px">tap to add</span></div></div></div>’;
+}
+if(day.photoSide){
+h+=’<div class="pslot has"><img src="'+day.photoSide+'" class="pimg"><button class="prem" onclick="rph(\'side\')">X</button><div class="ptyp">side</div></div>’;
+}else{
+h+=’<div class="pslot" onclick="document.getElementById(\'ps\').click()"><div class="pinner"><div class="picon">📷</div><div class="plbl">Side View<br><span style="color:#2a2a2a;font-size:9px">tap to add</span></div></div></div>’;
+}
+h+=’</div></div></div>’;
+
 // MACROS
-html+='<div class="card">'+
-  '<div class="slbl">Today\'s Macros</div>'+
-  '<div class="mring">'+
-  '<div class="rw">'+mkRing(day.totalProtein,PG,"#e8322a")+'<div class="ri"><div class="rv">'+day.totalProtein+'g</div><div class="rs">protein</div></div></div>'+
-  '<div style="flex:1">'+
-  mkBar("Protein",day.totalProtein,PG,"#e8322a")+
-  mkBar("Carbs",day.totalCarbs,250,"#f59e0b")+
-  mkBar("Fat",day.totalFat,70,"#3b82f6")+
-  mkBar("Calories",day.totalCalories,CG,"#10b981")+
-  '</div></div>'+
-  '<div class="chips">'+
-  '<div class="chip"><div class="cv" style="color:#e8322a">'+day.totalProtein+'g</div><div class="cl">Protein</div></div>'+
-  '<div class="chip"><div class="cv" style="color:#f59e0b">'+day.totalCarbs+'g</div><div class="cl">Carbs</div></div>'+
-  '<div class="chip"><div class="cv" style="color:#3b82f6">'+day.totalFat+'g</div><div class="cl">Fat</div></div>'+
-  '<div class="chip"><div class="cv" style="color:#10b981">'+day.totalCalories+'</div><div class="cl">Calories</div></div>'+
-  '</div></div>';
+h+=’<div class="card"><div class="slbl">Today's Macros</div>’+
+‘<div class="mring"><div class="rw">’+mkRing(day.totalProtein,PG,”#e8322a”)+
+‘<div class="ri"><div class="rv">’+day.totalProtein+‘g</div><div class="rs">protein</div></div></div>’+
+‘<div style="flex:1">’+mkBar(“Protein”,day.totalProtein,PG,”#e8322a”)+mkBar(“Carbs”,day.totalCarbs,250,”#f59e0b”)+mkBar(“Fat”,day.totalFat,70,”#3b82f6”)+mkBar(“Calories”,day.totalCalories,CG,”#10b981”)+’</div></div>’+
+‘<div class="chips">’+
+‘<div class="chip"><div class="cv" style="color:#e8322a">’+day.totalProtein+‘g</div><div class="cl">Protein</div></div>’+
+‘<div class="chip"><div class="cv" style="color:#f59e0b">’+day.totalCarbs+‘g</div><div class="cl">Carbs</div></div>’+
+‘<div class="chip"><div class="cv" style="color:#3b82f6">’+day.totalFat+‘g</div><div class="cl">Fat</div></div>’+
+‘<div class="chip"><div class="cv" style="color:#10b981">’+day.totalCalories+’</div><div class="cl">Calories</div></div>’+
+‘</div></div>’;
 
 // WATER
-html+='<div class="card">'+
-  '<div class="wtrrow">'+
-  '<div><div class="slbl">Water</div><div class="wtrval">'+day.water+' / '+WG+' glasses</div></div>'+
-  '<div class="wtrbtns">'+
-  '<button class="wtrbtn wtrm" onclick="upd(S.ad,function(d){var nd=copyDay(d);nd.water=Math.max(0,d.water-1);return nd;})">-</button>'+
-  '<button class="wtrbtn wtrp" onclick="upd(S.ad,function(d){var nd=copyDay(d);nd.water=Math.min('+WG+',d.water+1);return nd;})">+</button>'+
-  '</div></div>'+
-  '<div class="wsegs">';
-for(var i=0;i<WG;i++){
-  html+='<div class="wseg'+(i<day.water?" on":"")+'" onclick="upd(S.ad,function(d){var nd=copyDay(d);nd.water='+(i+1)+';return nd;})"></div>';
+h+=’<div class="card"><div class="wtrrow">’+
+‘<div><div class="slbl">Water</div><div class="wtrval">’+day.water+’ / ‘+WG+’ glasses</div></div>’+
+‘<div class="wtrbtns">’+
+‘<button class="wtrbtn wtrm" onclick="upd(S.ad,function(d){var nd=cpDay(d);nd.water=Math.max(0,d.water-1);return nd;})">-</button>’+
+‘<button class="wtrbtn wtrp" onclick="upd(S.ad,function(d){var nd=cpDay(d);nd.water=Math.min('+WG+',d.water+1);return nd;})">+</button>’+
+‘</div></div><div class="wsegs">’;
+for(var wi=0;wi<WG;wi++){
+h+=’<div class=“wseg’+(wi<day.water?” on”:””)+’” onclick=“upd(S.ad,function(d){var nd=cpDay(d);nd.water=’+(wi+1)+’;return nd;})”></div>’;
 }
-html+='</div></div>';
+h+=’</div></div>’;
 
 // MEALS
-html+='<div class="card">'+
-  '<div class="mhdr"><div class="slbl" style="margin-bottom:0">Meals</div>'+
-  '<button class="addbtn" onclick="S.smf=true;render()">+ Add Meal</button></div>';
+h+=’<div class="card"><div class="mhdr"><div class="slbl" style="margin-bottom:0">Meals</div>’+
+‘<button class="addbtn" onclick="S.smf=true;render()">+ Add Meal</button></div>’;
 
 if(S.smf){
-  html+='<div class="mform">'+
-    '<div class="mhint">Upload a photo, describe your meal, or both. Claude fills in the macros.</div>'+
-    '<input type="file" id="mph" accept="image/*" style="display:none" onchange="hmph(event)">';
-  if(S.mpp){
-    html+='<div class="pvw"><img src="'+S.mpp+'" class="pvwimg"><button class="pvrm" onclick="S.mp=null;S.mpp=null;render()">&#10005;</button><div class="pvbdg">&#128247; Ready</div></div>';
-  }else{
-    html+='<button class="phbtn" onclick="document.getElementById(\'mph\').click()">&#128247; Upload Food Photo (optional)</button>';
-  }
-  html+='<textarea class="mta" id="mta" placeholder="Describe what you ate... e.g. 2 eggs, toast, OJ">'+(S.mt||"")+'</textarea>';
-  if(S.ae)html+='<div class="aerr">'+S.ae+'</div>';
-  html+='<div class="fbtns">'+
-    '<button class="cancelbtn" onclick="S.smf=false;S.mt=\'\';S.mp=null;S.mpp=null;S.ae=\'\';render()">Cancel</button>'+
-    '<button class="anlzbtn" onclick="analyze()" '+(S.ld?"disabled":"")+'>'+( S.ld?"Analyzing...":"Analyze + Log")+'</button>'+
-    '</div></div>';
+h+=’<div class="mform"><div class="mhint">Photo, text, or both. Claude fills in your macros.</div>’+
+‘<input type="file" id="mph" accept="image/*" style="display:none" onchange="hmph(event)">’;
+if(S.mpp){
+h+=’<div class="pvw"><img src="'+S.mpp+'" class="pvwimg"><button class="pvrm" onclick="S.mp=null;S.mpp=null;render()">X</button><div class="pvbdg">Photo ready</div></div>’;
+}else{
+h+=’<button class="phbtn" onclick="document.getElementById(\'mph\').click()">📷 Upload Food Photo (optional)</button>’;
+}
+h+=’<textarea class="mta" id="mta" placeholder="Describe what you ate... e.g. grilled chicken, rice, broccoli">’+(S.mt||””)+’</textarea>’;
+if(S.ae){h+=’<div class="aerr">’+S.ae+’</div>’;}
+h+=’<div class="fbtns">’+
+‘<button class="cancelbtn" onclick="S.smf=false;S.mt=\'\';S.mp=null;S.mpp=null;S.ae=\'\';render()">Cancel</button>’+
+‘<button class=“anlzbtn” onclick=“doAnalyze()” ‘+(S.ld?“disabled”:””)+’>’+( S.ld?“Analyzing…”:“Analyze + Log”)+’</button>’+
+‘</div></div>’;
 }
 
-if(day.meals.length===0&&!S.smf){
-  html+='<div class="nomeal">No meals logged yet</div>';
+if(day.meals.length===0&&!S.smf){h+=’<div class="nomeal">No meals logged yet</div>’;}
+
+for(var mi=0;mi<day.meals.length;mi++){
+var m=day.meals[mi];
+h+=’<div class="mi"><div class="mihdr"><div style="flex:1"><div class="miname">’+m.name+’</div>’+(m.input?’<div class="midesc">’+m.input+’</div>’:””)+
+‘</div><button class="mirm" onclick="rmeal('+mi+')">X</button></div>’+
+(m.photoPreview?’<img src="'+m.photoPreview+'" class="miph">’:””)+
+‘<div class="mmacs">’+
+‘<div class="mm"><div class="mmv" style="color:#e8322a">’+m.protein+‘g</div><div class="mml">P</div></div>’+
+‘<div class="mm"><div class="mmv" style="color:#f59e0b">’+m.carbs+‘g</div><div class="mml">C</div></div>’+
+‘<div class="mm"><div class="mmv" style="color:#3b82f6">’+m.fat+‘g</div><div class="mml">F</div></div>’+
+‘<div class="mm"><div class="mmv" style="color:#10b981">’+m.calories+’</div><div class="mml">kcal</div></div>’+
+‘</div></div>’;
 }
-for(var i=0;i<day.meals.length;i++){
-  var m=day.meals[i];
-  html+='<div class="mi">'+
-    '<div class="mihdr"><div style="flex:1"><div class="miname">'+m.name+'</div>'+(m.input?'<div class="midesc">'+m.input+'</div>':"")+
-    '</div><button class="mirm" onclick="rmeal('+i+')">&#10005;</button></div>'+
-    (m.photoPreview?'<img src="'+m.photoPreview+'" class="miph">':"")+
-    '<div class="mmacs">'+
-    '<div class="mm"><div class="mmv" style="color:#e8322a">'+m.protein+'g</div><div class="mml">P</div></div>'+
-    '<div class="mm"><div class="mmv" style="color:#f59e0b">'+m.carbs+'g</div><div class="mml">C</div></div>'+
-    '<div class="mm"><div class="mmv" style="color:#3b82f6">'+m.fat+'g</div><div class="mml">F</div></div>'+
-    '<div class="mm"><div class="mmv" style="color:#10b981">'+m.calories+'</div><div class="mml">kcal</div></div>'+
-    '</div></div>';
-}
-html+='</div>';
+h+=’</div>’;
 
 // WORKOUT
-if(dt!=="Rest"){
-  html+='<div class="card"><div class="slbl">Workout - '+dt+'</div>'+
-    '<button class="woutbtn'+(day.workout.completed?" done":"")+'" onclick="upd(S.ad,function(d){var nd=copyDay(d);nd.workout={completed:!d.workout.completed,rating:d.workout.rating,notes:d.workout.notes};return nd;})">'+
-    (day.workout.completed?"&#10003; Workout Complete":"Mark Workout Done")+'</button>';
-  if(day.workout.completed){
-    html+='<div class="rhint">How did it feel?</div><div class="rrow">';
-    for(var i=0;i<RT.length;i++){
-      var r=RT[i];
-      html+='<button class="rbtn'+(day.workout.rating===r?" on":"")+'" onclick="upd(S.ad,function(d){var nd=copyDay(d);nd.workout={completed:d.workout.completed,rating:\''+r+'\',notes:d.workout.notes};return nd;})">'+r+'</button>';
-    }
-    html+='</div>'+
-      '<textarea class="wnotes" id="wn" placeholder="Log weights, PRs, notes...">'+day.workout.notes+'</textarea>';
-  }
-  html+='</div>';
+if(dt!==“Rest”){
+h+=’<div class="card"><div class="slbl">Workout - ‘+dt+’</div>’+
+‘<button class=“woutbtn’+(day.workout.completed?” done”:””)+’” onclick=“upd(S.ad,function(d){var nd=cpDay(d);nd.workout={completed:!d.workout.completed,rating:d.workout.rating,notes:d.workout.notes};return nd;})”>’+
+(day.workout.completed?“Done!”:“Mark Workout Done”)+’</button>’;
+if(day.workout.completed){
+h+=’<div class="rhint">How did it feel?</div><div class="rrow">’;
+for(var ri=0;ri<RT.length;ri++){
+var rv=RT[ri];
+h+=’<button class=“rbtn’+(day.workout.rating===rv?” on”:””)+’” onclick=“upd(S.ad,function(d){var nd=cpDay(d);nd.workout={completed:d.workout.completed,rating:'’+rv+’',notes:d.workout.notes};return nd;})”>’+rv+’</button>’;
 }
-```
-
+h+=’</div><textarea class="wnotes" id="wn" placeholder="Log weights, PRs, notes...">’+day.workout.notes+’</textarea>’;
+}
+h+=’</div>’;
+}
+return h;
 }
 
-if(S.view===“week”){
+function buildWeek(week){
+var h=””;
+var wkts=0,sumP=0,pdays=0;
+var wts2=[];
+for(var wi=0;wi<7;wi++){
+if(week[wi].workout.completed){wkts++;}
+sumP+=week[wi].totalProtein;
+if(week[wi].totalProtein>=PG){pdays++;}
+wts2.push(parseFloat(week[wi].weight)||0);
+}
+var avgP=Math.round(sumP/7);
+var lwts=[];
+for(var wi=0;wi<wts2.length;wi++){if(wts2[wi]>0){lwts.push(wts2[wi]);}}
+var avgWt=lwts.length?(lwts.reduce(function(a,b){return a+b;},0)/lwts.length).toFixed(1):”–”;
+
+h+=’<div class="wkstats">’+
+‘<div class="wkstat"><div class="wksv" style="color:#e8322a">’+avgP+‘g</div><div class="wkss">Goal ‘+PG+‘g</div><div class="wksl">Avg Protein</div></div>’+
+‘<div class="wkstat"><div class="wksv" style="color:#10b981">’+wkts+’/5</div><div class="wkss">Completed</div><div class="wksl">Workouts</div></div>’+
+‘<div class="wkstat"><div class="wksv" style="color:#f59e0b">’+avgWt+’</div><div class="wkss">lbs avg</div><div class="wksl">Weight</div></div>’+
+‘</div>’;
+
 var maxW=0,minW=9999;
-for(var i=0;i<7;i++){if(wts[i]>0){if(wts[i]>maxW)maxW=wts[i];if(wts[i]<minW)minW=wts[i];}}
+for(var wi=0;wi<7;wi++){if(wts2[wi]>0){if(wts2[wi]>maxW){maxW=wts2[wi];}if(wts2[wi]<minW){minW=wts2[wi];}}}
 if(maxW===0){maxW=1;minW=0;}
-var range=maxW-minW||1;
+var rng=maxW-minW||1;
+
+h+=’<div class="card"><div class="slbl">Weight This Week</div><div class="wchart">’;
+for(var wi=0;wi<7;wi++){
+var wv=wts2[wi];
+var bh=wv>0?Math.max(4,Math.round(((wv-minW)/rng)*36)+4):2;
+h+=’<div class="wbarw"><div class="wbarv">’+(wv>0?wv:””)+’</div>’+
+‘<div class=“wbar” style=“height:’+bh+‘px;background:’+(wv>0?”#f59e0b”:”#1a1a1a”)+’”></div>’+
+‘<div class="wbard">’+DAYS[wi]+’</div></div>’;
+}
+h+=’</div></div>’;
+
+h+=’<div class="card"><div class="slbl">Daily Breakdown</div>’;
+for(var di=0;di<7;di++){
+var wd=week[di];
+var rest=DT[DAYS[di]]===“Rest”;
+h+=’<div class=“drow’+(rest?” rest”:””)+’” onclick=“S.ad=’+di+’;S.view='log';render()”>’+
+‘<div><div class="dname">’+DAYS[di]+’ <span class="dtype">’+DT[DAYS[di]]+’</span></div>’+
+‘<div class="dsub">’+wd.meals.length+’ meals, ‘+wd.water+’ glasses’+(wd.workout.rating?” - “+wd.workout.rating:””)+
+‘</div></div><div class="dright">’+
+‘<div class="dprot" style="color:'+cc2(wd.totalProtein,PG)+'">’+wd.totalProtein+‘g</div>’+
+‘<div class="dcal">’+wd.totalCalories+’ kcal</div>’+
+(wd.weight?’<div class="dwt">’+wd.weight+’ lbs</div>’:””)+
+(wd.workout.completed?’<div class="dtrn">trained</div>’:””)+
+‘</div></div>’;
+}
+h+=’</div>’;
+
+h+=’<div class="card"><div class="slbl">Weekly Check-In</div>’+
+‘<div style="font-size:11px;color:#3a3a3a;margin-bottom:10px">Every Sunday copy this and paste into your chat with Claude.</div>’+
+‘<div class="cbox"><div class="ctitle">WEEKLY CHECK-IN - ‘+wlbl(S.wo)+’</div>’+
+‘<div>Workouts: ‘+wkts+’/5</div>’+
+‘<div>Avg protein: ‘+avgP+‘g (goal: ‘+PG+‘g)</div>’+
+‘<div>Protein days: ‘+pdays+’/7</div>’+
+‘<div>Avg weight: ‘+avgWt+’ lbs</div>’;
+var hasN=false;
+for(var ni=0;ni<7;ni++){
+if(week[ni].workout.notes){h+=’<div class="cnote">’+DAYS[ni]+’: ‘+week[ni].workout.notes+’</div>’;hasN=true;}
+}
+if(!hasN){h+=’<div class="cnote" style="color:#2a2a2a">No notes yet</div>’;}
+h+=’</div><button class=“cpbtn’+(S.cp?” ok”:””)+’” onclick=“doCopy()”>’+(S.cp?“Copied!”:“Copy Check-In”)+’</button></div>’;
+return h;
+}
+
+function render(){
+try{
+var week=gw(S.wo);
+var day=week[S.ad];
+var dt=DT[DAYS[S.ad]];
+var h=””;
 
 ```
-html+='<div class="wkstats">'+
-  '<div class="wkstat"><div class="wksv" style="color:#e8322a">'+avgP+'g</div><div class="wkss">Goal '+PG+'g</div><div class="wksl">Avg Protein</div></div>'+
-  '<div class="wkstat"><div class="wksv" style="color:#10b981">'+wkts+'/5</div><div class="wkss">Completed</div><div class="wksl">Workouts</div></div>'+
-  '<div class="wkstat"><div class="wksv" style="color:#f59e0b">'+avgWt+'</div><div class="wkss">lbs avg</div><div class="wksl">Weight</div></div>'+
+// HEADER
+h+='<div class="hdr"><div class="hlbl">Daily Tracker</div>'+
+  '<div class="hrow"><div class="htitle">'+wlbl(S.wo)+'</div>'+
+  '<div class="navb">'+
+  '<button class="nbtn" onclick="S.wo--;render()">&#8249;</button>'+
+  '<button class="nbtn" onclick="S.wo++;render()">&#8250;</button>'+
+  '</div></div>'+
+  (S.wo!==0?'<button class="bklnk" onclick="S.wo=0;render()">&#8592; Current week</button>':"")+
   '</div>';
 
-html+='<div class="card"><div class="slbl">Weight This Week</div><div class="wchart">';
-for(var i=0;i<7;i++){
-  var w=wts[i];
-  var h=w>0?Math.max(4,Math.round(((w-minW)/range)*36)+4):2;
-  html+='<div class="wbarw"><div class="wbarv">'+(w>0?w:"")+'</div>'+
-    '<div class="wbar" style="height:'+h+'px;background:'+(w>0?"#f59e0b":"#1a1a1a")+'"></div>'+
-    '<div class="wbard">'+DAYS[i]+'</div></div>';
+// TABS
+h+='<div class="tabs">';
+for(var ti=0;ti<7;ti++){
+  var dn=DAYS[ti];
+  var rest=DT[dn]==="Rest";
+  var act=ti===S.ad;
+  var today=S.wo===0&&ti===0;
+  h+='<div class="tab'+(act?" on":"")+(rest?" rest":"")+(today&&!act?" today":"")+'" onclick="S.ad='+ti+';render()">';
+  h+='<div class="tday">'+dn+'</div><div class="ttype">'+DT[dn]+'</div>';
+  if(week[ti].workout.completed){h+='<div class="tdone">done</div>';}
+  h+='</div>';
 }
-html+='</div></div>';
+h+='</div>';
 
-html+='<div class="card"><div class="slbl">Daily Breakdown</div>';
-for(var i=0;i<7;i++){
-  var wd=week[i];
-  var rest=DT[DAYS[i]]==="Rest";
-  html+='<div class="drow'+(rest?" rest":"")+'" onclick="S.ad='+i+';S.view=\'log\';render()">'+
-    '<div><div class="dname">'+DAYS[i]+' <span class="dtype">'+DT[DAYS[i]]+'</span></div>'+
-    '<div class="dsub">'+wd.meals.length+' meals, '+wd.water+' glasses'+(wd.workout.rating?" - "+wd.workout.rating:"")+
-    '</div></div>'+
-    '<div class="dright">'+
-    '<div class="dprot" style="color:'+cc2(wd.totalProtein,PG)+'">'+wd.totalProtein+'g</div>'+
-    '<div class="dcal">'+wd.totalCalories+' kcal</div>'+
-    (wd.weight?'<div class="dwt">'+wd.weight+' lbs</div>':"")+
-    (wd.workout.completed?'<div class="dtrn">&#10003; trained</div>':"")+
-    '</div></div>';
-}
-html+='</div>';
-
-html+='<div class="card"><div class="slbl">Weekly Check-In</div>'+
-  '<div style="font-size:11px;color:#3a3a3a;margin-bottom:10px">Every Sunday copy this and paste into your chat with Claude for your weekly review.</div>'+
-  '<div class="cbox">'+
-  '<div class="ctitle">WEEKLY CHECK-IN - '+wlbl(S.wo)+'</div>'+
-  '<div>Workouts: '+wkts+'/5</div>'+
-  '<div>Avg protein: '+avgP+'g (goal: '+PG+'g)</div>'+
-  '<div>Protein goal days: '+pdays+'/7</div>'+
-  '<div>Avg calories: '+avgCal+'</div>'+
-  '<div>Avg weight: '+avgWt+' lbs</div>'+
-  '<div style="margin-top:6px">Session notes:</div>';
-var hasNotes=false;
-for(var i=0;i<7;i++){
-  if(week[i].workout.notes){
-    html+='<div class="cnote">'+DAYS[i]+': '+week[i].workout.notes+'</div>';
-    hasNotes=true;
-  }
-}
-if(!hasNotes)html+='<div class="cnote" style="color:#2a2a2a">None logged yet</div>';
-html+='</div>'+
-  '<button class="cpbtn'+(S.cp?" ok":"")+'" onclick="cpclick()">'+(S.cp?"&#10003; Copied!":"Copy Check-In")+'</button>'+
+// VIEW TOGGLE
+h+='<div class="vtog">'+
+  '<button class="vbtn'+(S.view==="log"?" on":"")+'" onclick="S.view=\'log\';render()">Daily Log</button>'+
+  '<button class="vbtn'+(S.view==="week"?" on":"")+'" onclick="S.view=\'week\';render()">Week Summary</button>'+
   '</div>';
-```
 
-}
+h+='<div class="pg">';
+if(S.view==="log"){h+=buildLog(week,day,dt);}
+else{h+=buildWeek(week);}
+h+='</div>';
 
-html+=’</div>’;
+document.getElementById("root").innerHTML=h;
 
-document.getElementById(“root”).innerHTML=html;
+var ta=document.getElementById("mta");
+if(ta){ta.addEventListener("input",function(e){S.mt=e.target.value;});}
 
-var ta=document.getElementById(“mta”);
-if(ta){ta.addEventListener(“input”,function(e){S.mt=e.target.value;});}
-var wn=document.getElementById(“wn”);
+var wn=document.getElementById("wn");
 if(wn){
-wn.addEventListener(“blur”,function(e){
-upd(S.ad,function(d){
-var nd=copyDay(d);
-nd.workout={completed:d.workout.completed,rating:d.workout.rating,notes:e.target.value};
-return nd;
-});
-});
+  wn.addEventListener("blur",function(e){
+    upd(S.ad,function(d){
+      var nd=cpDay(d);
+      nd.workout={completed:d.workout.completed,rating:d.workout.rating,notes:e.target.value};
+      return nd;
+    });
+  });
+}
+
+var wi=document.getElementById("winp");
+if(wi){
+  wi.addEventListener("blur",function(e){
+    upd(S.ad,function(d){var nd=cpDay(d);nd.weight=e.target.value;return nd;});
+  });
+}
+```
+
+}catch(ex){
+document.getElementById(“root”).innerHTML=’<div style="color:#e8322a;padding:20px;font-size:13px;">Error: ‘+ex.message+’<br><br>’+ex.stack+’</div>’;
 }
 }
 
