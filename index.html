@@ -152,9 +152,24 @@ function handleMealPhoto(e) {
   if (!file) return;
   var reader = new FileReader();
   reader.onload = function() {
-    state.mealPhoto = reader.result.split(",")[1];
-    state.mealPhotoPreview = reader.result;
-    draw();
+    var img = new Image();
+    img.onload = function() {
+      var canvas = document.createElement('canvas');
+      var maxDim = 800;
+      var w = img.width, h = img.height;
+      if (w > maxDim || h > maxDim) {
+        if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+        else { w = Math.round(w * maxDim / h); h = maxDim; }
+      }
+      canvas.width = w; canvas.height = h;
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      var compressed = canvas.toDataURL('image/jpeg', 0.7);
+      state.mealPhoto = compressed.split(",")[1];
+      state.mealPhotoPreview = compressed;
+      draw();
+    };
+    img.src = reader.result;
   };
   reader.readAsDataURL(file);
 }
