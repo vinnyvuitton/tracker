@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -33,9 +32,9 @@ window.onerror = function(msg, src, line, col, err) {
   return true;
 };
 
-var DAYS = [“Sun”,“Mon”,“Tue”,“Wed”,“Thu”,“Fri”,“Sat”];
-var DAY_TYPES = {Sun:“Rest”,Mon:“Upper A”,Tue:“Lower+Abs”,Wed:“Cardio”,Thu:“Upper B”,Fri:“Lower+Abs”,Sat:“Rest”};
-var RATINGS = [“Brutal”,“Hard”,“Solid”,“Okay”,“Easy”];
+var DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+var DAY_TYPES = {Sun:"Rest",Mon:"Upper A",Tue:"Lower+Abs",Wed:"Cardio",Thu:"Upper B",Fri:"Lower+Abs",Sat:"Rest"};
+var RATINGS = ["Brutal","Hard","Solid","Okay","Easy"];
 var PROTEIN_GOAL = 140;
 var CALORIE_GOAL = 1900;
 var WATER_GOAL = 10;
@@ -43,459 +42,452 @@ var WEEK_START = new Date(2026, 2, 22).getTime();
 
 var allWeeks = {};
 var state = {
-weekOffset: 0,
-activeDay: 0,
-view: “log”,
-showMealForm: false,
-mealText: “”,
-mealPhoto: null,
-mealPhotoPreview: null,
-loading: false,
-error: “”,
-copied: false
+  weekOffset: 0,
+  activeDay: 0,
+  view: "log",
+  showMealForm: false,
+  mealText: "",
+  mealPhoto: null,
+  mealPhotoPreview: null,
+  loading: false,
+  error: "",
+  copied: false
 };
 
 function getWeekLabel(offset) {
-var months = [“Jan”,“Feb”,“Mar”,“Apr”,“May”,“Jun”,“Jul”,“Aug”,“Sep”,“Oct”,“Nov”,“Dec”];
-var start = new Date(WEEK_START + offset * 7 * 86400000);
-var end = new Date(start.getTime() + 6 * 86400000);
-return months[start.getMonth()] + “ “ + start.getDate() + “ - “ + months[end.getMonth()] + “ “ + end.getDate();
+  var months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  var start = new Date(WEEK_START + offset * 7 * 86400000);
+  var end = new Date(start.getTime() + 6 * 86400000);
+  return months[start.getMonth()] + " " + start.getDate() + " - " + months[end.getMonth()] + " " + end.getDate();
 }
 
 function newDay() {
-return {
-meals: [], water: 0, weight: “”,
-photoFront: null, photoSide: null,
-workout: { completed: false, rating: “”, notes: “” },
-p: 0, cal: 0, carbs: 0, fat: 0
-};
+  return {
+    meals: [], water: 0, weight: "",
+    photoFront: null, photoSide: null,
+    workout: { completed: false, rating: "", notes: "" },
+    p: 0, cal: 0, carbs: 0, fat: 0
+  };
 }
 
 function getWeek(offset) {
-if (!allWeeks[offset]) {
-allWeeks[offset] = [];
-for (var i = 0; i < 7; i++) { allWeeks[offset].push(newDay()); }
-}
-return allWeeks[offset];
+  if (!allWeeks[offset]) {
+    allWeeks[offset] = [];
+    for (var i = 0; i < 7; i++) { allWeeks[offset].push(newDay()); }
+  }
+  return allWeeks[offset];
 }
 
 function saveData() {
-try { localStorage.setItem(“mytracker”, JSON.stringify(allWeeks)); } catch(e) {}
+  try { localStorage.setItem("mytracker", JSON.stringify(allWeeks)); } catch(e) {}
 }
 
 function loadData() {
-try {
-var raw = localStorage.getItem(“mytracker”);
-if (raw) { allWeeks = JSON.parse(raw); }
-} catch(e) {}
+  try {
+    var raw = localStorage.getItem("mytracker");
+    if (raw) { allWeeks = JSON.parse(raw); }
+  } catch(e) {}
 }
 
 function getDay() { return getWeek(state.weekOffset)[state.activeDay]; }
 
 function setDay(fn) {
-var week = getWeek(state.weekOffset);
-week[state.activeDay] = fn(week[state.activeDay]);
-saveData();
-draw();
+  var week = getWeek(state.weekOffset);
+  week[state.activeDay] = fn(week[state.activeDay]);
+  saveData();
+  draw();
 }
 
 function handleProgressPhoto(e, side) {
-var file = e.target.files[0];
-if (!file) return;
-var reader = new FileReader();
-reader.onload = function() {
-setDay(function(d) {
-var nd = JSON.parse(JSON.stringify(d));
-if (side === “front”) nd.photoFront = reader.result;
-else nd.photoSide = reader.result;
-return nd;
-});
-};
-reader.readAsDataURL(file);
+  var file = e.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function() {
+    setDay(function(d) {
+      var nd = JSON.parse(JSON.stringify(d));
+      if (side === "front") nd.photoFront = reader.result;
+      else nd.photoSide = reader.result;
+      return nd;
+    });
+  };
+  reader.readAsDataURL(file);
 }
 
 function removeProgressPhoto(side) {
-setDay(function(d) {
-var nd = JSON.parse(JSON.stringify(d));
-if (side === “front”) nd.photoFront = null;
-else nd.photoSide = null;
-return nd;
-});
+  setDay(function(d) {
+    var nd = JSON.parse(JSON.stringify(d));
+    if (side === "front") nd.photoFront = null;
+    else nd.photoSide = null;
+    return nd;
+  });
 }
 
 function handleMealPhoto(e) {
-var file = e.target.files[0];
-if (!file) return;
-var reader = new FileReader();
-reader.onload = function() {
-state.mealPhoto = reader.result.split(”,”)[1];
-state.mealPhotoPreview = reader.result;
-draw();
-};
-reader.readAsDataURL(file);
+  var file = e.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function() {
+    state.mealPhoto = reader.result.split(",")[1];
+    state.mealPhotoPreview = reader.result;
+    draw();
+  };
+  reader.readAsDataURL(file);
 }
 
 function analyzeMeal() {
-var ta = document.getElementById(“meal-ta”);
-if (ta) state.mealText = ta.value;
-if (!state.mealText && !state.mealPhoto) return;
-state.loading = true; state.error = “”; draw();
-var content = [];
-if (state.mealPhoto) {
-content.push({ type: “image”, source: { type: “base64”, media_type: “image/jpeg”, data: state.mealPhoto } });
-}
-var prompt = state.mealPhoto
-? “Analyze this food photo” + (state.mealText ? “ plus: “ + state.mealText : “”) + “. Return ONLY valid JSON no markdown: {"name":"meal name","protein":25,"carbs":30,"fat":10,"calories":300}”
-: “Analyze: “ + state.mealText + “. Return ONLY valid JSON no markdown: {"name":"meal name","protein":25,"carbs":30,"fat":10,"calories":300}”;
-content.push({ type: “text”, text: prompt });
-fetch(“https://api.anthropic.com/v1/messages”, {
-method: “POST”,
-headers: { “Content-Type”: “application/json” },
-body: JSON.stringify({ model: “claude-sonnet-4-20250514”, max_tokens: 300, messages: [{ role: “user”, content: content }] })
-})
-.then(function(r) { return r.json(); })
-.then(function(data) {
-var txt = “”;
-if (data.content) {
-for (var i = 0; i < data.content.length; i++) {
-if (data.content[i].type === “text”) { txt = data.content[i].text; break; }
-}
-}
-txt = txt.replace(/`json/g, "").replace(/`/g, “”).trim();
-var parsed = JSON.parse(txt);
-var prev = state.mealPhotoPreview;
-var inp = state.mealText;
-setDay(function(d) {
-var nd = JSON.parse(JSON.stringify(d));
-nd.meals.push({ name: parsed.name || “Meal”, protein: parsed.protein || 0, carbs: parsed.carbs || 0, fat: parsed.fat || 0, calories: parsed.calories || 0, input: inp, photo: prev });
-nd.p += parsed.protein || 0;
-nd.cal += parsed.calories || 0;
-nd.carbs += parsed.carbs || 0;
-nd.fat += parsed.fat || 0;
-return nd;
-});
-state.mealText = “”; state.mealPhoto = null; state.mealPhotoPreview = null;
-state.showMealForm = false; state.loading = false; state.error = “”;
-draw();
-})
-.catch(function() {
-state.loading = false; state.error = “Could not analyze. Try again.”; draw();
-});
+  var ta = document.getElementById("meal-ta");
+  if (ta) state.mealText = ta.value;
+  if (!state.mealText && !state.mealPhoto) return;
+  state.loading = true; state.error = ""; draw();
+  var content = [];
+  if (state.mealPhoto) {
+    content.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: state.mealPhoto } });
+  }
+  var prompt = state.mealPhoto
+    ? "Analyze this food photo" + (state.mealText ? " plus: " + state.mealText : "") + ". Return ONLY valid JSON no markdown: {\"name\":\"meal name\",\"protein\":25,\"carbs\":30,\"fat\":10,\"calories\":300}"
+    : "Analyze: " + state.mealText + ". Return ONLY valid JSON no markdown: {\"name\":\"meal name\",\"protein\":25,\"carbs\":30,\"fat\":10,\"calories\":300}";
+  content.push({ type: "text", text: prompt });
+  fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 300, messages: [{ role: "user", content: content }] })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    var txt = "";
+    if (data.content) {
+      for (var i = 0; i < data.content.length; i++) {
+        if (data.content[i].type === "text") { txt = data.content[i].text; break; }
+      }
+    }
+    txt = txt.replace(/```json/g, "").replace(/```/g, "").trim();
+    var parsed = JSON.parse(txt);
+    var prev = state.mealPhotoPreview;
+    var inp = state.mealText;
+    setDay(function(d) {
+      var nd = JSON.parse(JSON.stringify(d));
+      nd.meals.push({ name: parsed.name || "Meal", protein: parsed.protein || 0, carbs: parsed.carbs || 0, fat: parsed.fat || 0, calories: parsed.calories || 0, input: inp, photo: prev });
+      nd.p += parsed.protein || 0;
+      nd.cal += parsed.calories || 0;
+      nd.carbs += parsed.carbs || 0;
+      nd.fat += parsed.fat || 0;
+      return nd;
+    });
+    state.mealText = ""; state.mealPhoto = null; state.mealPhotoPreview = null;
+    state.showMealForm = false; state.loading = false; state.error = "";
+    draw();
+  })
+  .catch(function() {
+    state.loading = false; state.error = "Could not analyze. Try again."; draw();
+  });
 }
 
 function removeMeal(idx) {
-setDay(function(d) {
-var nd = JSON.parse(JSON.stringify(d));
-var m = nd.meals[idx];
-nd.meals.splice(idx, 1);
-nd.p -= m.protein || 0;
-nd.cal -= m.calories || 0;
-nd.carbs -= m.carbs || 0;
-nd.fat -= m.fat || 0;
-return nd;
-});
+  setDay(function(d) {
+    var nd = JSON.parse(JSON.stringify(d));
+    var m = nd.meals[idx];
+    nd.meals.splice(idx, 1);
+    nd.p -= m.protein || 0;
+    nd.cal -= m.calories || 0;
+    nd.carbs -= m.carbs || 0;
+    nd.fat -= m.fat || 0;
+    return nd;
+  });
 }
 
 function copyCheckin() {
-var week = getWeek(state.weekOffset);
-var lines = [“WEEKLY CHECK-IN - “ + getWeekLabel(state.weekOffset)];
-var totalP = 0, workouts = 0, proteinDays = 0, weights = [];
-for (var i = 0; i < 7; i++) {
-totalP += week[i].p;
-if (week[i].workout.completed) workouts++;
-if (week[i].p >= PROTEIN_GOAL) proteinDays++;
-if (week[i].weight) weights.push(parseFloat(week[i].weight));
-}
-lines.push(“Workouts: “ + workouts + “/5”);
-lines.push(“Avg protein: “ + Math.round(totalP / 7) + “g (goal: “ + PROTEIN_GOAL + “g)”);
-lines.push(“Protein goal days: “ + proteinDays + “/7”);
-if (weights.length) {
-var sum = 0; for (var i = 0; i < weights.length; i++) sum += weights[i];
-lines.push(“Avg weight: “ + (sum / weights.length).toFixed(1) + “ lbs”);
-}
-var notes = [];
-for (var i = 0; i < 7; i++) {
-if (week[i].workout.notes) notes.push(DAYS[i] + “: “ + week[i].workout.notes);
-}
-if (notes.length) lines.push(“Notes: “ + notes.join(” | “));
-navigator.clipboard.writeText(lines.join(”\n”)).then(function() {
-state.copied = true; draw();
-setTimeout(function() { state.copied = false; draw(); }, 2500);
-}).catch(function() { alert(lines.join(”\n”)); });
+  var week = getWeek(state.weekOffset);
+  var lines = ["WEEKLY CHECK-IN - " + getWeekLabel(state.weekOffset)];
+  var totalP = 0, workouts = 0, proteinDays = 0, weights = [];
+  for (var i = 0; i < 7; i++) {
+    totalP += week[i].p;
+    if (week[i].workout.completed) workouts++;
+    if (week[i].p >= PROTEIN_GOAL) proteinDays++;
+    if (week[i].weight) weights.push(parseFloat(week[i].weight));
+  }
+  lines.push("Workouts: " + workouts + "/5");
+  lines.push("Avg protein: " + Math.round(totalP / 7) + "g (goal: " + PROTEIN_GOAL + "g)");
+  lines.push("Protein goal days: " + proteinDays + "/7");
+  if (weights.length) {
+    var sum = 0; for (var i = 0; i < weights.length; i++) sum += weights[i];
+    lines.push("Avg weight: " + (sum / weights.length).toFixed(1) + " lbs");
+  }
+  var notes = [];
+  for (var i = 0; i < 7; i++) {
+    if (week[i].workout.notes) notes.push(DAYS[i] + ": " + week[i].workout.notes);
+  }
+  if (notes.length) lines.push("Notes: " + notes.join(" | "));
+  navigator.clipboard.writeText(lines.join("\n")).then(function() {
+    state.copied = true; draw();
+    setTimeout(function() { state.copied = false; draw(); }, 2500);
+  }).catch(function() { alert(lines.join("\n")); });
 }
 
 function draw() {
-var week = getWeek(state.weekOffset);
-var day = getDay();
-var dayType = DAY_TYPES[DAYS[state.activeDay]];
-var html = “”;
+  var week = getWeek(state.weekOffset);
+  var day = getDay();
+  var dayType = DAY_TYPES[DAYS[state.activeDay]];
+  var html = "";
 
-html += “<div style='padding:44px 20px 12px;background:#0d0d0d;border-bottom:1px solid #1c1c1c;position:sticky;top:0;z-index:100'>”;
-html += “<div style='font-size:9px;letter-spacing:3px;color:#e8322a;text-transform:uppercase;margin-bottom:2px'>Daily Tracker</div>”;
-html += “<div style='display:flex;justify-content:space-between;align-items:center'>”;
-html += “<div style='font-size:18px;font-weight:700;color:#f0ede8'>” + getWeekLabel(state.weekOffset) + “</div>”;
-html += “<div style='display:flex;gap:5px'>”;
-html += “<button class='btn-dark' style='width:28px;height:28px;padding:0;font-size:16px' onclick='state.weekOffset--;draw()'>‹</button>”;
-html += “<button class='btn-dark' style='width:28px;height:28px;padding:0;font-size:16px' onclick='state.weekOffset++;draw()'>›</button>”;
-html += “</div></div>”;
-if (state.weekOffset !== 0) html += “<button onclick='state.weekOffset=0;draw()' style='background:none;border:none;color:#e8322a;font-size:10px;padding:3px 0 0;cursor:pointer'>← Current week</button>”;
-html += “</div>”;
-
-html += “<div style='display:flex;gap:5px;padding:10px 20px;overflow-x:auto;background:#0d0d0d;border-bottom:1px solid #1c1c1c;scrollbar-width:none'>”;
-for (var i = 0; i < 7; i++) {
-var d = DAYS[i];
-var isRest = DAY_TYPES[d] === “Rest”;
-var isActive = i === state.activeDay;
-var isToday = state.weekOffset === 0 && i === 0;
-html += “<div onclick='state.activeDay=" + i + ";draw()' style='flex-shrink:0;border-radius:10px;padding:6px 10px;text-align:center;cursor:pointer;border:1px solid " + (isActive ? "#e8322a" : (isToday ? "rgba(232,50,42,0.3)" : "#1c1c1c")) + ";background:" + (isActive ? "#e8322a" : "#121212") + ";opacity:" + (isRest ? "0.4" : "1") + "'>”;
-html += “<div style='font-size:8px;letter-spacing:1px;text-transform:uppercase;color:" + (isActive ? "rgba(255,255,255,0.5)" : "#3a3a3a") + ";margin-bottom:1px'>” + d + “</div>”;
-html += “<div style='font-size:10px;font-weight:600;color:" + (isActive ? "#fff" : "#888") + "'>” + DAY_TYPES[d] + “</div>”;
-if (week[i].workout.completed) html += “<div style='font-size:7px;color:" + (isActive ? "rgba(255,255,255,0.7)" : "#e8322a") + ";margin-top:2px'>done</div>”;
-html += “</div>”;
-}
-html += “</div>”;
-
-html += “<div style='display:flex;gap:6px;padding:12px 20px 0'>”;
-html += “<button onclick='state.view=\"log\";draw()' style='background:" + (state.view === "log" ? "#181818" : "transparent") + ";border:1px solid " + (state.view === "log" ? "#252525" : "#181818") + ";border-radius:8px;padding:5px 14px;color:" + (state.view === "log" ? "#f0ede8" : "#3a3a3a") + ";font-size:11px;font-weight:" + (state.view === "log" ? "600" : "400") + ";cursor:pointer'>Daily Log</button>”;
-html += “<button onclick='state.view=\"week\";draw()' style='background:" + (state.view === "week" ? "#181818" : "transparent") + ";border:1px solid " + (state.view === "week" ? "#252525" : "#181818") + ";border-radius:8px;padding:5px 14px;color:" + (state.view === "week" ? "#f0ede8" : "#3a3a3a") + ";font-size:11px;font-weight:" + (state.view === "week" ? "600" : "400") + ";cursor:pointer'>Week Summary</button>”;
-html += “</div>”;
-
-html += “<div style='padding:12px 20px 0'>”;
-
-if (state.view === “log”) {
-
-```
-html += "<div class='card'><div class='lbl'>Daily Weight &amp; Progress</div>";
-html += "<div style='display:flex;align-items:center;gap:10px;margin-bottom:4px'>";
-html += "<input type='number' id='weight-input' step='0.1' min='50' max='500' placeholder='0.0' value='" + (day.weight || "") + "' style='width:120px;font-size:22px;font-weight:700;text-align:center'>";
-html += "<span style='font-size:14px;color:#555'>lbs</span></div>";
-if (day.weight) html += "<div style='font-size:10px;color:#10b981;margin-bottom:10px'>Logged!</div>";
-html += "<div style='font-size:9px;letter-spacing:2px;color:#444;text-transform:uppercase;margin:12px 0 10px'>Progress Photos</div>";
-html += "<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px'>";
-html += "<input type='file' id='photo-front' accept='image/*' style='display:none' onchange='handleProgressPhoto(event,\"front\")'>";
-html += "<input type='file' id='photo-side' accept='image/*' style='display:none' onchange='handleProgressPhoto(event,\"side\")'>";
-
-var sides = ["front", "side"];
-for (var si = 0; si < 2; si++) {
-  var sn = sides[si];
-  var sp = sn === "front" ? day.photoFront : day.photoSide;
-  if (sp) {
-    html += "<div style='position:relative;aspect-ratio:3/4;border-radius:10px;overflow:hidden;border:1px solid #1c1c1c'>";
-    html += "<img src='" + sp + "' style='width:100%;height:100%;object-fit:cover;display:block'>";
-    html += "<button onclick='removeProgressPhoto(\"" + sn + "\")' style='position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.75);border:none;border-radius:50%;width:24px;height:24px;color:#fff;font-size:11px;cursor:pointer'>X</button>";
-    html += "<div style='position:absolute;bottom:6px;left:0;right:0;text-align:center;font-size:9px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:1px'>" + sn + "</div></div>";
-  } else {
-    html += "<div onclick='document.getElementById(\"photo-" + sn + "\").click()' style='aspect-ratio:3/4;background:#0c0c0c;border:1px dashed #252525;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;padding:12px'>";
-    html += "<div style='font-size:22px;margin-bottom:6px'>&#128247;</div>";
-    html += "<div style='font-size:10px;color:#444;text-align:center'>" + (sn.charAt(0).toUpperCase() + sn.slice(1)) + " View<br><span style='color:#2a2a2a;font-size:9px'>tap to add</span></div></div>";
-  }
-}
-html += "</div></div>";
-
-html += "<div class='card'><div class='lbl'>Today's Macros</div>";
-var protPct = Math.min(day.p / PROTEIN_GOAL * 100, 100);
-html += "<div style='display:flex;align-items:center;gap:14px;margin-bottom:14px'>";
-var sz = 64, sw = 6, r = (sz - sw * 2) / 2, circ = 2 * Math.PI * r, off = circ * (1 - protPct / 100);
-html += "<div style='position:relative;display:flex;align-items:center;justify-content:center;flex-shrink:0'>";
-html += "<svg width='" + sz + "' height='" + sz + "' style='transform:rotate(-90deg)'>";
-html += "<circle cx='" + sz/2 + "' cy='" + sz/2 + "' r='" + r + "' fill='none' stroke='#181818' stroke-width='" + sw + "'/>";
-html += "<circle cx='" + sz/2 + "' cy='" + sz/2 + "' r='" + r + "' fill='none' stroke='#e8322a' stroke-width='" + sw + "' stroke-dasharray='" + circ + "' stroke-dashoffset='" + off + "' stroke-linecap='round'/></svg>";
-html += "<div style='position:absolute;text-align:center'><div style='font-size:12px;font-weight:700;color:#f0ede8'>" + day.p + "g</div><div style='font-size:7px;color:#444'>protein</div></div></div>";
-html += "<div style='flex:1'>";
-var bars = [["Protein", day.p, PROTEIN_GOAL, "#e8322a"], ["Carbs", day.carbs, 250, "#f59e0b"], ["Fat", day.fat, 70, "#3b82f6"], ["Calories", day.cal, CALORIE_GOAL, "#10b981"]];
-for (var bi = 0; bi < bars.length; bi++) {
-  var bl = bars[bi];
-  var bp = Math.min(bl[1] / bl[2] * 100, 100);
-  var bu = bl[0] === "Calories" ? "" : "g";
-  html += "<div style='margin-bottom:7px'><div style='display:flex;justify-content:space-between;font-size:10px;color:#555;margin-bottom:3px'><span>" + bl[0] + "</span><span style='color:#999'>" + bl[1] + bu + " / " + bl[2] + bu + "</span></div>";
-  html += "<div style='background:#181818;border-radius:3px;height:4px'><div style='width:" + bp + "%;background:" + bl[3] + ";height:100%;border-radius:3px'></div></div></div>";
-}
-html += "</div></div>";
-html += "<div style='display:grid;grid-template-columns:repeat(4,1fr);gap:6px'>";
-var chips = [["Protein", day.p + "g", "#e8322a"], ["Carbs", day.carbs + "g", "#f59e0b"], ["Fat", day.fat + "g", "#3b82f6"], ["Calories", day.cal, "#10b981"]];
-for (var ci = 0; ci < chips.length; ci++) {
-  html += "<div style='background:#0c0c0c;border-radius:8px;padding:8px 4px;text-align:center'><div style='font-size:13px;font-weight:700;color:" + chips[ci][2] + "'>" + chips[ci][1] + "</div><div style='font-size:8px;color:#383838;margin-top:1px'>" + chips[ci][0] + "</div></div>";
-}
-html += "</div></div>";
-
-html += "<div class='card'>";
-html += "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px'>";
-html += "<div><div class='lbl'>Water</div><div style='font-size:16px;font-weight:700;color:#3b82f6'>" + day.water + " / " + WATER_GOAL + " glasses</div></div>";
-html += "<div style='display:flex;gap:6px'>";
-html += "<button onclick='setDay(function(d){var nd=JSON.parse(JSON.stringify(d));nd.water=Math.max(0,d.water-1);return nd;})' style='background:#181818;border:1px solid #252525;color:#888;border-radius:8px;width:32px;height:32px;font-size:16px;padding:0;cursor:pointer'>-</button>";
-html += "<button onclick='setDay(function(d){var nd=JSON.parse(JSON.stringify(d));nd.water=Math.min(" + WATER_GOAL + ",d.water+1);return nd;})' style='background:#3b82f6;border:none;color:#fff;border-radius:8px;width:32px;height:32px;font-size:16px;padding:0;cursor:pointer'>+</button>";
-html += "</div></div><div style='display:flex;gap:4px'>";
-for (var wi = 0; wi < WATER_GOAL; wi++) {
-  html += "<div onclick='setDay(function(d){var nd=JSON.parse(JSON.stringify(d));nd.water=" + (wi + 1) + ";return nd;})' style='flex:1;height:6px;border-radius:3px;background:" + (wi < day.water ? "#3b82f6" : "#181818") + ";cursor:pointer'></div>";
-}
-html += "</div></div>";
-
-html += "<div class='card'>";
-html += "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:12px'>";
-html += "<div class='lbl' style='margin:0'>Meals</div>";
-html += "<button class='btn-red' onclick='state.showMealForm=true;draw()'>+ Add Meal</button></div>";
-
-if (state.showMealForm) {
-  html += "<div style='background:#0c0c0c;border-radius:10px;padding:14px;margin-bottom:12px;border:1px solid #1a1a1a'>";
-  html += "<div style='font-size:11px;color:#555;margin-bottom:10px'>Upload a photo, describe your meal, or both. Claude fills in the macros.</div>";
-  html += "<input type='file' id='meal-photo-input' accept='image/*' style='display:none' onchange='handleMealPhoto(event)'>";
-  if (state.mealPhotoPreview) {
-    html += "<div style='position:relative;margin-bottom:10px'><img src='" + state.mealPhotoPreview + "' style='width:100%;max-height:150px;object-fit:cover;border-radius:8px;display:block'>";
-    html += "<button onclick='state.mealPhoto=null;state.mealPhotoPreview=null;draw()' style='position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.75);border:none;border-radius:50%;width:24px;height:24px;color:#fff;font-size:12px;cursor:pointer'>X</button>";
-    html += "<div style='position:absolute;bottom:6px;left:8px;background:#10b981;border-radius:4px;padding:2px 8px;font-size:9px;color:#fff'>Photo ready</div></div>";
-  } else {
-    html += "<button onclick='document.getElementById(\"meal-photo-input\").click()' style='width:100%;background:#111;border:1px dashed #252525;border-radius:8px;padding:10px 0;color:#444;font-size:12px;cursor:pointer;margin-bottom:10px'>&#128247; Upload Food Photo (optional)</button>";
-  }
-  html += "<textarea id='meal-ta' placeholder='Describe what you ate... e.g. grilled chicken, rice, broccoli' style='width:100%;height:60px;resize:none;margin-bottom:8px;display:block'>" + (state.mealText || "") + "</textarea>";
-  if (state.error) html += "<div style='color:#e8322a;font-size:11px;margin-bottom:8px'>" + state.error + "</div>";
-  html += "<div style='display:flex;gap:8px'>";
-  html += "<button onclick='state.showMealForm=false;state.mealText=\"\";state.mealPhoto=null;state.mealPhotoPreview=null;state.error=\"\";draw()' style='flex:1;background:transparent;border:1px solid #252525;border-radius:8px;color:#555;font-size:12px;padding:8px 0;cursor:pointer'>Cancel</button>";
-  html += "<button onclick='analyzeMeal()' " + (state.loading ? "disabled" : "") + " style='flex:2;background:" + (state.loading ? "#252525" : "#e8322a") + ";border:none;border-radius:8px;color:#fff;font-size:12px;font-weight:600;padding:8px 0;cursor:pointer'>" + (state.loading ? "Analyzing..." : "Analyze + Log") + "</button>";
-  html += "</div></div>";
-}
-
-if (day.meals.length === 0 && !state.showMealForm) {
-  html += "<div style='text-align:center;color:#2a2a2a;font-size:12px;padding:14px 0'>No meals logged yet</div>";
-}
-
-for (var mi = 0; mi < day.meals.length; mi++) {
-  var m = day.meals[mi];
-  html += "<div style='background:#0c0c0c;border-radius:10px;padding:12px;margin-bottom:8px;border:1px solid #181818'>";
-  html += "<div style='display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px'>";
-  html += "<div style='flex:1'><div style='font-size:13px;color:#f0ede8;font-weight:500'>" + m.name + "</div>";
-  if (m.input) html += "<div style='font-size:10px;color:#3a3a3a;margin-top:1px'>" + m.input + "</div>";
-  html += "</div><button onclick='removeMeal(" + mi + ")' style='background:none;border:none;color:#2a2a2a;font-size:13px;padding:0;margin-left:8px;cursor:pointer'>X</button></div>";
-  if (m.photo) html += "<img src='" + m.photo + "' style='width:100%;max-height:90px;object-fit:cover;border-radius:6px;margin-bottom:8px;display:block'>";
+  html += "<div style='padding:44px 20px 12px;background:#0d0d0d;border-bottom:1px solid #1c1c1c;position:sticky;top:0;z-index:100'>";
+  html += "<div style='font-size:9px;letter-spacing:3px;color:#e8322a;text-transform:uppercase;margin-bottom:2px'>Daily Tracker</div>";
+  html += "<div style='display:flex;justify-content:space-between;align-items:center'>";
+  html += "<div style='font-size:18px;font-weight:700;color:#f0ede8'>" + getWeekLabel(state.weekOffset) + "</div>";
   html += "<div style='display:flex;gap:5px'>";
-  var mm = [["P", m.protein, "#e8322a"], ["C", m.carbs, "#f59e0b"], ["F", m.fat, "#3b82f6"], ["kcal", m.calories, "#10b981"]];
-  for (var mmi = 0; mmi < mm.length; mmi++) {
-    html += "<div style='background:#141414;border-radius:6px;padding:4px 7px;text-align:center'><div style='font-size:12px;font-weight:700;color:" + mm[mmi][2] + "'>" + mm[mmi][1] + (mm[mmi][0] !== "kcal" ? "g" : "") + "</div><div style='font-size:8px;color:#383838'>" + mm[mmi][0] + "</div></div>";
-  }
+  html += "<button class='btn-dark' style='width:28px;height:28px;padding:0;font-size:16px' onclick='state.weekOffset--;draw()'>&#8249;</button>";
+  html += "<button class='btn-dark' style='width:28px;height:28px;padding:0;font-size:16px' onclick='state.weekOffset++;draw()'>&#8250;</button>";
   html += "</div></div>";
-}
-html += "</div>";
+  if (state.weekOffset !== 0) html += "<button onclick='state.weekOffset=0;draw()' style='background:none;border:none;color:#e8322a;font-size:10px;padding:3px 0 0;cursor:pointer'>&#8592; Current week</button>";
+  html += "</div>";
 
-if (dayType !== "Rest") {
-  html += "<div class='card'><div class='lbl'>Workout - " + dayType + "</div>";
-  html += "<button onclick='setDay(function(d){var nd=JSON.parse(JSON.stringify(d));nd.workout.completed=!d.workout.completed;return nd;})' style='width:100%;border-radius:10px;padding:10px 0;color:#fff;font-size:13px;font-weight:600;margin-bottom:10px;cursor:pointer;border:" + (day.workout.completed ? "none" : "1px solid #252525") + ";background:" + (day.workout.completed ? "#e8322a" : "#141414") + "'>" + (day.workout.completed ? "Done!" : "Mark Workout Done") + "</button>";
-  if (day.workout.completed) {
-    html += "<div style='font-size:10px;color:#444;margin-bottom:8px'>How did it feel?</div><div style='display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px'>";
-    for (var ri = 0; ri < RATINGS.length; ri++) {
-      var rv = RATINGS[ri];
-      html += "<button onclick='setDay(function(d){var nd=JSON.parse(JSON.stringify(d));nd.workout.rating=\"" + rv + "\";return nd;})' style='background:" + (day.workout.rating === rv ? "#1c1c1c" : "transparent") + ";border:1px solid " + (day.workout.rating === rv ? "#e8322a" : "#1e1e1e") + ";border-radius:8px;padding:5px 9px;color:" + (day.workout.rating === rv ? "#f0ede8" : "#444") + ";font-size:11px;cursor:pointer'>" + rv + "</button>";
-    }
-    html += "</div><textarea id='workout-notes' placeholder='Log weights, PRs, notes...' style='width:100%;height:60px;resize:none;display:block'>" + day.workout.notes + "</textarea>";
+  html += "<div style='display:flex;gap:5px;padding:10px 20px;overflow-x:auto;background:#0d0d0d;border-bottom:1px solid #1c1c1c;scrollbar-width:none'>";
+  for (var i = 0; i < 7; i++) {
+    var d = DAYS[i];
+    var isRest = DAY_TYPES[d] === "Rest";
+    var isActive = i === state.activeDay;
+    var isToday = state.weekOffset === 0 && i === 0;
+    html += "<div onclick='state.activeDay=" + i + ";draw()' style='flex-shrink:0;border-radius:10px;padding:6px 10px;text-align:center;cursor:pointer;border:1px solid " + (isActive ? "#e8322a" : (isToday ? "rgba(232,50,42,0.3)" : "#1c1c1c")) + ";background:" + (isActive ? "#e8322a" : "#121212") + ";opacity:" + (isRest ? "0.4" : "1") + "'>";
+    html += "<div style='font-size:8px;letter-spacing:1px;text-transform:uppercase;color:" + (isActive ? "rgba(255,255,255,0.5)" : "#3a3a3a") + ";margin-bottom:1px'>" + d + "</div>";
+    html += "<div style='font-size:10px;font-weight:600;color:" + (isActive ? "#fff" : "#888") + "'>" + DAY_TYPES[d] + "</div>";
+    if (week[i].workout.completed) html += "<div style='font-size:7px;color:" + (isActive ? "rgba(255,255,255,0.7)" : "#e8322a") + ";margin-top:2px'>done</div>";
+    html += "</div>";
   }
   html += "</div>";
-}
-```
 
-}
+  html += "<div style='display:flex;gap:6px;padding:12px 20px 0'>";
+  html += "<button onclick='state.view=\"log\";draw()' style='background:" + (state.view === "log" ? "#181818" : "transparent") + ";border:1px solid " + (state.view === "log" ? "#252525" : "#181818") + ";border-radius:8px;padding:5px 14px;color:" + (state.view === "log" ? "#f0ede8" : "#3a3a3a") + ";font-size:11px;font-weight:" + (state.view === "log" ? "600" : "400") + ";cursor:pointer'>Daily Log</button>";
+  html += "<button onclick='state.view=\"week\";draw()' style='background:" + (state.view === "week" ? "#181818" : "transparent") + ";border:1px solid " + (state.view === "week" ? "#252525" : "#181818") + ";border-radius:8px;padding:5px 14px;color:" + (state.view === "week" ? "#f0ede8" : "#3a3a3a") + ";font-size:11px;font-weight:" + (state.view === "week" ? "600" : "400") + ";cursor:pointer'>Week Summary</button>";
+  html += "</div>";
 
-if (state.view === “week”) {
-var wk = getWeek(state.weekOffset);
-var totalP2 = 0, wkts = 0, pdays = 0, wts = [];
-for (var i = 0; i < 7; i++) {
-totalP2 += wk[i].p;
-if (wk[i].workout.completed) wkts++;
-if (wk[i].p >= PROTEIN_GOAL) pdays++;
-wts.push(parseFloat(wk[i].weight) || 0);
-}
-var avgP2 = Math.round(totalP2 / 7);
-var lwts = []; for (var i = 0; i < wts.length; i++) { if (wts[i] > 0) lwts.push(wts[i]); }
-var avgWt = lwts.length ? (lwts.reduce(function(a, b) { return a + b; }, 0) / lwts.length).toFixed(1) : “–”;
+  html += "<div style='padding:12px 20px 0'>";
 
-```
-html += "<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px'>";
-var stats = [["Avg Protein", avgP2 + "g", "Goal " + PROTEIN_GOAL + "g", "#e8322a"], ["Workouts", wkts + "/5", "Completed", "#10b981"], ["Avg Weight", avgWt + "lbs", "This week", "#f59e0b"]];
-for (var si = 0; si < stats.length; si++) {
-  html += "<div style='background:#111;border:1px solid #1c1c1c;border-radius:12px;padding:12px 8px;text-align:center'><div style='font-size:18px;font-weight:700;color:" + stats[si][3] + "'>" + stats[si][1] + "</div><div style='font-size:9px;color:#3a3a3a;margin-top:2px'>" + stats[si][2] + "</div><div style='font-size:9px;color:#2a2a2a;margin-top:1px'>" + stats[si][0] + "</div></div>";
-}
-html += "</div>";
+  if (state.view === "log") {
 
-var maxW = 0, minW = 9999;
-for (var i = 0; i < wts.length; i++) { if (wts[i] > 0) { if (wts[i] > maxW) maxW = wts[i]; if (wts[i] < minW) minW = wts[i]; } }
-if (maxW === 0) { maxW = 1; minW = 0; }
-var rng = maxW - minW || 1;
+    html += "<div class='card'><div class='lbl'>Daily Weight &amp; Progress</div>";
+    html += "<div style='display:flex;align-items:center;gap:10px;margin-bottom:4px'>";
+    html += "<input type='number' id='weight-input' step='0.1' min='50' max='500' placeholder='0.0' value='" + (day.weight || "") + "' style='width:120px;font-size:22px;font-weight:700;text-align:center'>";
+    html += "<span style='font-size:14px;color:#555'>lbs</span></div>";
+    if (day.weight) html += "<div style='font-size:10px;color:#10b981;margin-bottom:10px'>Logged!</div>";
+    html += "<div style='font-size:9px;letter-spacing:2px;color:#444;text-transform:uppercase;margin:12px 0 10px'>Progress Photos</div>";
+    html += "<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px'>";
+    html += "<input type='file' id='photo-front' accept='image/*' style='display:none' onchange='handleProgressPhoto(event,\"front\")'>";
+    html += "<input type='file' id='photo-side' accept='image/*' style='display:none' onchange='handleProgressPhoto(event,\"side\")'>";
 
-html += "<div class='card'><div class='lbl'>Weight This Week</div><div style='display:flex;align-items:flex-end;gap:4px;height:56px;padding-top:8px;border-top:1px solid #181818;margin-top:12px'>";
-for (var i = 0; i < 7; i++) {
-  var bh = wts[i] > 0 ? Math.max(4, Math.round(((wts[i] - minW) / rng) * 36) + 4) : 2;
-  html += "<div style='flex:1;display:flex;flex-direction:column;align-items:center;gap:2px'>";
-  html += "<div style='font-size:7px;color:#f59e0b'>" + (wts[i] > 0 ? wts[i] : "") + "</div>";
-  html += "<div style='width:100%;height:" + bh + "px;border-radius:3px 3px 0 0;background:" + (wts[i] > 0 ? "#f59e0b" : "#1a1a1a") + "'></div>";
-  html += "<div style='font-size:7px;color:#3a3a3a'>" + DAYS[i] + "</div></div>";
-}
-html += "</div></div>";
+    var sides = ["front", "side"];
+    for (var si = 0; si < 2; si++) {
+      var sn = sides[si];
+      var sp = sn === "front" ? day.photoFront : day.photoSide;
+      if (sp) {
+        html += "<div style='position:relative;aspect-ratio:3/4;border-radius:10px;overflow:hidden;border:1px solid #1c1c1c'>";
+        html += "<img src='" + sp + "' style='width:100%;height:100%;object-fit:cover;display:block'>";
+        html += "<button onclick='removeProgressPhoto(\"" + sn + "\")' style='position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.75);border:none;border-radius:50%;width:24px;height:24px;color:#fff;font-size:11px;cursor:pointer'>X</button>";
+        html += "<div style='position:absolute;bottom:6px;left:0;right:0;text-align:center;font-size:9px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:1px'>" + sn + "</div></div>";
+      } else {
+        html += "<div onclick='document.getElementById(\"photo-" + sn + "\").click()' style='aspect-ratio:3/4;background:#0c0c0c;border:1px dashed #252525;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;padding:12px'>";
+        html += "<div style='font-size:22px;margin-bottom:6px'>&#128247;</div>";
+        html += "<div style='font-size:10px;color:#444;text-align:center'>" + (sn.charAt(0).toUpperCase() + sn.slice(1)) + " View<br><span style='color:#2a2a2a;font-size:9px'>tap to add</span></div></div>";
+      }
+    }
+    html += "</div></div>";
 
-html += "<div class='card'><div class='lbl'>Daily Breakdown</div>";
-for (var i = 0; i < 7; i++) {
-  var wd = wk[i];
-  var isRest = DAY_TYPES[DAYS[i]] === "Rest";
-  var protColor = wd.p >= PROTEIN_GOAL ? "#10b981" : (wd.p > 0 ? "#f59e0b" : "#2a2a2a");
-  html += "<div onclick='state.activeDay=" + i + ";state.view=\"log\";draw()' style='display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #181818;cursor:pointer;opacity:" + (isRest ? "0.3" : "1") + "'>";
-  html += "<div><div style='font-size:12px;font-weight:600;color:#f0ede8'>" + DAYS[i] + " <span style='color:#383838;font-weight:400;font-size:10px'>" + DAY_TYPES[DAYS[i]] + "</span></div>";
-  html += "<div style='font-size:10px;color:#3a3a3a;margin-top:1px'>" + wd.meals.length + " meals, " + wd.water + " glasses" + (wd.workout.rating ? " - " + wd.workout.rating : "") + "</div></div>";
-  html += "<div style='text-align:right'><div style='font-size:13px;font-weight:700;color:" + protColor + "'>" + wd.p + "g</div>";
-  html += "<div style='font-size:9px;color:#383838'>" + wd.cal + " kcal</div>";
-  if (wd.weight) html += "<div style='font-size:10px;color:#f59e0b;margin-top:1px'>" + wd.weight + " lbs</div>";
-  if (wd.workout.completed) html += "<div style='font-size:8px;color:#e8322a;margin-top:1px'>trained</div>";
-  html += "</div></div>";
-}
-html += "</div>";
+    html += "<div class='card'><div class='lbl'>Today's Macros</div>";
+    var protPct = Math.min(day.p / PROTEIN_GOAL * 100, 100);
+    html += "<div style='display:flex;align-items:center;gap:14px;margin-bottom:14px'>";
+    var sz = 64, sw = 6, r = (sz - sw * 2) / 2, circ = 2 * Math.PI * r, off = circ * (1 - protPct / 100);
+    html += "<div style='position:relative;display:flex;align-items:center;justify-content:center;flex-shrink:0'>";
+    html += "<svg width='" + sz + "' height='" + sz + "' style='transform:rotate(-90deg)'>";
+    html += "<circle cx='" + sz/2 + "' cy='" + sz/2 + "' r='" + r + "' fill='none' stroke='#181818' stroke-width='" + sw + "'/>";
+    html += "<circle cx='" + sz/2 + "' cy='" + sz/2 + "' r='" + r + "' fill='none' stroke='#e8322a' stroke-width='" + sw + "' stroke-dasharray='" + circ + "' stroke-dashoffset='" + off + "' stroke-linecap='round'/></svg>";
+    html += "<div style='position:absolute;text-align:center'><div style='font-size:12px;font-weight:700;color:#f0ede8'>" + day.p + "g</div><div style='font-size:7px;color:#444'>protein</div></div></div>";
+    html += "<div style='flex:1'>";
+    var bars = [["Protein", day.p, PROTEIN_GOAL, "#e8322a"], ["Carbs", day.carbs, 250, "#f59e0b"], ["Fat", day.fat, 70, "#3b82f6"], ["Calories", day.cal, CALORIE_GOAL, "#10b981"]];
+    for (var bi = 0; bi < bars.length; bi++) {
+      var bl = bars[bi];
+      var bp = Math.min(bl[1] / bl[2] * 100, 100);
+      var bu = bl[0] === "Calories" ? "" : "g";
+      html += "<div style='margin-bottom:7px'><div style='display:flex;justify-content:space-between;font-size:10px;color:#555;margin-bottom:3px'><span>" + bl[0] + "</span><span style='color:#999'>" + bl[1] + bu + " / " + bl[2] + bu + "</span></div>";
+      html += "<div style='background:#181818;border-radius:3px;height:4px'><div style='width:" + bp + "%;background:" + bl[3] + ";height:100%;border-radius:3px'></div></div></div>";
+    }
+    html += "</div></div>";
+    html += "<div style='display:grid;grid-template-columns:repeat(4,1fr);gap:6px'>";
+    var chips = [["Protein", day.p + "g", "#e8322a"], ["Carbs", day.carbs + "g", "#f59e0b"], ["Fat", day.fat + "g", "#3b82f6"], ["Calories", day.cal, "#10b981"]];
+    for (var ci = 0; ci < chips.length; ci++) {
+      html += "<div style='background:#0c0c0c;border-radius:8px;padding:8px 4px;text-align:center'><div style='font-size:13px;font-weight:700;color:" + chips[ci][2] + "'>" + chips[ci][1] + "</div><div style='font-size:8px;color:#383838;margin-top:1px'>" + chips[ci][0] + "</div></div>";
+    }
+    html += "</div></div>";
 
-html += "<div class='card'><div class='lbl'>Weekly Check-In</div>";
-html += "<div style='font-size:11px;color:#3a3a3a;margin-bottom:10px'>Every Sunday copy this and paste into your chat with Claude for your weekly review.</div>";
-html += "<div style='background:#0c0c0c;border-radius:10px;padding:12px;font-size:11px;color:#666;line-height:2;border:1px solid #181818;word-break:break-word'>";
-html += "<div style='color:#e8322a;font-weight:600;margin-bottom:4px'>WEEKLY CHECK-IN - " + getWeekLabel(state.weekOffset) + "</div>";
-html += "<div>Workouts: " + wkts + "/5</div>";
-html += "<div>Avg protein: " + avgP2 + "g (goal: " + PROTEIN_GOAL + "g)</div>";
-html += "<div>Protein days: " + pdays + "/7</div>";
-html += "<div>Avg weight: " + avgWt + " lbs</div>";
-var hasNotes = false;
-for (var i = 0; i < 7; i++) {
-  if (wk[i].workout.notes) { html += "<div style='padding-left:8px;color:#4a4a4a'>" + DAYS[i] + ": " + wk[i].workout.notes + "</div>"; hasNotes = true; }
-}
-if (!hasNotes) html += "<div style='padding-left:8px;color:#2a2a2a'>No notes yet</div>";
-html += "</div>";
-html += "<button onclick='copyCheckin()' style='width:100%;background:#181818;border:1px solid " + (state.copied ? "#10b981" : "#252525") + ";border-radius:8px;padding:8px 0;color:" + (state.copied ? "#10b981" : "#888") + ";font-size:12px;margin-top:10px;cursor:pointer'>" + (state.copied ? "Copied!" : "Copy Check-In") + "</button>";
-html += "</div>";
-```
+    html += "<div class='card'>";
+    html += "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px'>";
+    html += "<div><div class='lbl'>Water</div><div style='font-size:16px;font-weight:700;color:#3b82f6'>" + day.water + " / " + WATER_GOAL + " glasses</div></div>";
+    html += "<div style='display:flex;gap:6px'>";
+    html += "<button onclick='setDay(function(d){var nd=JSON.parse(JSON.stringify(d));nd.water=Math.max(0,d.water-1);return nd;})' style='background:#181818;border:1px solid #252525;color:#888;border-radius:8px;width:32px;height:32px;font-size:16px;padding:0;cursor:pointer'>-</button>";
+    html += "<button onclick='setDay(function(d){var nd=JSON.parse(JSON.stringify(d));nd.water=Math.min(" + WATER_GOAL + ",d.water+1);return nd;})' style='background:#3b82f6;border:none;color:#fff;border-radius:8px;width:32px;height:32px;font-size:16px;padding:0;cursor:pointer'>+</button>";
+    html += "</div></div><div style='display:flex;gap:4px'>";
+    for (var wi = 0; wi < WATER_GOAL; wi++) {
+      html += "<div onclick='setDay(function(d){var nd=JSON.parse(JSON.stringify(d));nd.water=" + (wi + 1) + ";return nd;})' style='flex:1;height:6px;border-radius:3px;background:" + (wi < day.water ? "#3b82f6" : "#181818") + ";cursor:pointer'></div>";
+    }
+    html += "</div></div>";
 
-}
+    html += "<div class='card'>";
+    html += "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:12px'>";
+    html += "<div class='lbl' style='margin:0'>Meals</div>";
+    html += "<button class='btn-red' onclick='state.showMealForm=true;draw()'>+ Add Meal</button></div>";
 
-html += “</div>”;
-document.getElementById(“app”).innerHTML = html;
+    if (state.showMealForm) {
+      html += "<div style='background:#0c0c0c;border-radius:10px;padding:14px;margin-bottom:12px;border:1px solid #1a1a1a'>";
+      html += "<div style='font-size:11px;color:#555;margin-bottom:10px'>Upload a photo, describe your meal, or both. Claude fills in the macros.</div>";
+      html += "<input type='file' id='meal-photo-input' accept='image/*' style='display:none' onchange='handleMealPhoto(event)'>";
+      if (state.mealPhotoPreview) {
+        html += "<div style='position:relative;margin-bottom:10px'><img src='" + state.mealPhotoPreview + "' style='width:100%;max-height:150px;object-fit:cover;border-radius:8px;display:block'>";
+        html += "<button onclick='state.mealPhoto=null;state.mealPhotoPreview=null;draw()' style='position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.75);border:none;border-radius:50%;width:24px;height:24px;color:#fff;font-size:12px;cursor:pointer'>X</button>";
+        html += "<div style='position:absolute;bottom:6px;left:8px;background:#10b981;border-radius:4px;padding:2px 8px;font-size:9px;color:#fff'>Photo ready</div></div>";
+      } else {
+        html += "<button onclick='document.getElementById(\"meal-photo-input\").click()' style='width:100%;background:#111;border:1px dashed #252525;border-radius:8px;padding:10px 0;color:#444;font-size:12px;cursor:pointer;margin-bottom:10px'>&#128247; Upload Food Photo (optional)</button>";
+      }
+      html += "<textarea id='meal-ta' placeholder='Describe what you ate... e.g. grilled chicken, rice, broccoli' style='width:100%;height:60px;resize:none;margin-bottom:8px;display:block'>" + (state.mealText || "") + "</textarea>";
+      if (state.error) html += "<div style='color:#e8322a;font-size:11px;margin-bottom:8px'>" + state.error + "</div>";
+      html += "<div style='display:flex;gap:8px'>";
+      html += "<button onclick='state.showMealForm=false;state.mealText=\"\";state.mealPhoto=null;state.mealPhotoPreview=null;state.error=\"\";draw()' style='flex:1;background:transparent;border:1px solid #252525;border-radius:8px;color:#555;font-size:12px;padding:8px 0;cursor:pointer'>Cancel</button>";
+      html += "<button onclick='analyzeMeal()' " + (state.loading ? "disabled" : "") + " style='flex:2;background:" + (state.loading ? "#252525" : "#e8322a") + ";border:none;border-radius:8px;color:#fff;font-size:12px;font-weight:600;padding:8px 0;cursor:pointer'>" + (state.loading ? "Analyzing..." : "Analyze + Log") + "</button>";
+      html += "</div></div>";
+    }
 
-var ta = document.getElementById(“meal-ta”);
-if (ta) ta.addEventListener(“input”, function(e) { state.mealText = e.target.value; });
+    if (day.meals.length === 0 && !state.showMealForm) {
+      html += "<div style='text-align:center;color:#2a2a2a;font-size:12px;padding:14px 0'>No meals logged yet</div>";
+    }
 
-var wn = document.getElementById(“workout-notes”);
-if (wn) {
-wn.addEventListener(“blur”, function(e) {
-setDay(function(d) {
-var nd = JSON.parse(JSON.stringify(d));
-nd.workout.notes = e.target.value;
-return nd;
-});
-});
-}
+    for (var mi = 0; mi < day.meals.length; mi++) {
+      var m = day.meals[mi];
+      html += "<div style='background:#0c0c0c;border-radius:10px;padding:12px;margin-bottom:8px;border:1px solid #181818'>";
+      html += "<div style='display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px'>";
+      html += "<div style='flex:1'><div style='font-size:13px;color:#f0ede8;font-weight:500'>" + m.name + "</div>";
+      if (m.input) html += "<div style='font-size:10px;color:#3a3a3a;margin-top:1px'>" + m.input + "</div>";
+      html += "</div><button onclick='removeMeal(" + mi + ")' style='background:none;border:none;color:#2a2a2a;font-size:13px;padding:0;margin-left:8px;cursor:pointer'>X</button></div>";
+      if (m.photo) html += "<img src='" + m.photo + "' style='width:100%;max-height:90px;object-fit:cover;border-radius:6px;margin-bottom:8px;display:block'>";
+      html += "<div style='display:flex;gap:5px'>";
+      var mm = [["P", m.protein, "#e8322a"], ["C", m.carbs, "#f59e0b"], ["F", m.fat, "#3b82f6"], ["kcal", m.calories, "#10b981"]];
+      for (var mmi = 0; mmi < mm.length; mmi++) {
+        html += "<div style='background:#141414;border-radius:6px;padding:4px 7px;text-align:center'><div style='font-size:12px;font-weight:700;color:" + mm[mmi][2] + "'>" + mm[mmi][1] + (mm[mmi][0] !== "kcal" ? "g" : "") + "</div><div style='font-size:8px;color:#383838'>" + mm[mmi][0] + "</div></div>";
+      }
+      html += "</div></div>";
+    }
+    html += "</div>";
 
-var weightInput = document.getElementById(“weight-input”);
-if (weightInput) {
-weightInput.addEventListener(“blur”, function(e) {
-setDay(function(d) {
-var nd = JSON.parse(JSON.stringify(d));
-nd.weight = e.target.value;
-return nd;
-});
-});
-}
+    if (dayType !== "Rest") {
+      html += "<div class='card'><div class='lbl'>Workout - " + dayType + "</div>";
+      html += "<button onclick='setDay(function(d){var nd=JSON.parse(JSON.stringify(d));nd.workout.completed=!d.workout.completed;return nd;})' style='width:100%;border-radius:10px;padding:10px 0;color:#fff;font-size:13px;font-weight:600;margin-bottom:10px;cursor:pointer;border:" + (day.workout.completed ? "none" : "1px solid #252525") + ";background:" + (day.workout.completed ? "#e8322a" : "#141414") + "'>" + (day.workout.completed ? "Done!" : "Mark Workout Done") + "</button>";
+      if (day.workout.completed) {
+        html += "<div style='font-size:10px;color:#444;margin-bottom:8px'>How did it feel?</div><div style='display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px'>";
+        for (var ri = 0; ri < RATINGS.length; ri++) {
+          var rv = RATINGS[ri];
+          html += "<button onclick='setDay(function(d){var nd=JSON.parse(JSON.stringify(d));nd.workout.rating=\"" + rv + "\";return nd;})' style='background:" + (day.workout.rating === rv ? "#1c1c1c" : "transparent") + ";border:1px solid " + (day.workout.rating === rv ? "#e8322a" : "#1e1e1e") + ";border-radius:8px;padding:5px 9px;color:" + (day.workout.rating === rv ? "#f0ede8" : "#444") + ";font-size:11px;cursor:pointer'>" + rv + "</button>";
+        }
+        html += "</div><textarea id='workout-notes' placeholder='Log weights, PRs, notes...' style='width:100%;height:60px;resize:none;display:block'>" + day.workout.notes + "</textarea>";
+      }
+      html += "</div>";
+    }
+  }
+
+  if (state.view === "week") {
+    var wk = getWeek(state.weekOffset);
+    var totalP2 = 0, wkts = 0, pdays = 0, wts = [];
+    for (var i = 0; i < 7; i++) {
+      totalP2 += wk[i].p;
+      if (wk[i].workout.completed) wkts++;
+      if (wk[i].p >= PROTEIN_GOAL) pdays++;
+      wts.push(parseFloat(wk[i].weight) || 0);
+    }
+    var avgP2 = Math.round(totalP2 / 7);
+    var lwts = []; for (var i = 0; i < wts.length; i++) { if (wts[i] > 0) lwts.push(wts[i]); }
+    var avgWt = lwts.length ? (lwts.reduce(function(a, b) { return a + b; }, 0) / lwts.length).toFixed(1) : "--";
+
+    html += "<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px'>";
+    var stats = [["Avg Protein", avgP2 + "g", "Goal " + PROTEIN_GOAL + "g", "#e8322a"], ["Workouts", wkts + "/5", "Completed", "#10b981"], ["Avg Weight", avgWt + "lbs", "This week", "#f59e0b"]];
+    for (var si = 0; si < stats.length; si++) {
+      html += "<div style='background:#111;border:1px solid #1c1c1c;border-radius:12px;padding:12px 8px;text-align:center'><div style='font-size:18px;font-weight:700;color:" + stats[si][3] + "'>" + stats[si][1] + "</div><div style='font-size:9px;color:#3a3a3a;margin-top:2px'>" + stats[si][2] + "</div><div style='font-size:9px;color:#2a2a2a;margin-top:1px'>" + stats[si][0] + "</div></div>";
+    }
+    html += "</div>";
+
+    var maxW = 0, minW = 9999;
+    for (var i = 0; i < wts.length; i++) { if (wts[i] > 0) { if (wts[i] > maxW) maxW = wts[i]; if (wts[i] < minW) minW = wts[i]; } }
+    if (maxW === 0) { maxW = 1; minW = 0; }
+    var rng = maxW - minW || 1;
+
+    html += "<div class='card'><div class='lbl'>Weight This Week</div><div style='display:flex;align-items:flex-end;gap:4px;height:56px;padding-top:8px;border-top:1px solid #181818;margin-top:12px'>";
+    for (var i = 0; i < 7; i++) {
+      var bh = wts[i] > 0 ? Math.max(4, Math.round(((wts[i] - minW) / rng) * 36) + 4) : 2;
+      html += "<div style='flex:1;display:flex;flex-direction:column;align-items:center;gap:2px'>";
+      html += "<div style='font-size:7px;color:#f59e0b'>" + (wts[i] > 0 ? wts[i] : "") + "</div>";
+      html += "<div style='width:100%;height:" + bh + "px;border-radius:3px 3px 0 0;background:" + (wts[i] > 0 ? "#f59e0b" : "#1a1a1a") + "'></div>";
+      html += "<div style='font-size:7px;color:#3a3a3a'>" + DAYS[i] + "</div></div>";
+    }
+    html += "</div></div>";
+
+    html += "<div class='card'><div class='lbl'>Daily Breakdown</div>";
+    for (var i = 0; i < 7; i++) {
+      var wd = wk[i];
+      var isRest = DAY_TYPES[DAYS[i]] === "Rest";
+      var protColor = wd.p >= PROTEIN_GOAL ? "#10b981" : (wd.p > 0 ? "#f59e0b" : "#2a2a2a");
+      html += "<div onclick='state.activeDay=" + i + ";state.view=\"log\";draw()' style='display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #181818;cursor:pointer;opacity:" + (isRest ? "0.3" : "1") + "'>";
+      html += "<div><div style='font-size:12px;font-weight:600;color:#f0ede8'>" + DAYS[i] + " <span style='color:#383838;font-weight:400;font-size:10px'>" + DAY_TYPES[DAYS[i]] + "</span></div>";
+      html += "<div style='font-size:10px;color:#3a3a3a;margin-top:1px'>" + wd.meals.length + " meals, " + wd.water + " glasses" + (wd.workout.rating ? " - " + wd.workout.rating : "") + "</div></div>";
+      html += "<div style='text-align:right'><div style='font-size:13px;font-weight:700;color:" + protColor + "'>" + wd.p + "g</div>";
+      html += "<div style='font-size:9px;color:#383838'>" + wd.cal + " kcal</div>";
+      if (wd.weight) html += "<div style='font-size:10px;color:#f59e0b;margin-top:1px'>" + wd.weight + " lbs</div>";
+      if (wd.workout.completed) html += "<div style='font-size:8px;color:#e8322a;margin-top:1px'>trained</div>";
+      html += "</div></div>";
+    }
+    html += "</div>";
+
+    html += "<div class='card'><div class='lbl'>Weekly Check-In</div>";
+    html += "<div style='font-size:11px;color:#3a3a3a;margin-bottom:10px'>Every Sunday copy this and paste into your chat with Claude for your weekly review.</div>";
+    html += "<div style='background:#0c0c0c;border-radius:10px;padding:12px;font-size:11px;color:#666;line-height:2;border:1px solid #181818;word-break:break-word'>";
+    html += "<div style='color:#e8322a;font-weight:600;margin-bottom:4px'>WEEKLY CHECK-IN - " + getWeekLabel(state.weekOffset) + "</div>";
+    html += "<div>Workouts: " + wkts + "/5</div>";
+    html += "<div>Avg protein: " + avgP2 + "g (goal: " + PROTEIN_GOAL + "g)</div>";
+    html += "<div>Protein days: " + pdays + "/7</div>";
+    html += "<div>Avg weight: " + avgWt + " lbs</div>";
+    var hasNotes = false;
+    for (var i = 0; i < 7; i++) {
+      if (wk[i].workout.notes) { html += "<div style='padding-left:8px;color:#4a4a4a'>" + DAYS[i] + ": " + wk[i].workout.notes + "</div>"; hasNotes = true; }
+    }
+    if (!hasNotes) html += "<div style='padding-left:8px;color:#2a2a2a'>No notes yet</div>";
+    html += "</div>";
+    html += "<button onclick='copyCheckin()' style='width:100%;background:#181818;border:1px solid " + (state.copied ? "#10b981" : "#252525") + ";border-radius:8px;padding:8px 0;color:" + (state.copied ? "#10b981" : "#888") + ";font-size:12px;margin-top:10px;cursor:pointer'>" + (state.copied ? "Copied!" : "Copy Check-In") + "</button>";
+    html += "</div>";
+  }
+
+  html += "</div>";
+  document.getElementById("app").innerHTML = html;
+
+  var ta = document.getElementById("meal-ta");
+  if (ta) ta.addEventListener("input", function(e) { state.mealText = e.target.value; });
+
+  var wn = document.getElementById("workout-notes");
+  if (wn) {
+    wn.addEventListener("blur", function(e) {
+      setDay(function(d) {
+        var nd = JSON.parse(JSON.stringify(d));
+        nd.workout.notes = e.target.value;
+        return nd;
+      });
+    });
+  }
+
+  var weightInput = document.getElementById("weight-input");
+  if (weightInput) {
+    weightInput.addEventListener("blur", function(e) {
+      setDay(function(d) {
+        var nd = JSON.parse(JSON.stringify(d));
+        nd.weight = e.target.value;
+        return nd;
+      });
+    });
+  }
 }
 
 loadData();
 draw();
 </script>
-
 </body>
 </html>
