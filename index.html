@@ -9,577 +9,492 @@
 <meta name="apple-mobile-web-app-title" content="My Tracker">
 <title>My Tracker</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-body{background:#0a0a0a;color:#ccc;font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;max-width:480px;margin:0 auto;padding-bottom:100px;min-height:100vh;}
-button,textarea,input{font-family:inherit;}
-.hdr{padding:44px 20px 12px;background:#0d0d0d;border-bottom:1px solid #1c1c1c;position:sticky;top:0;z-index:100;}
-.hlbl{font-size:9px;letter-spacing:3px;color:#e8322a;text-transform:uppercase;margin-bottom:2px;}
-.hrow{display:flex;justify-content:space-between;align-items:center;}
-.htitle{font-size:18px;font-weight:700;color:#f0ede8;}
-.navb{display:flex;gap:5px;}
-.nbtn{background:#181818;border:1px solid #252525;border-radius:6px;width:28px;height:28px;color:#888;font-size:16px;cursor:pointer;}
-.bklnk{background:none;border:none;color:#e8322a;font-size:10px;padding:2px 0 0;cursor:pointer;display:block;}
-.tabs{display:flex;gap:5px;padding:10px 20px;overflow-x:auto;background:#0d0d0d;border-bottom:1px solid #1c1c1c;scrollbar-width:none;}
-.tabs::-webkit-scrollbar{display:none;}
-.tab{flex-shrink:0;border-radius:10px;padding:6px 10px;text-align:center;border:1px solid #1c1c1c;background:#121212;cursor:pointer;}
-.tab.on{background:#e8322a;border-color:#e8322a;}
-.tab.rest{opacity:0.4;}
-.tday{font-size:8px;letter-spacing:1px;color:#3a3a3a;text-transform:uppercase;margin-bottom:1px;}
-.tab.on .tday{color:rgba(255,255,255,0.5);}
-.ttype{font-size:10px;font-weight:600;color:#888;}
-.tab.on .ttype{color:#fff;}
-.tdone{font-size:7px;color:#e8322a;margin-top:2px;}
-.tab.on .tdone{color:rgba(255,255,255,0.7);}
-.vtog{display:flex;gap:6px;padding:12px 20px 0;}
-.vbtn{background:transparent;border:1px solid #181818;border-radius:8px;padding:5px 14px;color:#3a3a3a;font-size:11px;cursor:pointer;}
-.vbtn.on{background:#181818;border-color:#252525;color:#f0ede8;font-weight:600;}
-.pg{padding:12px 20px 0;}
+body{background:#0a0a0a;color:#ccc;font-family:-apple-system,system-ui,sans-serif;padding:20px;max-width:480px;margin:0 auto;}
+*{box-sizing:border-box;margin:0;padding:0;}
 .card{background:#111;border:1px solid #1c1c1c;border-radius:14px;padding:16px;margin-bottom:12px;}
-.slbl{font-size:9px;letter-spacing:3px;color:#444;text-transform:uppercase;margin-bottom:12px;}
-.winp{background:#0c0c0c;border:1px solid #1c1c1c;border-radius:8px;color:#f0ede8;font-size:22px;font-weight:700;padding:10px 14px;width:130px;text-align:center;}
-.wunit{font-size:14px;color:#555;margin-left:8px;}
-.wok{font-size:10px;color:#10b981;margin-top:4px;}
-.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;}
-.pslot{background:#0c0c0c;border:1px dashed #252525;border-radius:10px;aspect-ratio:3/4;position:relative;overflow:hidden;cursor:pointer;}
-.pslot.has{border-style:solid;border-color:#1c1c1c;}
-.pinner{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:12px;}
-.picon{font-size:22px;margin-bottom:6px;}
-.plbl{font-size:10px;color:#444;text-align:center;}
-.pimg{width:100%;height:100%;object-fit:cover;display:block;}
-.prem{position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.75);border:none;border-radius:50%;width:24px;height:24px;color:#fff;font-size:11px;cursor:pointer;z-index:2;}
-.ptyp{position:absolute;bottom:6px;left:0;right:0;text-align:center;font-size:9px;color:rgba(255,255,255,0.5);letter-spacing:1px;text-transform:uppercase;}
-.mring{display:flex;gap:14px;align-items:center;margin-bottom:14px;}
-.rw{position:relative;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-.ri{position:absolute;text-align:center;pointer-events:none;}
-.rv{font-size:12px;font-weight:700;color:#f0ede8;}
-.rs{font-size:7px;color:#444;}
-.bar{margin-bottom:7px;}
-.blr{display:flex;justify-content:space-between;font-size:10px;color:#555;margin-bottom:3px;}
-.blrv{color:#999;}
-.bt{background:#181818;border-radius:3px;height:4px;}
-.bf{height:100%;border-radius:3px;}
-.chips{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
-.chip{background:#0c0c0c;border-radius:8px;padding:8px 4px;text-align:center;}
-.cv{font-size:13px;font-weight:700;}
-.cl{font-size:8px;color:#383838;margin-top:1px;}
-.wtrrow{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
-.wtrval{font-size:16px;font-weight:700;color:#3b82f6;}
-.wtrbtns{display:flex;gap:6px;}
-.wtrbtn{border-radius:8px;width:32px;height:32px;font-size:16px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;}
-.wtrm{background:#181818;border:1px solid #252525;color:#888;}
-.wtrp{background:#3b82f6;color:#fff;}
-.wsegs{display:flex;gap:4px;}
-.wseg{flex:1;height:6px;border-radius:3px;background:#181818;cursor:pointer;}
-.wseg.on{background:#3b82f6;}
-.mhdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
-.addbtn{background:#e8322a;border:none;border-radius:8px;padding:5px 12px;color:#fff;font-size:11px;font-weight:600;cursor:pointer;}
-.mform{background:#0c0c0c;border-radius:10px;padding:14px;margin-bottom:12px;border:1px solid #1a1a1a;}
-.mhint{font-size:11px;color:#555;margin-bottom:10px;}
-.phbtn{width:100%;background:#111;border:1px dashed #252525;border-radius:8px;padding:10px 0;color:#444;font-size:12px;cursor:pointer;margin-bottom:10px;}
-.pvw{position:relative;margin-bottom:10px;}
-.pvwimg{width:100%;max-height:150px;object-fit:cover;border-radius:8px;display:block;}
-.pvrm{position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.75);border:none;border-radius:50%;width:24px;height:24px;color:#fff;font-size:12px;cursor:pointer;}
-.pvbdg{position:absolute;bottom:6px;left:8px;background:#10b981;border-radius:4px;padding:2px 8px;font-size:9px;color:#fff;}
-.mta{width:100%;background:#111;border:1px solid #1c1c1c;border-radius:8px;color:#f0ede8;font-size:12px;padding:10px;resize:none;height:60px;margin-bottom:8px;display:block;}
-.aerr{color:#e8322a;font-size:11px;margin-bottom:8px;}
-.fbtns{display:flex;gap:8px;}
-.cancelbtn{flex:1;background:transparent;border:1px solid #252525;border-radius:8px;color:#555;font-size:12px;padding:8px 0;cursor:pointer;}
-.anlzbtn{flex:2;background:#e8322a;border:none;border-radius:8px;color:#fff;font-size:12px;font-weight:600;padding:8px 0;cursor:pointer;}
-.anlzbtn:disabled{background:#252525;opacity:0.5;}
-.nomeal{text-align:center;color:#2a2a2a;font-size:12px;padding:14px 0;}
-.mi{background:#0c0c0c;border-radius:10px;padding:12px;margin-bottom:8px;border:1px solid #181818;}
-.mihdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;}
-.miname{font-size:13px;color:#f0ede8;font-weight:500;}
-.midesc{font-size:10px;color:#3a3a3a;margin-top:1px;}
-.mirm{background:none;border:none;color:#2a2a2a;font-size:13px;padding:0;margin-left:8px;cursor:pointer;}
-.miph{width:100%;max-height:90px;object-fit:cover;border-radius:6px;margin-bottom:8px;display:block;}
-.mmacs{display:flex;gap:5px;}
-.mm{background:#141414;border-radius:6px;padding:4px 7px;text-align:center;}
-.mmv{font-size:12px;font-weight:700;}
-.mml{font-size:8px;color:#383838;}
-.woutbtn{width:100%;border-radius:10px;padding:10px 0;color:#fff;font-size:13px;font-weight:600;margin-bottom:10px;border:1px solid #252525;background:#141414;cursor:pointer;}
-.woutbtn.done{background:#e8322a;border-color:#e8322a;}
-.rhint{font-size:10px;color:#444;margin-bottom:8px;}
-.rrow{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;}
-.rbtn{background:transparent;border:1px solid #1e1e1e;border-radius:8px;padding:5px 9px;color:#444;font-size:11px;cursor:pointer;}
-.rbtn.on{background:#1c1c1c;border-color:#e8322a;color:#f0ede8;}
-.wnotes{width:100%;background:#0c0c0c;border:1px solid #181818;border-radius:8px;color:#ccc;font-size:12px;padding:10px;resize:none;height:60px;}
-.wkstats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;}
-.wkstat{background:#111;border:1px solid #1c1c1c;border-radius:12px;padding:12px 8px;text-align:center;}
-.wksv{font-size:18px;font-weight:700;}
-.wkss{font-size:9px;color:#3a3a3a;margin-top:2px;}
-.wksl{font-size:9px;color:#2a2a2a;margin-top:1px;}
-.drow{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #181818;cursor:pointer;}
-.drow.rest{opacity:0.3;}
-.dname{font-size:12px;font-weight:600;color:#f0ede8;}
-.dtype{color:#383838;font-weight:400;font-size:10px;}
-.dsub{font-size:10px;color:#3a3a3a;margin-top:1px;}
-.dright{text-align:right;}
-.dprot{font-size:13px;font-weight:700;}
-.dcal{font-size:9px;color:#383838;}
-.dwt{font-size:10px;color:#f59e0b;margin-top:1px;}
-.dtrn{font-size:8px;color:#e8322a;margin-top:1px;}
-.wchart{display:flex;align-items:flex-end;gap:4px;height:56px;padding-top:8px;border-top:1px solid #181818;margin-top:12px;}
-.wbarw{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;}
-.wbar{width:100%;border-radius:3px 3px 0 0;min-height:2px;}
-.wbard{font-size:7px;color:#3a3a3a;}
-.wbarv{font-size:7px;color:#f59e0b;}
-.cbox{background:#0c0c0c;border-radius:10px;padding:12px;font-size:11px;color:#666;line-height:2;border:1px solid #181818;word-break:break-word;}
-.ctitle{color:#e8322a;font-weight:600;margin-bottom:4px;}
-.cnote{padding-left:8px;color:#4a4a4a;}
-.cpbtn{width:100%;background:#181818;border:1px solid #252525;border-radius:8px;padding:8px 0;color:#888;font-size:12px;margin-top:10px;cursor:pointer;}
-.cpbtn.ok{color:#10b981;border-color:#10b981;}
+.red{color:#e8322a;}
+.green{color:#10b981;}
+.white{color:#f0ede8;}
+h1{font-size:20px;font-weight:700;color:#f0ede8;margin-bottom:4px;}
+.lbl{font-size:9px;letter-spacing:3px;color:#e8322a;text-transform:uppercase;margin-bottom:6px;}
+button{font-family:inherit;cursor:pointer;border-radius:8px;padding:8px 16px;border:none;font-size:13px;}
+.btn-red{background:#e8322a;color:#fff;font-weight:600;}
+.btn-dark{background:#181818;border:1px solid #252525;color:#888;}
+input,textarea{font-family:inherit;background:#0c0c0c;border:1px solid #1c1c1c;border-radius:8px;color:#f0ede8;padding:10px;font-size:14px;}
 </style>
 </head>
 <body>
-<div id="root"><div style="color:#e8322a;padding:40px 20px;font-size:14px;">Starting up...</div></div>
+<div id="app">Loading...</div>
 <script>
-var PG=140,CG=1900,WG=10;
-var DAYS=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-var DT={"Sun":"Rest","Mon":"Upper A","Tue":"Lower+Abs","Wed":"Cardio","Thu":"Upper B","Fri":"Lower+Abs","Sat":"Rest"};
-var RT=["Brutal","Hard","Solid","Okay","Easy"];
-var WS=new Date(2026,2,22).getTime();
-var AW={};
-var S={wo:0,ad:0,view:"log",smf:false,mt:"",mp:null,mpp:null,ld:false,ae:"",cp:false};
+window.onerror = function(msg, src, line, col, err) {
+  document.getElementById("app").innerHTML =
+    "<div style='color:#e8322a;padding:20px;font-size:13px;line-height:1.6'>" +
+    "<b>JS Error:</b><br>" + msg + "<br>Line: " + line + "</div>";
+  return true;
+};
 
-function wlbl(o){
-var mo=[“Jan”,“Feb”,“Mar”,“Apr”,“May”,“Jun”,“Jul”,“Aug”,“Sep”,“Oct”,“Nov”,“Dec”];
-var s=new Date(WS+o*604800000);
-var e=new Date(WS+o*604800000+518400000);
-return mo[s.getMonth()]+” “+s.getDate()+” - “+mo[e.getMonth()]+” “+e.getDate();
+var DAYS = [“Sun”,“Mon”,“Tue”,“Wed”,“Thu”,“Fri”,“Sat”];
+var DAY_TYPES = {Sun:“Rest”,Mon:“Upper A”,Tue:“Lower+Abs”,Wed:“Cardio”,Thu:“Upper B”,Fri:“Lower+Abs”,Sat:“Rest”};
+var RATINGS = [“Brutal”,“Hard”,“Solid”,“Okay”,“Easy”];
+var PROTEIN_GOAL = 140;
+var CALORIE_GOAL = 1900;
+var WATER_GOAL = 10;
+var WEEK_START = new Date(2026, 2, 22).getTime();
+
+var allWeeks = {};
+var state = {
+weekOffset: 0,
+activeDay: 0,
+view: “log”,
+showMealForm: false,
+mealText: “”,
+mealPhoto: null,
+mealPhotoPreview: null,
+loading: false,
+error: “”,
+copied: false
+};
+
+function getWeekLabel(offset) {
+var months = [“Jan”,“Feb”,“Mar”,“Apr”,“May”,“Jun”,“Jul”,“Aug”,“Sep”,“Oct”,“Nov”,“Dec”];
+var start = new Date(WEEK_START + offset * 7 * 86400000);
+var end = new Date(start.getTime() + 6 * 86400000);
+return months[start.getMonth()] + “ “ + start.getDate() + “ - “ + months[end.getMonth()] + “ “ + end.getDate();
 }
 
-function ed(){
-return{meals:[],water:0,weight:””,photoFront:null,photoSide:null,
-workout:{completed:false,rating:””,notes:””},
-totalProtein:0,totalCalories:0,totalCarbs:0,totalFat:0};
+function newDay() {
+return {
+meals: [], water: 0, weight: “”,
+photoFront: null, photoSide: null,
+workout: { completed: false, rating: “”, notes: “” },
+p: 0, cal: 0, carbs: 0, fat: 0
+};
 }
 
-function gw(o){
-if(!AW[o]){
-AW[o]=[ed(),ed(),ed(),ed(),ed(),ed(),ed()];
+function getWeek(offset) {
+if (!allWeeks[offset]) {
+allWeeks[offset] = [];
+for (var i = 0; i < 7; i++) { allWeeks[offset].push(newDay()); }
 }
-return AW[o];
-}
-
-function lsSave(){
-try{localStorage.setItem(“trk6”,JSON.stringify(AW));}catch(ex){}
+return allWeeks[offset];
 }
 
-function lsLoad(){
-try{
-var raw=localStorage.getItem(“trk6”);
-if(raw){AW=JSON.parse(raw);}
-}catch(ex){}
+function saveData() {
+try { localStorage.setItem(“mytracker”, JSON.stringify(allWeeks)); } catch(e) {}
 }
 
-function cpDay(d){
-var m2=[];
-for(var x=0;x<d.meals.length;x++){m2.push(d.meals[x]);}
-return{meals:m2,water:d.water,weight:d.weight,
-photoFront:d.photoFront,photoSide:d.photoSide,
-workout:{completed:d.workout.completed,rating:d.workout.rating,notes:d.workout.notes},
-totalProtein:d.totalProtein,totalCalories:d.totalCalories,
-totalCarbs:d.totalCarbs,totalFat:d.totalFat};
+function loadData() {
+try {
+var raw = localStorage.getItem(“mytracker”);
+if (raw) { allWeeks = JSON.parse(raw); }
+} catch(e) {}
 }
 
-function upd(di,fn){
-var wk=gw(S.wo);
-wk[di]=fn(wk[di]);
-AW[S.wo]=wk;
-lsSave();
-render();
+function getDay() { return getWeek(state.weekOffset)[state.activeDay]; }
+
+function setDay(fn) {
+var week = getWeek(state.weekOffset);
+week[state.activeDay] = fn(week[state.activeDay]);
+saveData();
+draw();
 }
 
-function hph(e,type){
-var f=e.target.files[0];
-if(!f){return;}
-var r=new FileReader();
-r.onload=function(){
-upd(S.ad,function(d){
-var nd=cpDay(d);
-if(type===“front”){nd.photoFront=r.result;}
-else{nd.photoSide=r.result;}
+function handleProgressPhoto(e, side) {
+var file = e.target.files[0];
+if (!file) return;
+var reader = new FileReader();
+reader.onload = function() {
+setDay(function(d) {
+var nd = JSON.parse(JSON.stringify(d));
+if (side === “front”) nd.photoFront = reader.result;
+else nd.photoSide = reader.result;
 return nd;
 });
 };
-r.readAsDataURL(f);
+reader.readAsDataURL(file);
 }
 
-function rph(type){
-upd(S.ad,function(d){
-var nd=cpDay(d);
-if(type===“front”){nd.photoFront=null;}
-else{nd.photoSide=null;}
+function removeProgressPhoto(side) {
+setDay(function(d) {
+var nd = JSON.parse(JSON.stringify(d));
+if (side === “front”) nd.photoFront = null;
+else nd.photoSide = null;
 return nd;
 });
 }
 
-function hmph(e){
-var f=e.target.files[0];
-if(!f){return;}
-var r=new FileReader();
-r.onload=function(){
-S.mp=r.result.split(”,”)[1];
-S.mpp=r.result;
-render();
+function handleMealPhoto(e) {
+var file = e.target.files[0];
+if (!file) return;
+var reader = new FileReader();
+reader.onload = function() {
+state.mealPhoto = reader.result.split(”,”)[1];
+state.mealPhotoPreview = reader.result;
+draw();
 };
-r.readAsDataURL(f);
+reader.readAsDataURL(file);
 }
 
-function doAnalyze(){
-var ta=document.getElementById(“mta”);
-if(ta){S.mt=ta.value;}
-if(!S.mt&&!S.mp){return;}
-S.ld=true;S.ae=””;render();
-var content=[];
-if(S.mp){
-content.push({type:“image”,source:{type:“base64”,media_type:“image/jpeg”,data:S.mp}});
+function analyzeMeal() {
+var ta = document.getElementById(“meal-ta”);
+if (ta) state.mealText = ta.value;
+if (!state.mealText && !state.mealPhoto) return;
+state.loading = true; state.error = “”; draw();
+var content = [];
+if (state.mealPhoto) {
+content.push({ type: “image”, source: { type: “base64”, media_type: “image/jpeg”, data: state.mealPhoto } });
 }
-var prompt=S.mp
-?“Analyze this food photo”+(S.mt?” plus: "”+S.mt+”"”:””)+”. Return ONLY raw JSON: {"name":"meal name","protein":0,"carbs":0,"fat":0,"calories":0}”
-:“Analyze: "”+S.mt+”". Return ONLY raw JSON: {"name":"meal name","protein":0,"carbs":0,"fat":0,"calories":0}”;
-content.push({type:“text”,text:prompt});
-fetch(“https://api.anthropic.com/v1/messages”,{
-method:“POST”,
-headers:{“Content-Type”:“application/json”},
-body:JSON.stringify({model:“claude-sonnet-4-20250514”,max_tokens:300,messages:[{role:“user”,content:content}]})
-}).then(function(res){return res.json();}).then(function(data){
-var txt=””;
-if(data.content){
-for(var xi=0;xi<data.content.length;xi++){
-if(data.content[xi].type===“text”){txt=data.content[xi].text;break;}
+var prompt = state.mealPhoto
+? “Analyze this food photo” + (state.mealText ? “ plus: “ + state.mealText : “”) + “. Return ONLY valid JSON no markdown: {"name":"meal name","protein":25,"carbs":30,"fat":10,"calories":300}”
+: “Analyze: “ + state.mealText + “. Return ONLY valid JSON no markdown: {"name":"meal name","protein":25,"carbs":30,"fat":10,"calories":300}”;
+content.push({ type: “text”, text: prompt });
+fetch(“https://api.anthropic.com/v1/messages”, {
+method: “POST”,
+headers: { “Content-Type”: “application/json” },
+body: JSON.stringify({ model: “claude-sonnet-4-20250514”, max_tokens: 300, messages: [{ role: “user”, content: content }] })
+})
+.then(function(r) { return r.json(); })
+.then(function(data) {
+var txt = “”;
+if (data.content) {
+for (var i = 0; i < data.content.length; i++) {
+if (data.content[i].type === “text”) { txt = data.content[i].text; break; }
 }
 }
-txt=txt.replace(/`json/g,"").replace(/`/g,””).trim();
-var p=JSON.parse(txt);
-var prev=S.mpp,inp=S.mt;
-upd(S.ad,function(d){
-var nd=cpDay(d);
-nd.meals=nd.meals.concat([{name:p.name||“Meal”,protein:p.protein||0,carbs:p.carbs||0,fat:p.fat||0,calories:p.calories||0,input:inp,photoPreview:prev}]);
-nd.totalProtein+=p.protein||0;
-nd.totalCalories+=p.calories||0;
-nd.totalCarbs+=p.carbs||0;
-nd.totalFat+=p.fat||0;
+txt = txt.replace(/`json/g, "").replace(/`/g, “”).trim();
+var parsed = JSON.parse(txt);
+var prev = state.mealPhotoPreview;
+var inp = state.mealText;
+setDay(function(d) {
+var nd = JSON.parse(JSON.stringify(d));
+nd.meals.push({ name: parsed.name || “Meal”, protein: parsed.protein || 0, carbs: parsed.carbs || 0, fat: parsed.fat || 0, calories: parsed.calories || 0, input: inp, photo: prev });
+nd.p += parsed.protein || 0;
+nd.cal += parsed.calories || 0;
+nd.carbs += parsed.carbs || 0;
+nd.fat += parsed.fat || 0;
 return nd;
 });
-S.mt=””;S.mp=null;S.mpp=null;S.smf=false;S.ld=false;S.ae=””;
-render();
-}).catch(function(){
-S.ld=false;S.ae=“Could not analyze. Try again.”;render();
+state.mealText = “”; state.mealPhoto = null; state.mealPhotoPreview = null;
+state.showMealForm = false; state.loading = false; state.error = “”;
+draw();
+})
+.catch(function() {
+state.loading = false; state.error = “Could not analyze. Try again.”; draw();
 });
 }
 
-function rmeal(idx){
-upd(S.ad,function(d){
-var m=d.meals[idx];
-var nd=cpDay(d);
-var nm=[];
-for(var xi=0;xi<d.meals.length;xi++){if(xi!==idx){nm.push(d.meals[xi]);}}
-nd.meals=nm;
-nd.totalProtein-=m.protein||0;
-nd.totalCalories-=m.calories||0;
-nd.totalCarbs-=m.carbs||0;
-nd.totalFat-=m.fat||0;
+function removeMeal(idx) {
+setDay(function(d) {
+var nd = JSON.parse(JSON.stringify(d));
+var m = nd.meals[idx];
+nd.meals.splice(idx, 1);
+nd.p -= m.protein || 0;
+nd.cal -= m.calories || 0;
+nd.carbs -= m.carbs || 0;
+nd.fat -= m.fat || 0;
 return nd;
 });
 }
 
-function doCopy(){
-var week=gw(S.wo);
-var wkts=0,sumP=0,pdays=0,notes=[];
-var wts2=[];
-for(var xi=0;xi<7;xi++){
-if(week[xi].workout.completed){wkts++;}
-sumP+=week[xi].totalProtein;
-if(week[xi].totalProtein>=PG){pdays++;}
-if(week[xi].workout.notes){notes.push(DAYS[xi]+”: “+week[xi].workout.notes);}
-wts2.push(parseFloat(week[xi].weight)||0);
+function copyCheckin() {
+var week = getWeek(state.weekOffset);
+var lines = [“WEEKLY CHECK-IN - “ + getWeekLabel(state.weekOffset)];
+var totalP = 0, workouts = 0, proteinDays = 0, weights = [];
+for (var i = 0; i < 7; i++) {
+totalP += week[i].p;
+if (week[i].workout.completed) workouts++;
+if (week[i].p >= PROTEIN_GOAL) proteinDays++;
+if (week[i].weight) weights.push(parseFloat(week[i].weight));
 }
-var lwts=[];
-for(var xi=0;xi<wts2.length;xi++){if(wts2[xi]>0){lwts.push(wts2[xi]);}}
-var avgWt=lwts.length?(lwts.reduce(function(a,b){return a+b;},0)/lwts.length).toFixed(1):”–”;
-var txt=“WEEKLY CHECK-IN - “+wlbl(S.wo)+
-“\nWorkouts: “+wkts+”/5”+
-“\nAvg protein: “+Math.round(sumP/7)+“g (goal: “+PG+“g)”+
-“\nProtein days: “+pdays+”/7”+
-“\nAvg weight: “+avgWt+” lbs”+
-“\nNotes: “+(notes.length?notes.join(” | “):“None”);
-navigator.clipboard.writeText(txt).then(function(){
-S.cp=true;render();
-setTimeout(function(){S.cp=false;render();},2500);
-}).catch(function(){alert(“Copied!”);});
+lines.push(“Workouts: “ + workouts + “/5”);
+lines.push(“Avg protein: “ + Math.round(totalP / 7) + “g (goal: “ + PROTEIN_GOAL + “g)”);
+lines.push(“Protein goal days: “ + proteinDays + “/7”);
+if (weights.length) {
+var sum = 0; for (var i = 0; i < weights.length; i++) sum += weights[i];
+lines.push(“Avg weight: “ + (sum / weights.length).toFixed(1) + “ lbs”);
 }
-
-function mkRing(val,max,color){
-var sz=64,sw=6,r=(sz-sw*2)/2,c=2*Math.PI*r;
-var pct=val/max;if(pct>1){pct=1;}if(pct<0){pct=0;}
-return ‘<svg width="'+sz+'" height="'+sz+'" style="transform:rotate(-90deg)">’+
-‘<circle cx="'+sz/2+'" cy="'+sz/2+'" r="'+r+'" fill="none" stroke="#181818" stroke-width="'+sw+'"/>’+
-‘<circle cx=”’+sz/2+’” cy=”’+sz/2+’” r=”’+r+’” fill=“none” stroke=”’+color+’” stroke-width=”’+sw+’”’+
-’ stroke-dasharray=”’+c+’” stroke-dashoffset=”’+(c*(1-pct))+’” stroke-linecap=“round”/></svg>’;
+var notes = [];
+for (var i = 0; i < 7; i++) {
+if (week[i].workout.notes) notes.push(DAYS[i] + “: “ + week[i].workout.notes);
+}
+if (notes.length) lines.push(“Notes: “ + notes.join(” | “));
+navigator.clipboard.writeText(lines.join(”\n”)).then(function() {
+state.copied = true; draw();
+setTimeout(function() { state.copied = false; draw(); }, 2500);
+}).catch(function() { alert(lines.join(”\n”)); });
 }
 
-function mkBar(lbl,val,max,color){
-var unit=lbl===“Calories”?””:“g”;
-var pct=val/max*100;if(pct>100){pct=100;}if(pct<0){pct=0;}
-return ‘<div class="bar"><div class="blr"><span>’+lbl+’</span><span class="blrv">’+val+unit+’ / ‘+max+unit+’</span></div>’+
-‘<div class="bt"><div class="bf" style="width:'+pct+'%;background:'+color+'"></div></div></div>’;
+function draw() {
+var week = getWeek(state.weekOffset);
+var day = getDay();
+var dayType = DAY_TYPES[DAYS[state.activeDay]];
+var html = “”;
+
+html += “<div style='padding:44px 20px 12px;background:#0d0d0d;border-bottom:1px solid #1c1c1c;position:sticky;top:0;z-index:100'>”;
+html += “<div style='font-size:9px;letter-spacing:3px;color:#e8322a;text-transform:uppercase;margin-bottom:2px'>Daily Tracker</div>”;
+html += “<div style='display:flex;justify-content:space-between;align-items:center'>”;
+html += “<div style='font-size:18px;font-weight:700;color:#f0ede8'>” + getWeekLabel(state.weekOffset) + “</div>”;
+html += “<div style='display:flex;gap:5px'>”;
+html += “<button class='btn-dark' style='width:28px;height:28px;padding:0;font-size:16px' onclick='state.weekOffset--;draw()'>‹</button>”;
+html += “<button class='btn-dark' style='width:28px;height:28px;padding:0;font-size:16px' onclick='state.weekOffset++;draw()'>›</button>”;
+html += “</div></div>”;
+if (state.weekOffset !== 0) html += “<button onclick='state.weekOffset=0;draw()' style='background:none;border:none;color:#e8322a;font-size:10px;padding:3px 0 0;cursor:pointer'>← Current week</button>”;
+html += “</div>”;
+
+html += “<div style='display:flex;gap:5px;padding:10px 20px;overflow-x:auto;background:#0d0d0d;border-bottom:1px solid #1c1c1c;scrollbar-width:none'>”;
+for (var i = 0; i < 7; i++) {
+var d = DAYS[i];
+var isRest = DAY_TYPES[d] === “Rest”;
+var isActive = i === state.activeDay;
+var isToday = state.weekOffset === 0 && i === 0;
+html += “<div onclick='state.activeDay=" + i + ";draw()' style='flex-shrink:0;border-radius:10px;padding:6px 10px;text-align:center;cursor:pointer;border:1px solid " + (isActive ? "#e8322a" : (isToday ? "rgba(232,50,42,0.3)" : "#1c1c1c")) + ";background:" + (isActive ? "#e8322a" : "#121212") + ";opacity:" + (isRest ? "0.4" : "1") + "'>”;
+html += “<div style='font-size:8px;letter-spacing:1px;text-transform:uppercase;color:" + (isActive ? "rgba(255,255,255,0.5)" : "#3a3a3a") + ";margin-bottom:1px'>” + d + “</div>”;
+html += “<div style='font-size:10px;font-weight:600;color:" + (isActive ? "#fff" : "#888") + "'>” + DAY_TYPES[d] + “</div>”;
+if (week[i].workout.completed) html += “<div style='font-size:7px;color:" + (isActive ? "rgba(255,255,255,0.7)" : "#e8322a") + ";margin-top:2px'>done</div>”;
+html += “</div>”;
 }
+html += “</div>”;
 
-function cc2(v,g){
-if(v>=g){return”#10b981”;}
-if(v>0){return”#f59e0b”;}
-return”#2a2a2a”;
-}
+html += “<div style='display:flex;gap:6px;padding:12px 20px 0'>”;
+html += “<button onclick='state.view=\"log\";draw()' style='background:" + (state.view === "log" ? "#181818" : "transparent") + ";border:1px solid " + (state.view === "log" ? "#252525" : "#181818") + ";border-radius:8px;padding:5px 14px;color:" + (state.view === "log" ? "#f0ede8" : "#3a3a3a") + ";font-size:11px;font-weight:" + (state.view === "log" ? "600" : "400") + ";cursor:pointer'>Daily Log</button>”;
+html += “<button onclick='state.view=\"week\";draw()' style='background:" + (state.view === "week" ? "#181818" : "transparent") + ";border:1px solid " + (state.view === "week" ? "#252525" : "#181818") + ";border-radius:8px;padding:5px 14px;color:" + (state.view === "week" ? "#f0ede8" : "#3a3a3a") + ";font-size:11px;font-weight:" + (state.view === "week" ? "600" : "400") + ";cursor:pointer'>Week Summary</button>”;
+html += “</div>”;
 
-function buildLog(week,day,dt){
-var h=””;
+html += “<div style='padding:12px 20px 0'>”;
 
-// WEIGHT & PROGRESS PHOTOS
-h+=’<div class="card"><div class="slbl">Daily Weight & Progress</div>’+
-‘<div style="display:flex;align-items:center;margin-bottom:4px">’+
-‘<input class=“winp” type=“number” step=“0.1” min=“50” max=“500” id=“winp” placeholder=“0.0” value=”’+(day.weight||””)+’”>’+
-‘<span class="wunit">lbs</span></div>’+
-(day.weight?’<div class="wok">Logged!</div>’:’’)+
-‘<div style="margin-top:14px">’+
-‘<div style="font-size:9px;letter-spacing:2px;color:#444;text-transform:uppercase;margin-bottom:10px">Progress Photos</div>’+
-‘<div class="pgrid">’+
-‘<input type="file" id="pf" accept="image/*" style="display:none" onchange="hph(event,\'front\')">’+
-‘<input type="file" id="ps" accept="image/*" style="display:none" onchange="hph(event,\'side\')">’;
-
-if(day.photoFront){
-h+=’<div class="pslot has"><img src="'+day.photoFront+'" class="pimg"><button class="prem" onclick="rph(\'front\')">X</button><div class="ptyp">front</div></div>’;
-}else{
-h+=’<div class="pslot" onclick="document.getElementById(\'pf\').click()"><div class="pinner"><div class="picon">📷</div><div class="plbl">Front View<br><span style="color:#2a2a2a;font-size:9px">tap to add</span></div></div></div>’;
-}
-if(day.photoSide){
-h+=’<div class="pslot has"><img src="'+day.photoSide+'" class="pimg"><button class="prem" onclick="rph(\'side\')">X</button><div class="ptyp">side</div></div>’;
-}else{
-h+=’<div class="pslot" onclick="document.getElementById(\'ps\').click()"><div class="pinner"><div class="picon">📷</div><div class="plbl">Side View<br><span style="color:#2a2a2a;font-size:9px">tap to add</span></div></div></div>’;
-}
-h+=’</div></div></div>’;
-
-// MACROS
-h+=’<div class="card"><div class="slbl">Today's Macros</div>’+
-‘<div class="mring"><div class="rw">’+mkRing(day.totalProtein,PG,”#e8322a”)+
-‘<div class="ri"><div class="rv">’+day.totalProtein+‘g</div><div class="rs">protein</div></div></div>’+
-‘<div style="flex:1">’+mkBar(“Protein”,day.totalProtein,PG,”#e8322a”)+mkBar(“Carbs”,day.totalCarbs,250,”#f59e0b”)+mkBar(“Fat”,day.totalFat,70,”#3b82f6”)+mkBar(“Calories”,day.totalCalories,CG,”#10b981”)+’</div></div>’+
-‘<div class="chips">’+
-‘<div class="chip"><div class="cv" style="color:#e8322a">’+day.totalProtein+‘g</div><div class="cl">Protein</div></div>’+
-‘<div class="chip"><div class="cv" style="color:#f59e0b">’+day.totalCarbs+‘g</div><div class="cl">Carbs</div></div>’+
-‘<div class="chip"><div class="cv" style="color:#3b82f6">’+day.totalFat+‘g</div><div class="cl">Fat</div></div>’+
-‘<div class="chip"><div class="cv" style="color:#10b981">’+day.totalCalories+’</div><div class="cl">Calories</div></div>’+
-‘</div></div>’;
-
-// WATER
-h+=’<div class="card"><div class="wtrrow">’+
-‘<div><div class="slbl">Water</div><div class="wtrval">’+day.water+’ / ‘+WG+’ glasses</div></div>’+
-‘<div class="wtrbtns">’+
-‘<button class="wtrbtn wtrm" onclick="upd(S.ad,function(d){var nd=cpDay(d);nd.water=Math.max(0,d.water-1);return nd;})">-</button>’+
-‘<button class="wtrbtn wtrp" onclick="upd(S.ad,function(d){var nd=cpDay(d);nd.water=Math.min('+WG+',d.water+1);return nd;})">+</button>’+
-‘</div></div><div class="wsegs">’;
-for(var wi=0;wi<WG;wi++){
-h+=’<div class=“wseg’+(wi<day.water?” on”:””)+’” onclick=“upd(S.ad,function(d){var nd=cpDay(d);nd.water=’+(wi+1)+’;return nd;})”></div>’;
-}
-h+=’</div></div>’;
-
-// MEALS
-h+=’<div class="card"><div class="mhdr"><div class="slbl" style="margin-bottom:0">Meals</div>’+
-‘<button class="addbtn" onclick="S.smf=true;render()">+ Add Meal</button></div>’;
-
-if(S.smf){
-h+=’<div class="mform"><div class="mhint">Photo, text, or both. Claude fills in your macros.</div>’+
-‘<input type="file" id="mph" accept="image/*" style="display:none" onchange="hmph(event)">’;
-if(S.mpp){
-h+=’<div class="pvw"><img src="'+S.mpp+'" class="pvwimg"><button class="pvrm" onclick="S.mp=null;S.mpp=null;render()">X</button><div class="pvbdg">Photo ready</div></div>’;
-}else{
-h+=’<button class="phbtn" onclick="document.getElementById(\'mph\').click()">📷 Upload Food Photo (optional)</button>’;
-}
-h+=’<textarea class="mta" id="mta" placeholder="Describe what you ate... e.g. grilled chicken, rice, broccoli">’+(S.mt||””)+’</textarea>’;
-if(S.ae){h+=’<div class="aerr">’+S.ae+’</div>’;}
-h+=’<div class="fbtns">’+
-‘<button class="cancelbtn" onclick="S.smf=false;S.mt=\'\';S.mp=null;S.mpp=null;S.ae=\'\';render()">Cancel</button>’+
-‘<button class=“anlzbtn” onclick=“doAnalyze()” ‘+(S.ld?“disabled”:””)+’>’+( S.ld?“Analyzing…”:“Analyze + Log”)+’</button>’+
-‘</div></div>’;
-}
-
-if(day.meals.length===0&&!S.smf){h+=’<div class="nomeal">No meals logged yet</div>’;}
-
-for(var mi=0;mi<day.meals.length;mi++){
-var m=day.meals[mi];
-h+=’<div class="mi"><div class="mihdr"><div style="flex:1"><div class="miname">’+m.name+’</div>’+(m.input?’<div class="midesc">’+m.input+’</div>’:””)+
-‘</div><button class="mirm" onclick="rmeal('+mi+')">X</button></div>’+
-(m.photoPreview?’<img src="'+m.photoPreview+'" class="miph">’:””)+
-‘<div class="mmacs">’+
-‘<div class="mm"><div class="mmv" style="color:#e8322a">’+m.protein+‘g</div><div class="mml">P</div></div>’+
-‘<div class="mm"><div class="mmv" style="color:#f59e0b">’+m.carbs+‘g</div><div class="mml">C</div></div>’+
-‘<div class="mm"><div class="mmv" style="color:#3b82f6">’+m.fat+‘g</div><div class="mml">F</div></div>’+
-‘<div class="mm"><div class="mmv" style="color:#10b981">’+m.calories+’</div><div class="mml">kcal</div></div>’+
-‘</div></div>’;
-}
-h+=’</div>’;
-
-// WORKOUT
-if(dt!==“Rest”){
-h+=’<div class="card"><div class="slbl">Workout - ‘+dt+’</div>’+
-‘<button class=“woutbtn’+(day.workout.completed?” done”:””)+’” onclick=“upd(S.ad,function(d){var nd=cpDay(d);nd.workout={completed:!d.workout.completed,rating:d.workout.rating,notes:d.workout.notes};return nd;})”>’+
-(day.workout.completed?“Done!”:“Mark Workout Done”)+’</button>’;
-if(day.workout.completed){
-h+=’<div class="rhint">How did it feel?</div><div class="rrow">’;
-for(var ri=0;ri<RT.length;ri++){
-var rv=RT[ri];
-h+=’<button class=“rbtn’+(day.workout.rating===rv?” on”:””)+’” onclick=“upd(S.ad,function(d){var nd=cpDay(d);nd.workout={completed:d.workout.completed,rating:'’+rv+’',notes:d.workout.notes};return nd;})”>’+rv+’</button>’;
-}
-h+=’</div><textarea class="wnotes" id="wn" placeholder="Log weights, PRs, notes...">’+day.workout.notes+’</textarea>’;
-}
-h+=’</div>’;
-}
-return h;
-}
-
-function buildWeek(week){
-var h=””;
-var wkts=0,sumP=0,pdays=0;
-var wts2=[];
-for(var wi=0;wi<7;wi++){
-if(week[wi].workout.completed){wkts++;}
-sumP+=week[wi].totalProtein;
-if(week[wi].totalProtein>=PG){pdays++;}
-wts2.push(parseFloat(week[wi].weight)||0);
-}
-var avgP=Math.round(sumP/7);
-var lwts=[];
-for(var wi=0;wi<wts2.length;wi++){if(wts2[wi]>0){lwts.push(wts2[wi]);}}
-var avgWt=lwts.length?(lwts.reduce(function(a,b){return a+b;},0)/lwts.length).toFixed(1):”–”;
-
-h+=’<div class="wkstats">’+
-‘<div class="wkstat"><div class="wksv" style="color:#e8322a">’+avgP+‘g</div><div class="wkss">Goal ‘+PG+‘g</div><div class="wksl">Avg Protein</div></div>’+
-‘<div class="wkstat"><div class="wksv" style="color:#10b981">’+wkts+’/5</div><div class="wkss">Completed</div><div class="wksl">Workouts</div></div>’+
-‘<div class="wkstat"><div class="wksv" style="color:#f59e0b">’+avgWt+’</div><div class="wkss">lbs avg</div><div class="wksl">Weight</div></div>’+
-‘</div>’;
-
-var maxW=0,minW=9999;
-for(var wi=0;wi<7;wi++){if(wts2[wi]>0){if(wts2[wi]>maxW){maxW=wts2[wi];}if(wts2[wi]<minW){minW=wts2[wi];}}}
-if(maxW===0){maxW=1;minW=0;}
-var rng=maxW-minW||1;
-
-h+=’<div class="card"><div class="slbl">Weight This Week</div><div class="wchart">’;
-for(var wi=0;wi<7;wi++){
-var wv=wts2[wi];
-var bh=wv>0?Math.max(4,Math.round(((wv-minW)/rng)*36)+4):2;
-h+=’<div class="wbarw"><div class="wbarv">’+(wv>0?wv:””)+’</div>’+
-‘<div class=“wbar” style=“height:’+bh+‘px;background:’+(wv>0?”#f59e0b”:”#1a1a1a”)+’”></div>’+
-‘<div class="wbard">’+DAYS[wi]+’</div></div>’;
-}
-h+=’</div></div>’;
-
-h+=’<div class="card"><div class="slbl">Daily Breakdown</div>’;
-for(var di=0;di<7;di++){
-var wd=week[di];
-var rest=DT[DAYS[di]]===“Rest”;
-h+=’<div class=“drow’+(rest?” rest”:””)+’” onclick=“S.ad=’+di+’;S.view='log';render()”>’+
-‘<div><div class="dname">’+DAYS[di]+’ <span class="dtype">’+DT[DAYS[di]]+’</span></div>’+
-‘<div class="dsub">’+wd.meals.length+’ meals, ‘+wd.water+’ glasses’+(wd.workout.rating?” - “+wd.workout.rating:””)+
-‘</div></div><div class="dright">’+
-‘<div class="dprot" style="color:'+cc2(wd.totalProtein,PG)+'">’+wd.totalProtein+‘g</div>’+
-‘<div class="dcal">’+wd.totalCalories+’ kcal</div>’+
-(wd.weight?’<div class="dwt">’+wd.weight+’ lbs</div>’:””)+
-(wd.workout.completed?’<div class="dtrn">trained</div>’:””)+
-‘</div></div>’;
-}
-h+=’</div>’;
-
-h+=’<div class="card"><div class="slbl">Weekly Check-In</div>’+
-‘<div style="font-size:11px;color:#3a3a3a;margin-bottom:10px">Every Sunday copy this and paste into your chat with Claude.</div>’+
-‘<div class="cbox"><div class="ctitle">WEEKLY CHECK-IN - ‘+wlbl(S.wo)+’</div>’+
-‘<div>Workouts: ‘+wkts+’/5</div>’+
-‘<div>Avg protein: ‘+avgP+‘g (goal: ‘+PG+‘g)</div>’+
-‘<div>Protein days: ‘+pdays+’/7</div>’+
-‘<div>Avg weight: ‘+avgWt+’ lbs</div>’;
-var hasN=false;
-for(var ni=0;ni<7;ni++){
-if(week[ni].workout.notes){h+=’<div class="cnote">’+DAYS[ni]+’: ‘+week[ni].workout.notes+’</div>’;hasN=true;}
-}
-if(!hasN){h+=’<div class="cnote" style="color:#2a2a2a">No notes yet</div>’;}
-h+=’</div><button class=“cpbtn’+(S.cp?” ok”:””)+’” onclick=“doCopy()”>’+(S.cp?“Copied!”:“Copy Check-In”)+’</button></div>’;
-return h;
-}
-
-function render(){
-try{
-var week=gw(S.wo);
-var day=week[S.ad];
-var dt=DT[DAYS[S.ad]];
-var h=””;
+if (state.view === “log”) {
 
 ```
-// HEADER
-h+='<div class="hdr"><div class="hlbl">Daily Tracker</div>'+
-  '<div class="hrow"><div class="htitle">'+wlbl(S.wo)+'</div>'+
-  '<div class="navb">'+
-  '<button class="nbtn" onclick="S.wo--;render()">&#8249;</button>'+
-  '<button class="nbtn" onclick="S.wo++;render()">&#8250;</button>'+
-  '</div></div>'+
-  (S.wo!==0?'<button class="bklnk" onclick="S.wo=0;render()">&#8592; Current week</button>':"")+
-  '</div>';
+html += "<div class='card'><div class='lbl'>Daily Weight &amp; Progress</div>";
+html += "<div style='display:flex;align-items:center;gap:10px;margin-bottom:4px'>";
+html += "<input type='number' id='weight-input' step='0.1' min='50' max='500' placeholder='0.0' value='" + (day.weight || "") + "' style='width:120px;font-size:22px;font-weight:700;text-align:center'>";
+html += "<span style='font-size:14px;color:#555'>lbs</span></div>";
+if (day.weight) html += "<div style='font-size:10px;color:#10b981;margin-bottom:10px'>Logged!</div>";
+html += "<div style='font-size:9px;letter-spacing:2px;color:#444;text-transform:uppercase;margin:12px 0 10px'>Progress Photos</div>";
+html += "<div style='display:grid;grid-template-columns:1fr 1fr;gap:10px'>";
+html += "<input type='file' id='photo-front' accept='image/*' style='display:none' onchange='handleProgressPhoto(event,\"front\")'>";
+html += "<input type='file' id='photo-side' accept='image/*' style='display:none' onchange='handleProgressPhoto(event,\"side\")'>";
 
-// TABS
-h+='<div class="tabs">';
-for(var ti=0;ti<7;ti++){
-  var dn=DAYS[ti];
-  var rest=DT[dn]==="Rest";
-  var act=ti===S.ad;
-  var today=S.wo===0&&ti===0;
-  h+='<div class="tab'+(act?" on":"")+(rest?" rest":"")+(today&&!act?" today":"")+'" onclick="S.ad='+ti+';render()">';
-  h+='<div class="tday">'+dn+'</div><div class="ttype">'+DT[dn]+'</div>';
-  if(week[ti].workout.completed){h+='<div class="tdone">done</div>';}
-  h+='</div>';
+var sides = ["front", "side"];
+for (var si = 0; si < 2; si++) {
+  var sn = sides[si];
+  var sp = sn === "front" ? day.photoFront : day.photoSide;
+  if (sp) {
+    html += "<div style='position:relative;aspect-ratio:3/4;border-radius:10px;overflow:hidden;border:1px solid #1c1c1c'>";
+    html += "<img src='" + sp + "' style='width:100%;height:100%;object-fit:cover;display:block'>";
+    html += "<button onclick='removeProgressPhoto(\"" + sn + "\")' style='position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.75);border:none;border-radius:50%;width:24px;height:24px;color:#fff;font-size:11px;cursor:pointer'>X</button>";
+    html += "<div style='position:absolute;bottom:6px;left:0;right:0;text-align:center;font-size:9px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:1px'>" + sn + "</div></div>";
+  } else {
+    html += "<div onclick='document.getElementById(\"photo-" + sn + "\").click()' style='aspect-ratio:3/4;background:#0c0c0c;border:1px dashed #252525;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;padding:12px'>";
+    html += "<div style='font-size:22px;margin-bottom:6px'>&#128247;</div>";
+    html += "<div style='font-size:10px;color:#444;text-align:center'>" + (sn.charAt(0).toUpperCase() + sn.slice(1)) + " View<br><span style='color:#2a2a2a;font-size:9px'>tap to add</span></div></div>";
+  }
 }
-h+='</div>';
+html += "</div></div>";
 
-// VIEW TOGGLE
-h+='<div class="vtog">'+
-  '<button class="vbtn'+(S.view==="log"?" on":"")+'" onclick="S.view=\'log\';render()">Daily Log</button>'+
-  '<button class="vbtn'+(S.view==="week"?" on":"")+'" onclick="S.view=\'week\';render()">Week Summary</button>'+
-  '</div>';
+html += "<div class='card'><div class='lbl'>Today's Macros</div>";
+var protPct = Math.min(day.p / PROTEIN_GOAL * 100, 100);
+html += "<div style='display:flex;align-items:center;gap:14px;margin-bottom:14px'>";
+var sz = 64, sw = 6, r = (sz - sw * 2) / 2, circ = 2 * Math.PI * r, off = circ * (1 - protPct / 100);
+html += "<div style='position:relative;display:flex;align-items:center;justify-content:center;flex-shrink:0'>";
+html += "<svg width='" + sz + "' height='" + sz + "' style='transform:rotate(-90deg)'>";
+html += "<circle cx='" + sz/2 + "' cy='" + sz/2 + "' r='" + r + "' fill='none' stroke='#181818' stroke-width='" + sw + "'/>";
+html += "<circle cx='" + sz/2 + "' cy='" + sz/2 + "' r='" + r + "' fill='none' stroke='#e8322a' stroke-width='" + sw + "' stroke-dasharray='" + circ + "' stroke-dashoffset='" + off + "' stroke-linecap='round'/></svg>";
+html += "<div style='position:absolute;text-align:center'><div style='font-size:12px;font-weight:700;color:#f0ede8'>" + day.p + "g</div><div style='font-size:7px;color:#444'>protein</div></div></div>";
+html += "<div style='flex:1'>";
+var bars = [["Protein", day.p, PROTEIN_GOAL, "#e8322a"], ["Carbs", day.carbs, 250, "#f59e0b"], ["Fat", day.fat, 70, "#3b82f6"], ["Calories", day.cal, CALORIE_GOAL, "#10b981"]];
+for (var bi = 0; bi < bars.length; bi++) {
+  var bl = bars[bi];
+  var bp = Math.min(bl[1] / bl[2] * 100, 100);
+  var bu = bl[0] === "Calories" ? "" : "g";
+  html += "<div style='margin-bottom:7px'><div style='display:flex;justify-content:space-between;font-size:10px;color:#555;margin-bottom:3px'><span>" + bl[0] + "</span><span style='color:#999'>" + bl[1] + bu + " / " + bl[2] + bu + "</span></div>";
+  html += "<div style='background:#181818;border-radius:3px;height:4px'><div style='width:" + bp + "%;background:" + bl[3] + ";height:100%;border-radius:3px'></div></div></div>";
+}
+html += "</div></div>";
+html += "<div style='display:grid;grid-template-columns:repeat(4,1fr);gap:6px'>";
+var chips = [["Protein", day.p + "g", "#e8322a"], ["Carbs", day.carbs + "g", "#f59e0b"], ["Fat", day.fat + "g", "#3b82f6"], ["Calories", day.cal, "#10b981"]];
+for (var ci = 0; ci < chips.length; ci++) {
+  html += "<div style='background:#0c0c0c;border-radius:8px;padding:8px 4px;text-align:center'><div style='font-size:13px;font-weight:700;color:" + chips[ci][2] + "'>" + chips[ci][1] + "</div><div style='font-size:8px;color:#383838;margin-top:1px'>" + chips[ci][0] + "</div></div>";
+}
+html += "</div></div>";
 
-h+='<div class="pg">';
-if(S.view==="log"){h+=buildLog(week,day,dt);}
-else{h+=buildWeek(week);}
-h+='</div>';
+html += "<div class='card'>";
+html += "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px'>";
+html += "<div><div class='lbl'>Water</div><div style='font-size:16px;font-weight:700;color:#3b82f6'>" + day.water + " / " + WATER_GOAL + " glasses</div></div>";
+html += "<div style='display:flex;gap:6px'>";
+html += "<button onclick='setDay(function(d){var nd=JSON.parse(JSON.stringify(d));nd.water=Math.max(0,d.water-1);return nd;})' style='background:#181818;border:1px solid #252525;color:#888;border-radius:8px;width:32px;height:32px;font-size:16px;padding:0;cursor:pointer'>-</button>";
+html += "<button onclick='setDay(function(d){var nd=JSON.parse(JSON.stringify(d));nd.water=Math.min(" + WATER_GOAL + ",d.water+1);return nd;})' style='background:#3b82f6;border:none;color:#fff;border-radius:8px;width:32px;height:32px;font-size:16px;padding:0;cursor:pointer'>+</button>";
+html += "</div></div><div style='display:flex;gap:4px'>";
+for (var wi = 0; wi < WATER_GOAL; wi++) {
+  html += "<div onclick='setDay(function(d){var nd=JSON.parse(JSON.stringify(d));nd.water=" + (wi + 1) + ";return nd;})' style='flex:1;height:6px;border-radius:3px;background:" + (wi < day.water ? "#3b82f6" : "#181818") + ";cursor:pointer'></div>";
+}
+html += "</div></div>";
 
-document.getElementById("root").innerHTML=h;
+html += "<div class='card'>";
+html += "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:12px'>";
+html += "<div class='lbl' style='margin:0'>Meals</div>";
+html += "<button class='btn-red' onclick='state.showMealForm=true;draw()'>+ Add Meal</button></div>";
 
-var ta=document.getElementById("mta");
-if(ta){ta.addEventListener("input",function(e){S.mt=e.target.value;});}
-
-var wn=document.getElementById("wn");
-if(wn){
-  wn.addEventListener("blur",function(e){
-    upd(S.ad,function(d){
-      var nd=cpDay(d);
-      nd.workout={completed:d.workout.completed,rating:d.workout.rating,notes:e.target.value};
-      return nd;
-    });
-  });
+if (state.showMealForm) {
+  html += "<div style='background:#0c0c0c;border-radius:10px;padding:14px;margin-bottom:12px;border:1px solid #1a1a1a'>";
+  html += "<div style='font-size:11px;color:#555;margin-bottom:10px'>Upload a photo, describe your meal, or both. Claude fills in the macros.</div>";
+  html += "<input type='file' id='meal-photo-input' accept='image/*' style='display:none' onchange='handleMealPhoto(event)'>";
+  if (state.mealPhotoPreview) {
+    html += "<div style='position:relative;margin-bottom:10px'><img src='" + state.mealPhotoPreview + "' style='width:100%;max-height:150px;object-fit:cover;border-radius:8px;display:block'>";
+    html += "<button onclick='state.mealPhoto=null;state.mealPhotoPreview=null;draw()' style='position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.75);border:none;border-radius:50%;width:24px;height:24px;color:#fff;font-size:12px;cursor:pointer'>X</button>";
+    html += "<div style='position:absolute;bottom:6px;left:8px;background:#10b981;border-radius:4px;padding:2px 8px;font-size:9px;color:#fff'>Photo ready</div></div>";
+  } else {
+    html += "<button onclick='document.getElementById(\"meal-photo-input\").click()' style='width:100%;background:#111;border:1px dashed #252525;border-radius:8px;padding:10px 0;color:#444;font-size:12px;cursor:pointer;margin-bottom:10px'>&#128247; Upload Food Photo (optional)</button>";
+  }
+  html += "<textarea id='meal-ta' placeholder='Describe what you ate... e.g. grilled chicken, rice, broccoli' style='width:100%;height:60px;resize:none;margin-bottom:8px;display:block'>" + (state.mealText || "") + "</textarea>";
+  if (state.error) html += "<div style='color:#e8322a;font-size:11px;margin-bottom:8px'>" + state.error + "</div>";
+  html += "<div style='display:flex;gap:8px'>";
+  html += "<button onclick='state.showMealForm=false;state.mealText=\"\";state.mealPhoto=null;state.mealPhotoPreview=null;state.error=\"\";draw()' style='flex:1;background:transparent;border:1px solid #252525;border-radius:8px;color:#555;font-size:12px;padding:8px 0;cursor:pointer'>Cancel</button>";
+  html += "<button onclick='analyzeMeal()' " + (state.loading ? "disabled" : "") + " style='flex:2;background:" + (state.loading ? "#252525" : "#e8322a") + ";border:none;border-radius:8px;color:#fff;font-size:12px;font-weight:600;padding:8px 0;cursor:pointer'>" + (state.loading ? "Analyzing..." : "Analyze + Log") + "</button>";
+  html += "</div></div>";
 }
 
-var wi=document.getElementById("winp");
-if(wi){
-  wi.addEventListener("blur",function(e){
-    upd(S.ad,function(d){var nd=cpDay(d);nd.weight=e.target.value;return nd;});
-  });
+if (day.meals.length === 0 && !state.showMealForm) {
+  html += "<div style='text-align:center;color:#2a2a2a;font-size:12px;padding:14px 0'>No meals logged yet</div>";
+}
+
+for (var mi = 0; mi < day.meals.length; mi++) {
+  var m = day.meals[mi];
+  html += "<div style='background:#0c0c0c;border-radius:10px;padding:12px;margin-bottom:8px;border:1px solid #181818'>";
+  html += "<div style='display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px'>";
+  html += "<div style='flex:1'><div style='font-size:13px;color:#f0ede8;font-weight:500'>" + m.name + "</div>";
+  if (m.input) html += "<div style='font-size:10px;color:#3a3a3a;margin-top:1px'>" + m.input + "</div>";
+  html += "</div><button onclick='removeMeal(" + mi + ")' style='background:none;border:none;color:#2a2a2a;font-size:13px;padding:0;margin-left:8px;cursor:pointer'>X</button></div>";
+  if (m.photo) html += "<img src='" + m.photo + "' style='width:100%;max-height:90px;object-fit:cover;border-radius:6px;margin-bottom:8px;display:block'>";
+  html += "<div style='display:flex;gap:5px'>";
+  var mm = [["P", m.protein, "#e8322a"], ["C", m.carbs, "#f59e0b"], ["F", m.fat, "#3b82f6"], ["kcal", m.calories, "#10b981"]];
+  for (var mmi = 0; mmi < mm.length; mmi++) {
+    html += "<div style='background:#141414;border-radius:6px;padding:4px 7px;text-align:center'><div style='font-size:12px;font-weight:700;color:" + mm[mmi][2] + "'>" + mm[mmi][1] + (mm[mmi][0] !== "kcal" ? "g" : "") + "</div><div style='font-size:8px;color:#383838'>" + mm[mmi][0] + "</div></div>";
+  }
+  html += "</div></div>";
+}
+html += "</div>";
+
+if (dayType !== "Rest") {
+  html += "<div class='card'><div class='lbl'>Workout - " + dayType + "</div>";
+  html += "<button onclick='setDay(function(d){var nd=JSON.parse(JSON.stringify(d));nd.workout.completed=!d.workout.completed;return nd;})' style='width:100%;border-radius:10px;padding:10px 0;color:#fff;font-size:13px;font-weight:600;margin-bottom:10px;cursor:pointer;border:" + (day.workout.completed ? "none" : "1px solid #252525") + ";background:" + (day.workout.completed ? "#e8322a" : "#141414") + "'>" + (day.workout.completed ? "Done!" : "Mark Workout Done") + "</button>";
+  if (day.workout.completed) {
+    html += "<div style='font-size:10px;color:#444;margin-bottom:8px'>How did it feel?</div><div style='display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px'>";
+    for (var ri = 0; ri < RATINGS.length; ri++) {
+      var rv = RATINGS[ri];
+      html += "<button onclick='setDay(function(d){var nd=JSON.parse(JSON.stringify(d));nd.workout.rating=\"" + rv + "\";return nd;})' style='background:" + (day.workout.rating === rv ? "#1c1c1c" : "transparent") + ";border:1px solid " + (day.workout.rating === rv ? "#e8322a" : "#1e1e1e") + ";border-radius:8px;padding:5px 9px;color:" + (day.workout.rating === rv ? "#f0ede8" : "#444") + ";font-size:11px;cursor:pointer'>" + rv + "</button>";
+    }
+    html += "</div><textarea id='workout-notes' placeholder='Log weights, PRs, notes...' style='width:100%;height:60px;resize:none;display:block'>" + day.workout.notes + "</textarea>";
+  }
+  html += "</div>";
 }
 ```
 
-}catch(ex){
-document.getElementById(“root”).innerHTML=’<div style="color:#e8322a;padding:20px;font-size:13px;">Error: ‘+ex.message+’<br><br>’+ex.stack+’</div>’;
+}
+
+if (state.view === “week”) {
+var wk = getWeek(state.weekOffset);
+var totalP2 = 0, wkts = 0, pdays = 0, wts = [];
+for (var i = 0; i < 7; i++) {
+totalP2 += wk[i].p;
+if (wk[i].workout.completed) wkts++;
+if (wk[i].p >= PROTEIN_GOAL) pdays++;
+wts.push(parseFloat(wk[i].weight) || 0);
+}
+var avgP2 = Math.round(totalP2 / 7);
+var lwts = []; for (var i = 0; i < wts.length; i++) { if (wts[i] > 0) lwts.push(wts[i]); }
+var avgWt = lwts.length ? (lwts.reduce(function(a, b) { return a + b; }, 0) / lwts.length).toFixed(1) : “–”;
+
+```
+html += "<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px'>";
+var stats = [["Avg Protein", avgP2 + "g", "Goal " + PROTEIN_GOAL + "g", "#e8322a"], ["Workouts", wkts + "/5", "Completed", "#10b981"], ["Avg Weight", avgWt + "lbs", "This week", "#f59e0b"]];
+for (var si = 0; si < stats.length; si++) {
+  html += "<div style='background:#111;border:1px solid #1c1c1c;border-radius:12px;padding:12px 8px;text-align:center'><div style='font-size:18px;font-weight:700;color:" + stats[si][3] + "'>" + stats[si][1] + "</div><div style='font-size:9px;color:#3a3a3a;margin-top:2px'>" + stats[si][2] + "</div><div style='font-size:9px;color:#2a2a2a;margin-top:1px'>" + stats[si][0] + "</div></div>";
+}
+html += "</div>";
+
+var maxW = 0, minW = 9999;
+for (var i = 0; i < wts.length; i++) { if (wts[i] > 0) { if (wts[i] > maxW) maxW = wts[i]; if (wts[i] < minW) minW = wts[i]; } }
+if (maxW === 0) { maxW = 1; minW = 0; }
+var rng = maxW - minW || 1;
+
+html += "<div class='card'><div class='lbl'>Weight This Week</div><div style='display:flex;align-items:flex-end;gap:4px;height:56px;padding-top:8px;border-top:1px solid #181818;margin-top:12px'>";
+for (var i = 0; i < 7; i++) {
+  var bh = wts[i] > 0 ? Math.max(4, Math.round(((wts[i] - minW) / rng) * 36) + 4) : 2;
+  html += "<div style='flex:1;display:flex;flex-direction:column;align-items:center;gap:2px'>";
+  html += "<div style='font-size:7px;color:#f59e0b'>" + (wts[i] > 0 ? wts[i] : "") + "</div>";
+  html += "<div style='width:100%;height:" + bh + "px;border-radius:3px 3px 0 0;background:" + (wts[i] > 0 ? "#f59e0b" : "#1a1a1a") + "'></div>";
+  html += "<div style='font-size:7px;color:#3a3a3a'>" + DAYS[i] + "</div></div>";
+}
+html += "</div></div>";
+
+html += "<div class='card'><div class='lbl'>Daily Breakdown</div>";
+for (var i = 0; i < 7; i++) {
+  var wd = wk[i];
+  var isRest = DAY_TYPES[DAYS[i]] === "Rest";
+  var protColor = wd.p >= PROTEIN_GOAL ? "#10b981" : (wd.p > 0 ? "#f59e0b" : "#2a2a2a");
+  html += "<div onclick='state.activeDay=" + i + ";state.view=\"log\";draw()' style='display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #181818;cursor:pointer;opacity:" + (isRest ? "0.3" : "1") + "'>";
+  html += "<div><div style='font-size:12px;font-weight:600;color:#f0ede8'>" + DAYS[i] + " <span style='color:#383838;font-weight:400;font-size:10px'>" + DAY_TYPES[DAYS[i]] + "</span></div>";
+  html += "<div style='font-size:10px;color:#3a3a3a;margin-top:1px'>" + wd.meals.length + " meals, " + wd.water + " glasses" + (wd.workout.rating ? " - " + wd.workout.rating : "") + "</div></div>";
+  html += "<div style='text-align:right'><div style='font-size:13px;font-weight:700;color:" + protColor + "'>" + wd.p + "g</div>";
+  html += "<div style='font-size:9px;color:#383838'>" + wd.cal + " kcal</div>";
+  if (wd.weight) html += "<div style='font-size:10px;color:#f59e0b;margin-top:1px'>" + wd.weight + " lbs</div>";
+  if (wd.workout.completed) html += "<div style='font-size:8px;color:#e8322a;margin-top:1px'>trained</div>";
+  html += "</div></div>";
+}
+html += "</div>";
+
+html += "<div class='card'><div class='lbl'>Weekly Check-In</div>";
+html += "<div style='font-size:11px;color:#3a3a3a;margin-bottom:10px'>Every Sunday copy this and paste into your chat with Claude for your weekly review.</div>";
+html += "<div style='background:#0c0c0c;border-radius:10px;padding:12px;font-size:11px;color:#666;line-height:2;border:1px solid #181818;word-break:break-word'>";
+html += "<div style='color:#e8322a;font-weight:600;margin-bottom:4px'>WEEKLY CHECK-IN - " + getWeekLabel(state.weekOffset) + "</div>";
+html += "<div>Workouts: " + wkts + "/5</div>";
+html += "<div>Avg protein: " + avgP2 + "g (goal: " + PROTEIN_GOAL + "g)</div>";
+html += "<div>Protein days: " + pdays + "/7</div>";
+html += "<div>Avg weight: " + avgWt + " lbs</div>";
+var hasNotes = false;
+for (var i = 0; i < 7; i++) {
+  if (wk[i].workout.notes) { html += "<div style='padding-left:8px;color:#4a4a4a'>" + DAYS[i] + ": " + wk[i].workout.notes + "</div>"; hasNotes = true; }
+}
+if (!hasNotes) html += "<div style='padding-left:8px;color:#2a2a2a'>No notes yet</div>";
+html += "</div>";
+html += "<button onclick='copyCheckin()' style='width:100%;background:#181818;border:1px solid " + (state.copied ? "#10b981" : "#252525") + ";border-radius:8px;padding:8px 0;color:" + (state.copied ? "#10b981" : "#888") + ";font-size:12px;margin-top:10px;cursor:pointer'>" + (state.copied ? "Copied!" : "Copy Check-In") + "</button>";
+html += "</div>";
+```
+
+}
+
+html += “</div>”;
+document.getElementById(“app”).innerHTML = html;
+
+var ta = document.getElementById(“meal-ta”);
+if (ta) ta.addEventListener(“input”, function(e) { state.mealText = e.target.value; });
+
+var wn = document.getElementById(“workout-notes”);
+if (wn) {
+wn.addEventListener(“blur”, function(e) {
+setDay(function(d) {
+var nd = JSON.parse(JSON.stringify(d));
+nd.workout.notes = e.target.value;
+return nd;
+});
+});
+}
+
+var weightInput = document.getElementById(“weight-input”);
+if (weightInput) {
+weightInput.addEventListener(“blur”, function(e) {
+setDay(function(d) {
+var nd = JSON.parse(JSON.stringify(d));
+nd.weight = e.target.value;
+return nd;
+});
+});
 }
 }
 
-lsLoad();
-render();
+loadData();
+draw();
 </script>
 
 </body>
