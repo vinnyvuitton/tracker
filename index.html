@@ -189,7 +189,7 @@ var PLAN={
 };
 
 var AW={};
-var S={wo:0,ad:0,view:"log",showWS:false,expandedWk:null,
+var S={wo:0,ad:0,view:"log",showWS:false,expandedWk:null,lastSaved:null,cloudSynced:null,
   smf:false,mt:"",mp:null,mpp:null,ld:false,ae:"",
   exporting:false,expDone:false,activeVid:null,pgOpen:false};
 
@@ -209,8 +209,131 @@ function gw(o){
   return AW[o];
 }
 
-function save(){try{localStorage.setItem("mytracker",JSON.stringify(AW));}catch(e){}}
-function load(){try{var r=localStorage.getItem("mytracker");if(r){AW=JSON.parse(r);}}catch(e){}}
+// OFFLINE-FIRST SYNC SYSTEM
+var SYNC_KEY="mytracker";
+var CLOUD_URL="https://tracker-proxy.vinny-olsauskas.workers.dev/data";
+var syncRetryTimer=null;
+var syncPending=false;
+
+function save(){
+  // Step 1: Always save locally first, instantly
+  var localOk=false;
+  try{
+    var data=JSON.stringify(AW);
+    localStorage.setItem(SYNC_KEY,data);
+    var check=localStorage.getItem(SYNC_KEY);
+    if(check&&check.length===data.length){localOk=true;}
+  }catch(e){localOk=false;}
+
+  showToast(localOk?"local":null);
+
+  if(localOk){
+    S.lastSaved=new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+    updateSavedLabel();
+  }
+
+  // Step 2: Try to push to cloud in background
+  syncPending=true;
+  pushToCloud();
+}
+
+function pushToCloud(){
+  if(!syncPending){return;}
+  var data=localStorage.getItem(SYNC_KEY);
+  if(!data){return;}
+  fetch(CLOUD_URL,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({action:"save",payload:data})
+  }).then(function(r){
+    if(r.ok){
+      syncPending=false;
+      if(syncRetryTimer){clearInterval(syncRetryTimer);syncRetryTimer=null;}
+      S.cloudSynced=new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+      updateSavedLabel();
+      showToast("cloud");
+    }else{
+      scheduleRetry();
+    }
+  }).catch(function(){
+    scheduleRetry();
+  });
+}
+
+function scheduleRetry(){
+  if(syncRetryTimer){return;}
+  syncRetryTimer=setInterval(function(){
+    if(syncPending){pushToCloud();}
+    else{clearInterval(syncRetryTimer);syncRetryTimer=null;}
+  },30000);
+  updateSavedLabel();
+}
+
+function updateSavedLabel(){
+  var el=document.getElementById("last-saved");
+  if(!el){return;}
+  if(S.cloudSynced){
+    el.textContent="Synced "+S.cloudSynced;
+    el.style.color="#10b981";
+  }else if(syncPending){
+    el.textContent="Saved locally, syncing...";
+    el.style.color="#f59e0b";
+  }else if(S.lastSaved){
+    el.textContent="Saved "+S.lastSaved;
+    el.style.color="#444";
+  }
+}
+
+function showToast(type){
+  var existing=document.getElementById("save-toast");
+  if(existing){existing.remove();}
+  if(!type){return;}
+  var t=document.createElement("div");
+  t.id="save-toast";
+  var msg=type==="cloud"?"Synced to cloud":type==="local"?"Saved":"Save failed";
+  var bg=type==="cloud"?"#10b981":type==="local"?"#3b82f6":"#e8322a";
+  t.textContent=msg;
+  t.style.cssText="position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:"+bg+";color:#fff;padding:8px 20px;border-radius:20px;font-size:13px;font-weight:500;z-index:9999;pointer-events:none;transition:opacity 0.4s;font-family:-apple-system,system-ui,sans-serif;";
+  document.body.appendChild(t);
+  var dur=type==="cloud"?2000:1200;
+  setTimeout(function(){t.style.opacity="0";setTimeout(function(){if(t.parentNode){t.remove();}},400);},dur);
+}
+
+function load(){
+  // Try cloud first, fall back to localStorage
+  fetch(CLOUD_URL,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({action:"load"})
+  }).then(function(r){return r.json();}).then(function(resp){
+    if(resp&&resp.payload){
+      try{
+        var cloudData=JSON.parse(resp.payload);
+        AW=cloudData;
+        // Also update localStorage with cloud data
+        try{localStorage.setItem(SYNC_KEY,resp.payload);}catch(e){}
+        S.cloudSynced=new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+        syncPending=false;
+        draw();
+      }catch(e){loadFromLocal();}
+    }else{
+      loadFromLocal();
+    }
+  }).catch(function(){
+    loadFromLocal();
+  });
+}
+
+function loadFromLocal(){
+  try{
+    var r=localStorage.getItem(SYNC_KEY);
+    if(r){AW=JSON.parse(r);}
+  }catch(e){}
+  // Mark as pending sync so it will retry
+  var hasData=Object.keys(AW).length>0;
+  if(hasData){syncPending=true;scheduleRetry();}
+  draw();
+}
 function gday(){return gw(S.wo)[S.ad];}
 
 function sday(fn){
@@ -273,11 +396,11 @@ function hprog(e,side){
     var img=new Image();
     img.onload=function(){
       var cv=document.createElement("canvas");
-      var mx=600,w=img.width,h=img.height;
+      var mx=400,w=img.width,h=img.height;
       if(w>mx||h>mx){if(w>h){h=Math.round(h*mx/w);w=mx;}else{w=Math.round(w*mx/h);h=mx;}}
       cv.width=w;cv.height=h;
       var ctx=cv.getContext("2d");ctx.drawImage(img,0,0,w,h);
-      var comp=cv.toDataURL("image/jpeg",0.6);
+      var comp=cv.toDataURL("image/jpeg",0.4);
       sday(function(d){if(side==="front"){d.photoFront=comp;}else{d.photoSide=comp;}return d;});
     };
     img.src=reader.result;
@@ -296,10 +419,10 @@ function hmeal(e){
     var img=new Image();
     img.onload=function(){
       var cv=document.createElement("canvas");
-      var mx=800,w=img.width,h=img.height;
+      var mx=400,w=img.width,h=img.height;
       if(w>mx||h>mx){if(w>h){h=Math.round(h*mx/w);w=mx;}else{w=Math.round(w*mx/h);h=mx;}}
       cv.width=w;cv.height=h;cv.getContext("2d").drawImage(img,0,0,w,h);
-      var comp=cv.toDataURL("image/jpeg",0.7);
+      var comp=cv.toDataURL("image/jpeg",0.4);
       S.mp=comp.split(",")[1];S.mpp=comp;draw();
     };
     img.src=reader.result;
@@ -458,7 +581,7 @@ function draw(){
   // HEADER
   h+="<div class='hdr'>";
   h+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:4px'>";
-  h+="<div class='hlbl'>Daily Tracker</div>";
+  h+="<div class='hlbl'>Daily Tracker</div><div id='last-saved' style='font-size:9px;color:#444;margin-top:1px'>"+(S.lastSaved?"Saved "+S.lastSaved:"")+"</div>";
   h+="<button class='wsbtn"+(S.showWS?" on":"")+"' onclick='S.showWS=!S.showWS;draw()'>Week Summary</button>";
   h+="</div>";
   h+="<div class='hrow'><div class='htitle'>"+wlbl(S.wo)+"</div>";
@@ -792,7 +915,15 @@ function draw(){
   }
 }
 
-load();draw();
+// Auto jump to today
+(function(){
+  var now=new Date();
+  S.ad=now.getDay();
+  S.wo=0;
+  S.view="log";
+})();
+// Load data - cloud first, falls back to local, each calls draw() when ready
+load();
 </script>
 </body>
 </html>
