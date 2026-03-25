@@ -378,6 +378,29 @@ function rprog(side){
   sday(function(d){if(side==="front"){d.photoFront=null;d.photoFrontDesc=null;}else{d.photoSide=null;d.photoSideDesc=null;}return d;});
 }
 
+function hcardio(e){
+  var f=e.target.files[0];if(!f)return;
+  var reader=new FileReader();
+  reader.onload=function(){
+    var img=new Image();
+    img.onload=function(){
+      var cv=document.createElement("canvas");
+      var mx=800,w=img.width,ch=img.height;
+      if(w>mx||ch>mx){if(w>ch){ch=Math.round(ch*mx/w);w=mx;}else{w=Math.round(w*mx/ch);ch=mx;}}
+      cv.width=w;cv.height=ch;
+      cv.getContext("2d").drawImage(img,0,0,w,ch);
+      var comp=cv.toDataURL("image/jpeg",0.6);
+      sday(function(d){d.cardioPhoto=comp;d.cardioPhotoDesc=null;return d;});
+    };
+    img.src=reader.result;
+  };
+  reader.readAsDataURL(f);
+}
+
+function rmcardio(){
+  sday(function(d){d.cardioPhoto=null;d.cardioPhotoDesc=null;return d;});
+}
+
 function hmeal(e){
   var f=e.target.files[0];if(!f)return;
   var reader=new FileReader();
@@ -447,6 +470,7 @@ function doExport(wo){
     var d=wk[di];
     if(d.photoFront){photos.push({di:di,side:"front",data:d.photoFront.split(",")[1]});}
     if(d.photoSide){photos.push({di:di,side:"side",data:d.photoSide.split(",")[1]});}
+    if(d.cardioPhoto){photos.push({di:di,side:"cardio",data:d.cardioPhoto.split(",")[1]});}
     if(d.meals){for(var mi=0;mi<d.meals.length;mi++){if(d.meals[mi].photo){photos.push({di:di,mi:mi,data:d.meals[mi].photo.split(",")[1]});}}}
   }
   var totalP=0,wkts=0,pdays=0,wts=[];
@@ -481,7 +505,7 @@ function doExport(wo){
   var descs={},pending=photos.length;
   function analyzePhoto(item){
     var content=[{type:"image",source:{type:"base64",media_type:"image/jpeg",data:item.data}},
-      {type:"text",text:"Describe this "+(item.side?"progress photo ("+item.side+" view)":"food photo")+" in one concise sentence for fitness tracking."}];
+      {type:"text",text:"Describe this "+(item.side==="cardio"?"treadmill screen photo (summarize calories, distance, time, speed, incline)":item.side?"progress photo ("+item.side+" view)":"food photo")+" in one concise sentence for fitness tracking."}];
     callAPI([{role:"user",content:content}],150,function(err,dtxt){
       var key=item.di+(item.side?"-"+item.side:"-meal"+item.mi);
       descs[key]=dtxt||"Photo logged";
@@ -498,6 +522,7 @@ function finishExport(wo,txt,descs){
     var d=wk[di];
     if(d.photoFront){d.photoFrontDesc=descs[di+"-front"]||"Front progress photo";d.photoFront=null;}
     if(d.photoSide){d.photoSideDesc=descs[di+"-side"]||"Side progress photo";d.photoSide=null;}
+    if(d.cardioPhoto){d.cardioPhotoDesc=descs[di+"-cardio"]||"Treadmill screen logged";d.cardioPhoto=null;}
     if(d.meals){for(var mi=0;mi<d.meals.length;mi++){if(d.meals[mi].photo){d.meals[mi].photoDesc=descs[di+"-meal"+mi]||"Food photo";d.meals[mi].photo=null;}}}
   }
   AW[wo]=wk;
@@ -672,7 +697,10 @@ function draw(){
   for(var ti=0;ti<7;ti++){
     var dn=DAYS[ti];var rest=DTYPES[dn]==="Rest";var act=ti===S.ad;
     h+="<div class='tab"+(act?" on":"")+(rest?" rest":"")+"' onclick='S.ad="+ti+";S.view=\"log\";draw()'>";
-    h+="<div class='tday'>"+dn+"</div><div class='ttype'>"+DTYPES[dn]+"</div>";
+    var tabDate=new Date(WS+S.wo*604800000+ti*86400000);
+    var tabDateNum=tabDate.getDate();
+    var tabMo=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][tabDate.getMonth()];
+    h+="<div class='tday'>"+dn+"</div><div class='ttype'>"+tabMo+" "+tabDateNum+"</div>";
     if(week[ti].workout&&week[ti].workout.completed){h+="<div class='tdone'>done</div>";}
     h+="</div>";
   }
@@ -695,7 +723,7 @@ function draw(){
     // WEIGHT
     h+="<div class='card'><div class='slbl'>Daily Weight &amp; Progress</div>";
     h+="<div style='display:flex;align-items:center;gap:10px;margin-bottom:4px'>";
-    h+="<input id='weight-inp' type='number' step='0.1' min='50' max='500' placeholder='0.0' value='"+(day.weight||"")+"' style='background:#0c0c0c;border:1px solid #1c1c1c;border-radius:8px;color:#f0ede8;font-size:22px;font-weight:500;padding:10px 14px;width:130px;text-align:center'>";
+    h+="<input id='weight-inp' type='tel' inputmode='decimal' placeholder='0.0' value='"+(day.weight||"")+"' style='background:#0c0c0c;border:1px solid #1c1c1c;border-radius:8px;color:#f0ede8;font-size:22px;font-weight:500;padding:10px 14px;width:130px;text-align:center'>";
     h+="<span style='font-size:14px;color:#555'>lbs</span></div>";
     if(day.weight){h+="<div style='font-size:10px;color:#10b981;margin-bottom:8px'>Logged!</div>";}
     h+="<button class='pgtoggle' onclick='S.pgOpen=!S.pgOpen;draw()'>"+(S.pgOpen?"Hide Progress Photos":"View Progress Photos")+"</button>";
@@ -775,7 +803,7 @@ function draw(){
       h+="</div></div>";
     }
     if(day.meals.length===0&&!S.smf){h+="<div style='text-align:center;color:#2a2a2a;font-size:12px;padding:14px 0'>No meals logged yet</div>";}
-    for(var mi=0;mi<day.meals.length;mi++){
+    for(var mi=day.meals.length-1;mi>=0;mi--){
       var m=day.meals[mi];
       h+="<div style='background:#0c0c0c;border-radius:10px;padding:12px;margin-bottom:8px;border:1px solid #181818'>";
       h+="<div style='display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px'>";
@@ -827,6 +855,8 @@ function draw(){
           h+="</div>";
         }
         var cs=gex("cardio-session");
+        var csPhoto=gday().cardioPhoto||null;
+        var csPhotoDesc=gday().cardioPhotoDesc||null;
         h+="<div class='card'>";
         h+="<div class='slbl'>Session Feedback</div>";
         h+="<div style='display:flex;gap:5px;margin-bottom:10px'>";
@@ -836,6 +866,19 @@ function draw(){
         }
         h+="</div>";
         h+="<textarea class='ex-textarea' id='cardio-note' placeholder='How did the session feel? Notes...' style='margin-top:0'>"+(cs.note||"")+"</textarea>";
+        // Cardio photo upload
+        h+="<input type='file' id='cardio-photo-inp' accept='image/*' style='display:none' onchange='hcardio(event)'>";
+        h+="<div style='margin-top:10px'>";
+        if(csPhoto){
+          h+="<div style='position:relative'><img src='"+csPhoto+"' style='width:100%;max-height:180px;object-fit:cover;border-radius:8px;display:block'>";
+          h+="<button onclick='rmcardio()' style='position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.75);border:none;border-radius:50%;width:24px;height:24px;color:#fff;font-size:11px;cursor:pointer'>X</button>";
+          h+="<div style='position:absolute;bottom:6px;left:8px;background:#10b981;border-radius:4px;padding:2px 8px;font-size:9px;color:#fff'>Screen logged</div></div>";
+        }else if(csPhotoDesc){
+          h+="<div style='background:#0c0c0c;border-radius:8px;padding:10px;border:1px solid #1a1a1a;font-size:10px;color:#555;font-style:italic'>"+csPhotoDesc+"</div>";
+        }else{
+          h+="<button class='phbtn' onclick='document.getElementById(\"cardio-photo-inp\").click()' style='margin-bottom:0'>&#128247; Upload Treadmill Screen</button>";
+        }
+        h+="</div>";
         h+="</div>";
       }else{
         for(var sci=0;sci<plan.sections.length;sci++){
@@ -877,6 +920,23 @@ function draw(){
                 h+="<textarea class='ex-textarea' id='exnote-"+sci+"-"+exi+"' placeholder='How did it feel? Weight adjustments, notes...' data-exname='"+ex.n+"'>"+(exst.note||"")+"</textarea>";
               }else{
                 h+="<div class='ex-note"+(exst.note?" has":"")+"' onclick='setActive(\""+ex.n+"\")'>"+(exst.note||"Tap to add a note...")+"</div>";
+              }
+              // Cardio photo upload for Incline Walk Finisher
+              if(ex.n==="Incline Walk Finisher"){
+                var finPhoto=gday().cardioPhoto||null;
+                var finPhotoDesc=gday().cardioPhotoDesc||null;
+                h+="<input type='file' id='cardio-photo-inp' accept='image/*' style='display:none' onchange='hcardio(event)'>";
+                h+="<div style='margin-top:10px'>";
+                if(finPhoto){
+                  h+="<div style='position:relative'><img src='"+finPhoto+"' style='width:100%;max-height:180px;object-fit:cover;border-radius:8px;display:block'>";
+                  h+="<button onclick='rmcardio()' style='position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.75);border:none;border-radius:50%;width:24px;height:24px;color:#fff;font-size:11px;cursor:pointer'>X</button>";
+                  h+="<div style='position:absolute;bottom:6px;left:8px;background:#10b981;border-radius:4px;padding:2px 8px;font-size:9px;color:#fff'>Screen logged</div></div>";
+                }else if(finPhotoDesc){
+                  h+="<div style='background:#0c0c0c;border-radius:8px;padding:10px;border:1px solid #1a1a1a;font-size:10px;color:#555;font-style:italic'>"+finPhotoDesc+"</div>";
+                }else{
+                  h+="<button class='phbtn' onclick='document.getElementById(\"cardio-photo-inp\").click()' style='margin-bottom:0'>&#128247; Upload Treadmill Screen</button>";
+                }
+                h+="</div>";
               }
             }
             h+="</div>";
