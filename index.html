@@ -564,6 +564,31 @@ function wkstats(wk){
   return{avgP:Math.round(totalP/7),wkts:wkts,pdays:pdays,wts:wts,avgWt:avgWt};
 }
 
+// ======== WEEK MIGRATION ========
+// If stored data was saved when WS pointed to a different Sunday,
+// shift all week keys so historical data lands in the correct slots.
+function migrateWeekOffsets(){
+  var stored=localStorage.getItem("mytracker_ws");
+  var storedWS=stored?parseInt(stored,10):null;
+  // Save current WS so future loads can detect drift
+  try{localStorage.setItem("mytracker_ws",WS);}catch(e){}
+  if(!storedWS||storedWS===WS){return;} // no migration needed
+  // Calculate how many weeks the anchor shifted
+  var weekDiff=Math.round((WS-storedWS)/604800000);
+  if(weekDiff===0){return;}
+  var oldKeys=Object.keys(AW).map(Number);
+  var migrated={};
+  for(var ki=0;ki<oldKeys.length;ki++){
+    var oldKey=oldKeys[ki];
+    var newKey=oldKey-weekDiff;
+    migrated[newKey]=AW[oldKey];
+  }
+  AW=migrated;
+  // Persist migrated data immediately
+  try{localStorage.setItem("mytracker",JSON.stringify(AW));}catch(e){}
+  scheduleSave();
+}
+
 // ======== LOAD ========
 function load(){
   fetch(CLOUD_URL,{
@@ -581,9 +606,11 @@ function load(){
     }else{
       loadFromLocal();
     }
+    migrateWeekOffsets();
     draw();
   }).catch(function(){
     loadFromLocal();
+    migrateWeekOffsets();
     draw();
   });
 }
