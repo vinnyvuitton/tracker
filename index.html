@@ -112,7 +112,11 @@ var PG=140,CG=1900,WG=10;
 var DAYS=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 var DTYPES={Sun:"Rest",Mon:"Upper A",Tue:"Lower+Abs",Wed:"Cardio",Thu:"Upper B",Fri:"Lower+Abs",Sat:"Rest"};
 var RATINGS=["Brutal","Hard","Solid","Okay","Easy"];
-var WS=new Date(2026,2,22).getTime();
+
+// Always calculate week start dynamically from today's date
+var _today=new Date();
+var WS=new Date(_today.getFullYear(),_today.getMonth(),_today.getDate()-_today.getDay()).getTime();
+
 var PROXY="https://tracker-proxy.vinny-olsauskas.workers.dev/";
 var CLOUD_URL="https://tracker-proxy.vinny-olsauskas.workers.dev/data";
 
@@ -195,26 +199,22 @@ var AW={};
 var S={wo:0,ad:0,view:"log",showWS:false,expandedWk:null,
   smf:false,mt:"",mp:null,mpp:null,ld:false,ae:"",
   exporting:false,expDone:false,activeVid:null,pgOpen:false,
-  syncStatus:"idle"}; // idle | saving | saved | error
+  syncStatus:"idle"};
 
 // ======== DEBOUNCED SAVE SYSTEM ========
 var _debTimer=null;
 var _lastSavedTs=null;
 
 function scheduleSave(){
-  // Update status immediately so user sees feedback
   S.syncStatus="saving";
   updateSyncBar();
-  // Debounce: wait 600ms after last change before writing
   if(_debTimer){clearTimeout(_debTimer);}
   _debTimer=setTimeout(function(){executeSave();},600);
 }
 
 function executeSave(){
   var payload=JSON.stringify(AW);
-  // 1. Write to localStorage as instant backup
   try{localStorage.setItem("mytracker",payload);}catch(e){}
-  // 2. Push to cloud
   fetch(CLOUD_URL,{
     method:"POST",
     headers:{"Content-Type":"application/json"},
@@ -280,7 +280,6 @@ function gw(o){
 
 function gday(){return gw(S.wo)[S.ad];}
 
-// sday: mutate today's data + schedule save
 function sday(fn){
   var wk=gw(S.wo);
   wk[S.ad]=fn(JSON.parse(JSON.stringify(wk[S.ad])));
@@ -289,7 +288,6 @@ function sday(fn){
   draw();
 }
 
-// sdayNoRedraw: mutate without redrawing (for input handlers)
 function sdayNoRedraw(fn){
   var wk=gw(S.wo);
   wk[S.ad]=fn(JSON.parse(JSON.stringify(wk[S.ad])));
@@ -614,7 +612,6 @@ function draw(){
   h+="<button class='nbtn' onclick='S.wo--;draw()'>&#8249;</button>";
   h+="<button class='nbtn' onclick='S.wo++;draw()'>&#8250;</button>";
   h+="</div></div>";
-  // SYNC BAR
   var dotColor=S.syncStatus==="saved"?"#10b981":S.syncStatus==="saving"?"#f59e0b":S.syncStatus==="error"?"#e8322a":"#333";
   var syncTxt=S.syncStatus==="saved"?"Saved to cloud "+(_lastSavedTs||""):S.syncStatus==="saving"?"Saving...":S.syncStatus==="error"?"Save failed - tap Force Sync":"Ready";
   var syncTxtColor=S.syncStatus==="saved"?"#10b981":S.syncStatus==="saving"?"#f59e0b":S.syncStatus==="error"?"#e8322a":"#555";
@@ -866,7 +863,6 @@ function draw(){
         }
         h+="</div>";
         h+="<textarea class='ex-textarea' id='cardio-note' placeholder='How did the session feel? Notes...' style='margin-top:0'>"+(cs.note||"")+"</textarea>";
-        // Cardio photo upload
         h+="<input type='file' id='cardio-photo-inp' accept='image/*' style='display:none' onchange='hcardio(event)'>";
         h+="<div style='margin-top:10px'>";
         if(csPhoto){
@@ -921,7 +917,6 @@ function draw(){
               }else{
                 h+="<div class='ex-note"+(exst.note?" has":"")+"' onclick='setActive(\""+ex.n+"\")'>"+(exst.note||"Tap to add a note...")+"</div>";
               }
-              // Cardio photo upload for Incline Walk Finisher
               if(ex.n==="Incline Walk Finisher"){
                 var finPhoto=gday().cardioPhoto||null;
                 var finPhotoDesc=gday().cardioPhotoDesc||null;
@@ -949,21 +944,17 @@ function draw(){
   h+="</div>";
   document.getElementById("root").innerHTML=h;
 
-  // ======== INPUT HANDLERS - save on every keystroke ========
-
-  // Weight: save on every input keystroke
+  // ======== INPUT HANDLERS ========
   var wi2=document.getElementById("weight-inp");
   if(wi2){
     wi2.addEventListener("input",function(e){
       sdayNoRedraw(function(d){d.weight=e.target.value;return d;});
     });
-    // Also catch blur as a safety net
     wi2.addEventListener("change",function(e){
       sdayNoRedraw(function(d){d.weight=e.target.value;return d;});
     });
   }
 
-  // Cardio note: save on every keystroke
   var cn=document.getElementById("cardio-note");
   if(cn){
     cn.addEventListener("input",function(e){
@@ -971,7 +962,6 @@ function draw(){
     });
   }
 
-  // Exercise notes: save on every keystroke
   var exNotes=document.querySelectorAll(".ex-textarea[data-exname]");
   for(var ni=0;ni<exNotes.length;ni++){
     (function(el){
@@ -982,7 +972,6 @@ function draw(){
     })(exNotes[ni]);
   }
 
-  // Meal textarea: just track in state, no save needed until Analyze is hit
   var mta=document.getElementById("meal-ta");
   if(mta){mta.addEventListener("input",function(e){S.mt=e.target.value;});}
 }
