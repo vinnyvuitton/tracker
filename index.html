@@ -203,12 +203,35 @@ var S={wo:0,ad:0,view:"log",showWS:false,expandedWk:null,
 
 
 // ======== HAPTIC FEEDBACK ========
-function haptic(pattern){try{if(navigator.vibrate){navigator.vibrate(pattern);}}catch(e){}}
-function hTiny(){haptic(30);}
-function hShort(){haptic(60);}
-function hDouble(){haptic([60,60,60]);}
-function hLong(){haptic(150);}
-function hTriple(){haptic([60,80,60,80,60]);}
+// Uses iOS checkbox switch trick (Safari 17.4+) with Android vibrate fallback
+function hapticIOS(){
+  try{
+    var cb=document.createElement('input');
+    cb.type='checkbox';
+    cb.setAttribute('switch','');
+    cb.style.cssText='position:fixed;opacity:0;pointer-events:none;width:1px;height:1px;';
+    document.body.appendChild(cb);
+    cb.click();
+    setTimeout(function(){cb.click();document.body.removeChild(cb);},10);
+  }catch(e){}
+}
+function hapticAndroid(pattern){try{if(navigator.vibrate){navigator.vibrate(pattern);}}catch(e){}}
+function haptic(pattern){
+  // Try Android vibrate first, fall back to iOS trick
+  if(navigator.vibrate){hapticAndroid(pattern);}
+  else{hapticIOS();}
+}
+// Multiple iOS pulses for patterns
+function hapticIOSMulti(times,delay){
+  for(var i=0;i<times;i++){
+    (function(idx){setTimeout(hapticIOS,idx*delay);})(i);
+  }
+}
+function hTiny(){if(navigator.vibrate){hapticAndroid(30);}else{hapticIOS();}}
+function hShort(){if(navigator.vibrate){hapticAndroid(60);}else{hapticIOS();}}
+function hDouble(){if(navigator.vibrate){hapticAndroid([60,60,60]);}else{hapticIOSMulti(2,80);}}
+function hLong(){if(navigator.vibrate){hapticAndroid(150);}else{hapticIOSMulti(2,60);}}
+function hTriple(){if(navigator.vibrate){hapticAndroid([60,80,60,80,60]);}else{hapticIOSMulti(3,90);}}
 
 // ======== DEBOUNCED SAVE SYSTEM ========
 var _debTimer=null;
