@@ -504,7 +504,7 @@ function doExport(wo){
   var descs={},pending=photos.length;
   function analyzePhoto(item){
     var content=[{type:"image",source:{type:"base64",media_type:"image/jpeg",data:item.data}},
-      {type:"text",text:"Describe this "+(item.side==="cardio"?"treadmill screen photo (summarize calories, distance, time, speed, incline)":item.side?"progress photo ("+item.side+" view)":"food photo")+" in one concise sentence for fitness tracking."}];
+      {type:"text",text:"This is a fitness progress tracking photo taken by someone monitoring their physique changes over time. "+(item.side==="cardio"?"This is a treadmill screen showing workout stats. Summarize the calories, distance, time, speed, and incline in one sentence.":item.side?"This is a bodyweight progress photo ("+item.side+" view) of a person in standard fitness attire for physique tracking. Describe the visible physique and body composition in one concise sentence for personal fitness records.":"This is a food photo for meal tracking. Describe the food and estimate the portion in one concise sentence.")}];
     callAPI([{role:"user",content:content}],150,function(err,dtxt){
       var key=item.di+(item.side?"-"+item.side:"-meal"+item.mi);
       descs[key]=dtxt||"Photo logged";
