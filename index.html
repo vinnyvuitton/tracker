@@ -568,10 +568,10 @@ function wkstats(wk){
 // ======== ONE-TIME SHIFT ========
 // Shifts every week key forward by +1. Runs once, marks done in localStorage.
 function applyOneTimeShift(){
-  if(localStorage.getItem("mytracker_shift_v3")==="done"){return;}
+  if(localStorage.getItem("mytracker_shift_v4")==="done"){return;}
   var oldKeys=Object.keys(AW).map(Number);
   if(oldKeys.length===0){
-    localStorage.setItem("mytracker_shift_v3","done");
+    localStorage.setItem("mytracker_shift_v4","done");
     return;
   }
   var shifted={};
@@ -580,7 +580,7 @@ function applyOneTimeShift(){
   }
   AW=shifted;
   try{localStorage.setItem("mytracker",JSON.stringify(AW));}catch(e){}
-  localStorage.setItem("mytracker_shift_v3","done");
+  localStorage.setItem("mytracker_shift_v4","done");
   scheduleSave();
 }
 
