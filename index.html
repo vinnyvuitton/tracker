@@ -201,6 +201,15 @@ var S={wo:0,ad:0,view:"log",showWS:false,expandedWk:null,
   exporting:false,expDone:false,activeVid:null,pgOpen:false,
   syncStatus:"idle"};
 
+
+// ======== HAPTIC FEEDBACK ========
+function haptic(pattern){try{if(navigator.vibrate){navigator.vibrate(pattern);}}catch(e){}}
+function hTiny(){haptic(30);}
+function hShort(){haptic(60);}
+function hDouble(){haptic([60,60,60]);}
+function hLong(){haptic(150);}
+function hTriple(){haptic([60,80,60,80,60]);}
+
 // ======== DEBOUNCED SAVE SYSTEM ========
 var _debTimer=null;
 var _lastSavedTs=null;
@@ -223,6 +232,7 @@ function executeSave(){
     if(r.ok){
       S.syncStatus="saved";
       _lastSavedTs=new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+      hShort();
     }else{
       S.syncStatus="error";
     }
@@ -324,9 +334,11 @@ function toggleDone(nm){
   var wk=gw(S.wo);var d=wk[S.ad];
   if(!d.exercises){d.exercises={};}
   if(!d.exercises[nm]){d.exercises[nm]={done:false,rating:"",note:"",active:false};}
+  var wasDone=d.exercises[nm].done;
   d.exercises[nm].done=!d.exercises[nm].done;
   d.exercises[nm].active=false;
-  AW[S.wo]=wk;scheduleSave();draw();
+  AW[S.wo]=wk;scheduleSave();
+  if(!wasDone){hShort();}draw();
 }
 
 function setActive(nm){
@@ -442,12 +454,15 @@ function analyzeMeal(){
     try{
       var p=JSON.parse(txt.replace(/```json|```/g,"").trim());
       var prev=S.mpp,inp=S.mt;
+      var prevP=gday().p;var prevCal=gday().cal;
       sday(function(d){
         d.meals.push({name:p.name||"Meal",protein:p.protein||0,carbs:p.carbs||0,fat:p.fat||0,calories:p.calories||0,input:inp,photo:prev});
         d.p+=p.protein||0;d.cal+=p.calories||0;d.carbs+=p.carbs||0;d.fat+=p.fat||0;
+        if(d.p>=PG&&prevP<PG){setTimeout(hTriple,300);}
+        else if(d.cal>=CG&&prevCal<CG){setTimeout(hLong,300);}
         return d;
       });
-      S.mt="";S.mp=null;S.mpp=null;S.smf=false;S.ld=false;S.ae="";draw();
+      S.mt="";S.mp=null;S.mpp=null;S.smf=false;S.ld=false;S.ae="";hDouble();draw();
     }catch(e){S.ld=false;S.ae="Could not parse. Try again.";draw();}
   });
 }
@@ -789,11 +804,11 @@ function draw(){
     h+="<div><div class='slbl'>Water</div><div style='font-size:16px;font-weight:500;color:#3b82f6'>"+day.water+" / "+WG+" glasses</div></div>";
     h+="<div style='display:flex;gap:6px'>";
     h+="<button onclick='sday(function(d){d.water=Math.max(0,d.water-1);return d;})' style='background:#181818;border:1px solid #252525;border-radius:8px;width:32px;height:32px;font-size:16px;color:#888;cursor:pointer'>-</button>";
-    h+="<button onclick='sday(function(d){d.water=Math.min("+WG+",d.water+1);return d;})' style='background:#3b82f6;border:none;border-radius:8px;width:32px;height:32px;font-size:16px;color:#fff;cursor:pointer'>+</button>";
+    h+="<button onclick='(function(){var prev=gday().water;sday(function(d){d.water=Math.min(WG,d.water+1);if(d.water===WG&&prev<WG){hTriple();}else if(d.water>prev){hTiny();}return d;});})()' style='background:#3b82f6;border:none;border-radius:8px;width:32px;height:32px;font-size:16px;color:#fff;cursor:pointer'>+</button>";
     h+="</div></div>";
     h+="<div style='display:flex;gap:4px'>";
     for(var wi=0;wi<WG;wi++){
-      h+="<div class='wseg"+(wi<day.water?" on":"")+"' onclick='sday(function(d){d.water="+(wi+1)+";return d;})'></div>";
+      h+="<div class='wseg"+(wi<day.water?" on":"")+"' onclick='(function(){sday(function(d){var t="+(wi+1)+";if(t===WG&&d.water<WG){hTriple();}else{hTiny();}d.water=t;return d;});})()'></div>";
     }
     h+="</div></div>";
 
@@ -827,7 +842,7 @@ function draw(){
       h+="<div style='display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px'>";
       h+="<div style='flex:1'><div style='font-size:13px;color:#f0ede8;font-weight:500'>"+m.name+"</div>";
       if(m.input){h+="<div style='font-size:10px;color:#3a3a3a;margin-top:1px'>"+m.input+"</div>";}
-      h+="</div><button onclick='rmMeal("+mi+")' style='background:none;border:none;color:#2a2a2a;font-size:13px;padding:0;margin-left:8px;cursor:pointer'>X</button></div>";
+      h+="</div><button onclick='hShort();rmMeal("+mi+")' style='background:none;border:none;color:#2a2a2a;font-size:13px;padding:0;margin-left:8px;cursor:pointer'>X</button></div>";
       if(m.photo){h+="<img src='"+m.photo+"' style='width:100%;max-height:90px;object-fit:cover;border-radius:6px;margin-bottom:8px;display:block'>";}
       if(m.photoDesc){h+="<div style='font-size:10px;color:#555;margin-bottom:6px;font-style:italic'>"+m.photoDesc+"</div>";}
       h+="<div style='display:flex;gap:5px'>";
@@ -850,6 +865,8 @@ function draw(){
       h+="<div><div style='font-size:9px;letter-spacing:3px;color:#444;text-transform:uppercase;margin-bottom:3px'>"+DAYS[S.ad]+"</div>";
       h+="<div style='font-size:20px;font-weight:500;color:#f0ede8'>"+plan.title+"</div>";
       h+="<div style='font-size:11px;color:#555;margin-top:2px'>"+plan.sub+"</div></div>";
+      var isWoDone=gday().workout&&gday().workout.completed;
+      h+="<button onclick='(function(){var was=gday().workout&&gday().workout.completed;sday(function(d){if(!d.workout){d.workout={};}d.workout.completed=!d.workout.completed;return d;});if(!was){hLong();}})()' style='width:100%;border:none;border-radius:8px;padding:9px 0;font-size:12px;font-weight:500;cursor:pointer;margin-bottom:12px;background:"+(isWoDone?"#10b981":"#1a1a1a")+";color:"+(isWoDone?"#fff":"#555")+"'>"+(isWoDone?"✓ Workout Complete":"Mark Workout Complete")+"</button>";
       if(!isCardio){
         h+="<div style='position:relative;width:52px;height:52px'>"+ring(exDone,Math.max(exTotal,1),"#e8322a",52,4);
         h+="<div style='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center'>";
@@ -970,6 +987,7 @@ function draw(){
   if(wi2){
     wi2.addEventListener("input",function(e){
       sdayNoRedraw(function(d){d.weight=e.target.value;return d;});
+      hTiny();
     });
     wi2.addEventListener("change",function(e){
       sdayNoRedraw(function(d){d.weight=e.target.value;return d;});
