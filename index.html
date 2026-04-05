@@ -87,6 +87,8 @@ button,textarea,input{font-family:inherit;}
 .expbtn.done{background:#10b981;}
 .arch-card{background:#111;border:1px solid #1c1c1c;border-radius:14px;padding:16px;margin-bottom:10px;cursor:pointer;}
 .arch-card.open{border-color:#e8322a;}
+.wo-notes-textarea{width:100%;background:#0c0c0c;border:1px solid #252525;border-radius:8px;color:#f0ede8;font-size:12px;padding:8px 10px;resize:none;height:72px;display:block;}
+.wo-notes-textarea:focus{outline:none;border-color:#444;}
 </style>
 </head>
 <body>
@@ -113,7 +115,6 @@ var DAYS=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 var DTYPES={Sun:"Rest",Mon:"Upper A",Tue:"Lower+Abs",Wed:"Cardio",Thu:"Upper B",Fri:"Lower+Abs",Sat:"Rest"};
 var RATINGS=["Brutal","Hard","Solid","Okay","Easy"];
 
-// Always calculate week start dynamically from today's date
 var _today=new Date();
 var WS=new Date(_today.getFullYear(),_today.getMonth(),_today.getDate()-_today.getDay()).getTime();
 
@@ -201,8 +202,6 @@ var S={wo:0,ad:0,view:"log",showWS:false,expandedWk:null,
   exporting:false,expDone:false,activeVid:null,pgOpen:false,
   syncStatus:"idle"};
 
-
-// ======== DEBOUNCED SAVE SYSTEM ========
 var _debTimer=null;
 var _lastSavedTs=null;
 
@@ -262,7 +261,6 @@ function updateSyncBar(){
   }
 }
 
-// ======== DATA HELPERS ========
 function wlbl(o){
   var mo=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   var s=new Date(WS+o*604800000),e=new Date(WS+o*604800000+518400000);
@@ -490,6 +488,7 @@ function doExport(wo){
   var exFb=[];
   for(var di=0;di<7;di++){
     var d=wk[di];
+    if(d.workout&&d.workout.notes){exFb.push(DAYS[di]+" (day notes): "+d.workout.notes);}
     if(d.exercises){
       var eks=Object.keys(d.exercises);
       for(var eki=0;eki<eks.length;eki++){
@@ -498,7 +497,7 @@ function doExport(wo){
       }
     }
   }
-  if(exFb.length){lines.push("Exercise feedback:");for(var fi=0;fi<exFb.length;fi++){lines.push("  "+exFb[fi]);}}
+  if(exFb.length){lines.push("Workout notes + exercise feedback:");for(var fi=0;fi<exFb.length;fi++){lines.push("  "+exFb[fi]);}}
   var txt=lines.join("\n");
   if(photos.length===0){finishExport(wo,txt,{});return;}
   var descs={},pending=photos.length;
@@ -565,8 +564,6 @@ function wkstats(wk){
   return{avgP:Math.round(totalP/7),wkts:wkts,pdays:pdays,wts:wts,avgWt:avgWt};
 }
 
-// ======== ONE-TIME SHIFT ========
-// Shifts every week key forward by +1. Runs once, marks done in localStorage.
 function applyOneTimeShift(){
   if(localStorage.getItem("mytracker_shift_v4")==="done"){return;}
   var oldKeys=Object.keys(AW).map(Number);
@@ -584,7 +581,6 @@ function applyOneTimeShift(){
   scheduleSave();
 }
 
-// ======== LOAD ========
 function load(){
   fetch(CLOUD_URL,{
     method:"POST",
@@ -618,12 +614,10 @@ function loadFromLocal(){
   S.syncStatus="error";
 }
 
-// ======== DRAW ========
 function draw(){
   var week=gw(S.wo),day=gday(),dtype=DTYPES[DAYS[S.ad]];
   var h="";
 
-  // HEADER
   h+="<div class='hdr'>";
   h+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:6px'>";
   h+="<div class='hlbl'>Daily Tracker</div>";
@@ -645,7 +639,6 @@ function draw(){
   if(S.wo!==0){h+="<button onclick='S.wo=0;draw()' style='background:none;border:none;color:#e8322a;font-size:10px;padding:4px 0 0;cursor:pointer'>Back to current week</button>";}
   h+="</div>";
 
-  // WEEK SUMMARY VIEW
   if(S.showWS){
     h+="<div class='pg'>";
     h+="<div style='font-size:9px;letter-spacing:3px;color:#444;text-transform:uppercase;margin-bottom:14px;padding-top:4px'>All Weeks</div>";
@@ -711,7 +704,6 @@ function draw(){
     return;
   }
 
-  // DAY TABS
   h+="<div class='tabs'>";
   for(var ti=0;ti<7;ti++){
     var dn=DAYS[ti];var rest=DTYPES[dn]==="Rest";var act=ti===S.ad;
@@ -725,7 +717,6 @@ function draw(){
   }
   h+="</div>";
 
-  // VIEW TOGGLE
   if(dtype!=="Rest"){
     h+="<div class='vtog'>";
     h+="<button class='vbtn"+(S.view==="log"?" on":"")+"' onclick='S.view=\"log\";draw()'>Daily Log</button>";
@@ -739,7 +730,6 @@ function draw(){
 
   if(S.view==="log"||dtype==="Rest"){
 
-    // WEIGHT
     h+="<div class='card'><div class='slbl'>Daily Weight &amp; Progress</div>";
     h+="<div style='display:flex;align-items:center;gap:10px;margin-bottom:4px'>";
     h+="<input id='weight-inp' type='tel' inputmode='decimal' placeholder='0.0' value='"+(day.weight||"")+"' style='background:#0c0c0c;border:1px solid #1c1c1c;border-radius:8px;color:#f0ede8;font-size:22px;font-weight:500;padding:10px 14px;width:130px;text-align:center'>";
@@ -771,7 +761,6 @@ function draw(){
     }
     h+="</div>";
 
-    // MACROS
     h+="<div class='card'><div class='slbl'>Today's Macros</div>";
     h+="<div style='display:flex;gap:14px;align-items:center;margin-bottom:14px'>";
     h+="<div style='position:relative;display:flex;align-items:center;justify-content:center;flex-shrink:0'>"+ring(day.p,PG,"#e8322a");
@@ -784,7 +773,6 @@ function draw(){
     h+="<div class='chip'><div class='cv' style='color:#10b981'>"+day.cal+"</div><div class='cl'>Calories</div></div>";
     h+="</div></div>";
 
-    // WATER
     h+="<div class='card'>";
     h+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px'>";
     h+="<div><div class='slbl'>Water</div><div style='font-size:16px;font-weight:500;color:#3b82f6'>"+day.water+" / "+WG+" glasses</div></div>";
@@ -798,7 +786,6 @@ function draw(){
     }
     h+="</div></div>";
 
-    // MEALS
     h+="<div class='card'>";
     h+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:12px'>";
     h+="<div class='slbl' style='margin:0'>Meals</div>";
@@ -841,7 +828,6 @@ function draw(){
     h+="</div>";
   }
 
-  // WORKOUT VIEW
   if(S.view==="workout"&&dtype!=="Rest"){
     var plan=PLAN[DAYS[S.ad]];
     if(plan){
@@ -897,6 +883,11 @@ function draw(){
           h+="<button class='phbtn' onclick='document.getElementById(\"cardio-photo-inp\").click()' style='margin-bottom:0'>&#128247; Upload Treadmill Screen</button>";
         }
         h+="</div>";
+        h+="</div>";
+        // WORKOUT DAY NOTES - cardio days
+        h+="<div class='card'>";
+        h+="<div class='slbl'>Day Notes</div>";
+        h+="<textarea class='wo-notes-textarea' id='workout-notes' placeholder='Swapped exercises? Did a different workout? Anything else worth noting...'>"+(day.workout&&day.workout.notes||"")+"</textarea>";
         h+="</div>";
       }else{
         for(var sci=0;sci<plan.sections.length;sci++){
@@ -959,6 +950,11 @@ function draw(){
             h+="</div>";
           }
         }
+        // WORKOUT DAY NOTES - upper/lower days
+        h+="<div class='card'>";
+        h+="<div class='slbl'>Day Notes</div>";
+        h+="<textarea class='wo-notes-textarea' id='workout-notes' placeholder='Swapped exercises? Did a different workout? Anything else worth noting...'>"+(day.workout&&day.workout.notes||"")+"</textarea>";
+        h+="</div>";
       }
     }
   }
@@ -966,7 +962,6 @@ function draw(){
   h+="</div>";
   document.getElementById("root").innerHTML=h;
 
-  // ======== INPUT HANDLERS ========
   var wi2=document.getElementById("weight-inp");
   if(wi2){
     wi2.addEventListener("input",function(e){
@@ -994,11 +989,21 @@ function draw(){
     })(exNotes[ni]);
   }
 
+  var wn=document.getElementById("workout-notes");
+  if(wn){
+    wn.addEventListener("input",function(e){
+      sdayNoRedraw(function(d){
+        if(!d.workout){d.workout={completed:false,rating:"",notes:""};}
+        d.workout.notes=e.target.value;
+        return d;
+      });
+    });
+  }
+
   var mta=document.getElementById("meal-ta");
   if(mta){mta.addEventListener("input",function(e){S.mt=e.target.value;});}
 }
 
-// Start
 (function(){
   var now=new Date();
   S.ad=now.getDay();
