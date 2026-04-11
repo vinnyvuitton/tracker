@@ -398,6 +398,37 @@ function rmcardio(){
   sday(function(d){d.cardioPhoto=null;d.cardioPhotoDesc=null;return d;});
 }
 
+function hwnote(e){
+  var f=e.target.files[0];if(!f)return;
+  var reader=new FileReader();
+  reader.onload=function(){
+    var img=new Image();
+    img.onload=function(){
+      var cv=document.createElement("canvas");
+      var mx=800,w=img.width,ch=img.height;
+      if(w>mx||ch>mx){if(w>ch){ch=Math.round(ch*mx/w);w=mx;}else{w=Math.round(w*mx/ch);ch=mx;}}
+      cv.width=w;cv.height=ch;
+      cv.getContext("2d").drawImage(img,0,0,w,ch);
+      var comp=cv.toDataURL("image/jpeg",0.6);
+      sday(function(d){
+        if(!d.workout){d.workout={completed:false,rating:"",notes:""};}
+        d.workout.notePhoto=comp;d.workout.notePhotoDesc=null;
+        return d;
+      });
+    };
+    img.src=reader.result;
+  };
+  reader.readAsDataURL(f);
+}
+
+function rmwnote(){
+  sday(function(d){
+    if(!d.workout){d.workout={completed:false,rating:"",notes:""};}
+    d.workout.notePhoto=null;d.workout.notePhotoDesc=null;
+    return d;
+  });
+}
+
 function hmeal(e){
   var f=e.target.files[0];if(!f)return;
   var reader=new FileReader();
@@ -468,6 +499,7 @@ function doExport(wo){
     if(d.photoFront){photos.push({di:di,side:"front",data:d.photoFront.split(",")[1]});}
     if(d.photoSide){photos.push({di:di,side:"side",data:d.photoSide.split(",")[1]});}
     if(d.cardioPhoto){photos.push({di:di,side:"cardio",data:d.cardioPhoto.split(",")[1]});}
+    if(d.workout&&d.workout.notePhoto){photos.push({di:di,side:"wonote",data:d.workout.notePhoto.split(",")[1]});}
     if(d.meals){for(var mi=0;mi<d.meals.length;mi++){if(d.meals[mi].photo){photos.push({di:di,mi:mi,data:d.meals[mi].photo.split(",")[1]});}}}
   }
   var totalP=0,wkts=0,pdays=0,wts=[];
@@ -503,7 +535,7 @@ function doExport(wo){
   var descs={},pending=photos.length;
   function analyzePhoto(item){
     var content=[{type:"image",source:{type:"base64",media_type:"image/jpeg",data:item.data}},
-      {type:"text",text:"This is a fitness progress tracking photo taken by someone monitoring their physique changes over time. "+(item.side==="cardio"?"This is a treadmill screen showing workout stats. Summarize the calories, distance, time, speed, and incline in one sentence.":item.side?"This is a bodyweight progress photo ("+item.side+" view) of a person in standard fitness attire for physique tracking. Describe the visible physique and body composition in one concise sentence for personal fitness records.":"This is a food photo for meal tracking. Describe the food and estimate the portion in one concise sentence.")}];
+      {type:"text",text:"This is a fitness progress tracking photo taken by someone monitoring their physique changes over time. "+(item.side==="cardio"||item.side==="wonote"?"This is a treadmill or workout screen showing stats. Summarize the visible numbers (calories, distance, time, speed, incline) in one sentence.":item.side?"This is a bodyweight progress photo ("+item.side+" view) of a person in standard fitness attire for physique tracking. Describe the visible physique and body composition in one concise sentence for personal fitness records.":"This is a food photo for meal tracking. Describe the food and estimate the portion in one concise sentence.")}];
     callAPI([{role:"user",content:content}],150,function(err,dtxt){
       var key=item.di+(item.side?"-"+item.side:"-meal"+item.mi);
       descs[key]=dtxt||"Photo logged";
@@ -521,6 +553,7 @@ function finishExport(wo,txt,descs){
     if(d.photoFront){d.photoFrontDesc=descs[di+"-front"]||"Front progress photo";d.photoFront=null;}
     if(d.photoSide){d.photoSideDesc=descs[di+"-side"]||"Side progress photo";d.photoSide=null;}
     if(d.cardioPhoto){d.cardioPhotoDesc=descs[di+"-cardio"]||"Treadmill screen logged";d.cardioPhoto=null;}
+    if(d.workout&&d.workout.notePhoto){d.workout.notePhotoDesc=descs[di+"-wonote"]||"Workout note photo";d.workout.notePhoto=null;}
     if(d.meals){for(var mi=0;mi<d.meals.length;mi++){if(d.meals[mi].photo){d.meals[mi].photoDesc=descs[di+"-meal"+mi]||"Food photo";d.meals[mi].photo=null;}}}
   }
   AW[wo]=wk;
@@ -826,6 +859,25 @@ function draw(){
       h+="</div></div>";
     }
     h+="</div>";
+    // REST DAY NOTES - Saturday and Sunday
+    if(dtype==="Rest"){
+      h+="<div class='card'>";
+      h+="<div class='slbl'>Day Notes</div>";
+      h+="<textarea class='wo-notes-textarea' id='workout-notes' placeholder='Light workout? Walk? How are you feeling? Anything worth noting...'>"+(day.workout&&day.workout.notes||"")+"</textarea>";
+      h+="<input type='file' id='wonote-photo-inp' accept='image/*' style='display:none' onchange='hwnote(event)'>";
+      h+="<div style='margin-top:10px'>";
+      if(day.workout&&day.workout.notePhoto){
+        h+="<div style='position:relative'><img src='"+day.workout.notePhoto+"' style='width:100%;max-height:180px;object-fit:cover;border-radius:8px;display:block'>";
+        h+="<button onclick='rmwnote()' style='position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.75);border:none;border-radius:50%;width:24px;height:24px;color:#fff;font-size:11px;cursor:pointer'>X</button>";
+        h+="<div style='position:absolute;bottom:6px;left:8px;background:#10b981;border-radius:4px;padding:2px 8px;font-size:9px;color:#fff'>Photo logged</div></div>";
+      }else if(day.workout&&day.workout.notePhotoDesc){
+        h+="<div style='background:#0c0c0c;border-radius:8px;padding:10px;border:1px solid #1a1a1a;font-size:10px;color:#555;font-style:italic'>"+day.workout.notePhotoDesc+"</div>";
+      }else{
+        h+="<button class='phbtn' onclick='document.getElementById(\"wonote-photo-inp\").click()' style='margin-bottom:0'>&#128247; Upload Photo</button>";
+      }
+      h+="</div>";
+      h+="</div>";
+    }
   }
 
   if(S.view==="workout"&&dtype!=="Rest"){
@@ -888,6 +940,18 @@ function draw(){
         h+="<div class='card'>";
         h+="<div class='slbl'>Day Notes</div>";
         h+="<textarea class='wo-notes-textarea' id='workout-notes' placeholder='Swapped exercises? Did a different workout? Anything else worth noting...'>"+(day.workout&&day.workout.notes||"")+"</textarea>";
+        h+="<input type='file' id='wonote-photo-inp' accept='image/*' style='display:none' onchange='hwnote(event)'>";
+        h+="<div style='margin-top:10px'>";
+        if(day.workout&&day.workout.notePhoto){
+          h+="<div style='position:relative'><img src='"+day.workout.notePhoto+"' style='width:100%;max-height:180px;object-fit:cover;border-radius:8px;display:block'>";
+          h+="<button onclick='rmwnote()' style='position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.75);border:none;border-radius:50%;width:24px;height:24px;color:#fff;font-size:11px;cursor:pointer'>X</button>";
+          h+="<div style='position:absolute;bottom:6px;left:8px;background:#10b981;border-radius:4px;padding:2px 8px;font-size:9px;color:#fff'>Photo logged</div></div>";
+        }else if(day.workout&&day.workout.notePhotoDesc){
+          h+="<div style='background:#0c0c0c;border-radius:8px;padding:10px;border:1px solid #1a1a1a;font-size:10px;color:#555;font-style:italic'>"+day.workout.notePhotoDesc+"</div>";
+        }else{
+          h+="<button class='phbtn' onclick='document.getElementById(\"wonote-photo-inp\").click()' style='margin-bottom:0'>&#128247; Upload Photo (treadmill screen, etc.)</button>";
+        }
+        h+="</div>";
         h+="</div>";
       }else{
         for(var sci=0;sci<plan.sections.length;sci++){
@@ -954,6 +1018,18 @@ function draw(){
         h+="<div class='card'>";
         h+="<div class='slbl'>Day Notes</div>";
         h+="<textarea class='wo-notes-textarea' id='workout-notes' placeholder='Swapped exercises? Did a different workout? Anything else worth noting...'>"+(day.workout&&day.workout.notes||"")+"</textarea>";
+        h+="<input type='file' id='wonote-photo-inp' accept='image/*' style='display:none' onchange='hwnote(event)'>";
+        h+="<div style='margin-top:10px'>";
+        if(day.workout&&day.workout.notePhoto){
+          h+="<div style='position:relative'><img src='"+day.workout.notePhoto+"' style='width:100%;max-height:180px;object-fit:cover;border-radius:8px;display:block'>";
+          h+="<button onclick='rmwnote()' style='position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.75);border:none;border-radius:50%;width:24px;height:24px;color:#fff;font-size:11px;cursor:pointer'>X</button>";
+          h+="<div style='position:absolute;bottom:6px;left:8px;background:#10b981;border-radius:4px;padding:2px 8px;font-size:9px;color:#fff'>Photo logged</div></div>";
+        }else if(day.workout&&day.workout.notePhotoDesc){
+          h+="<div style='background:#0c0c0c;border-radius:8px;padding:10px;border:1px solid #1a1a1a;font-size:10px;color:#555;font-style:italic'>"+day.workout.notePhotoDesc+"</div>";
+        }else{
+          h+="<button class='phbtn' onclick='document.getElementById(\"wonote-photo-inp\").click()' style='margin-bottom:0'>&#128247; Upload Photo (treadmill screen, etc.)</button>";
+        }
+        h+="</div>";
         h+="</div>";
       }
     }
