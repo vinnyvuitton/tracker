@@ -261,6 +261,8 @@ function updateSyncBar(){
   }
 }
 
+function wkKey(o){return WS+o*604800000;}
+
 function wlbl(o){
   var mo=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   var s=new Date(WS+o*604800000),e=new Date(WS+o*604800000+518400000);
@@ -273,8 +275,9 @@ function nd(){
 }
 
 function gw(o){
-  if(!AW[o]){AW[o]=[];for(var i=0;i<7;i++){AW[o].push(nd());}}
-  return AW[o];
+  var k=wkKey(o);
+  if(!AW[k]){AW[k]=[];for(var i=0;i<7;i++){AW[k].push(nd());}}
+  return AW[k];
 }
 
 function gday(){return gw(S.wo)[S.ad];}
@@ -282,7 +285,7 @@ function gday(){return gw(S.wo)[S.ad];}
 function sday(fn){
   var wk=gw(S.wo);
   wk[S.ad]=fn(JSON.parse(JSON.stringify(wk[S.ad])));
-  AW[S.wo]=wk;
+  AW[wkKey(S.wo)]=wk;
   scheduleSave();
   draw();
 }
@@ -290,7 +293,7 @@ function sday(fn){
 function sdayNoRedraw(fn){
   var wk=gw(S.wo);
   wk[S.ad]=fn(JSON.parse(JSON.stringify(wk[S.ad])));
-  AW[S.wo]=wk;
+  AW[wkKey(S.wo)]=wk;
   scheduleSave();
 }
 
@@ -305,7 +308,7 @@ function sex(nm,field,val){
   if(!d.exercises){d.exercises={};}
   if(!d.exercises[nm]){d.exercises[nm]={done:false,rating:"",note:"",active:false};}
   d.exercises[nm][field]=val;
-  AW[S.wo]=wk;
+  AW[wkKey(S.wo)]=wk;
   scheduleSave();
   draw();
 }
@@ -315,7 +318,7 @@ function sexNoRedraw(nm,field,val){
   if(!d.exercises){d.exercises={};}
   if(!d.exercises[nm]){d.exercises[nm]={done:false,rating:"",note:"",active:false};}
   d.exercises[nm][field]=val;
-  AW[S.wo]=wk;
+  AW[wkKey(S.wo)]=wk;
   scheduleSave();
 }
 
@@ -325,7 +328,7 @@ function toggleDone(nm){
   if(!d.exercises[nm]){d.exercises[nm]={done:false,rating:"",note:"",active:false};}
   d.exercises[nm].done=!d.exercises[nm].done;
   d.exercises[nm].active=false;
-  AW[S.wo]=wk;scheduleSave();draw();
+  AW[wkKey(S.wo)]=wk;scheduleSave();draw();
 }
 
 function setActive(nm){
@@ -335,7 +338,7 @@ function setActive(nm){
   for(var ki=0;ki<keys.length;ki++){if(!d.exercises[keys[ki]].done){d.exercises[keys[ki]].active=false;}}
   if(!d.exercises[nm]){d.exercises[nm]={done:false,rating:"",note:"",active:false};}
   if(!d.exercises[nm].done){d.exercises[nm].active=!d.exercises[nm].active;}
-  AW[S.wo]=wk;scheduleSave();draw();
+  AW[wkKey(S.wo)]=wk;scheduleSave();draw();
 }
 
 function exDoneCount(){
@@ -556,7 +559,7 @@ function finishExport(wo,txt,descs){
     if(d.workout&&d.workout.notePhoto){d.workout.notePhotoDesc=descs[di+"-wonote"]||"Workout note photo";d.workout.notePhoto=null;}
     if(d.meals){for(var mi=0;mi<d.meals.length;mi++){if(d.meals[mi].photo){d.meals[mi].photoDesc=descs[di+"-meal"+mi]||"Food photo";d.meals[mi].photo=null;}}}
   }
-  AW[wo]=wk;
+  AW[wkKey(wo)]=wk;
   scheduleSave();
   navigator.clipboard.writeText(txt).then(function(){
     S.exporting=false;S.expDone=true;draw();
@@ -597,21 +600,38 @@ function wkstats(wk){
   return{avgP:Math.round(totalP/7),wkts:wkts,pdays:pdays,wts:wts,avgWt:avgWt};
 }
 
-function applyOneTimeShift(){
-  if(localStorage.getItem("mytracker_shift_v4")==="done"){return;}
-  var oldKeys=Object.keys(AW).map(Number);
-  if(oldKeys.length===0){
-    localStorage.setItem("mytracker_shift_v4","done");
-    return;
-  }
-  var shifted={};
+function isDayEmpty(d){
+  if(!d){return true;}
+  if(d.meals&&d.meals.length){return false;}
+  if(d.water){return false;}
+  if(d.weight){return false;}
+  if(d.workout&&(d.workout.completed||d.workout.rating||d.workout.notes||d.workout.notePhoto||d.workout.notePhotoDesc)){return false;}
+  if(d.exercises&&Object.keys(d.exercises).length){return false;}
+  if(d.photoFront||d.photoSide||d.cardioPhoto||d.photoFrontDesc||d.photoSideDesc||d.cardioPhotoDesc){return false;}
+  return true;
+}
+
+function migrateToDateKeys(){
+  if(localStorage.getItem("mytracker_migrated_to_date_keys_v1")==="done"){return;}
+  localStorage.setItem("mytracker_migrated_to_date_keys_v1","done");
+  var oldKeys=Object.keys(AW);
+  var migrated={};
+  var didMigrate=false;
   for(var ki=0;ki<oldKeys.length;ki++){
-    shifted[oldKeys[ki]+1]=AW[oldKeys[ki]];
+    var ok=oldKeys[ki];
+    var n=Number(ok);
+    if(!isFinite(n)){didMigrate=true;continue;}
+    var data=AW[ok];
+    if(Math.abs(n)>1e6){migrated[ok]=data;continue;}
+    var empty=true;
+    if(Array.isArray(data)){for(var di=0;di<data.length;di++){if(!isDayEmpty(data[di])){empty=false;break;}}}
+    if(empty){didMigrate=true;continue;}
+    var newKey=WS-(n+1)*604800000;
+    migrated[newKey]=data;
+    didMigrate=true;
   }
-  AW=shifted;
-  try{localStorage.setItem("mytracker",JSON.stringify(AW));}catch(e){}
-  localStorage.setItem("mytracker_shift_v4","done");
-  scheduleSave();
+  AW=migrated;
+  if(didMigrate){scheduleSave();}
 }
 
 function load(){
@@ -630,11 +650,11 @@ function load(){
     }else{
       loadFromLocal();
     }
-    applyOneTimeShift();
+    migrateToDateKeys();
     draw();
   }).catch(function(){
     loadFromLocal();
-    applyOneTimeShift();
+    migrateToDateKeys();
     draw();
   });
 }
@@ -680,7 +700,7 @@ function draw(){
       h+="<div style='text-align:center;color:#2a2a2a;font-size:13px;padding:40px 0'>No weeks logged yet</div>";
     }else{
       for(var wki=0;wki<wkKeys.length;wki++){
-        var wko=wkKeys[wki];
+        var wko=Math.round((wkKeys[wki]-WS)/604800000);
         var wkdata=gw(wko);
         var st=wkstats(wkdata);
         var isOpen=S.expandedWk===wko;
