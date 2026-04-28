@@ -89,10 +89,87 @@ button,textarea,input{font-family:inherit;}
 .arch-card.open{border-color:#e8322a;}
 .wo-notes-textarea{width:100%;background:#0c0c0c;border:1px solid #252525;border-radius:8px;color:#f0ede8;font-size:12px;padding:8px 10px;resize:none;height:72px;display:block;}
 .wo-notes-textarea:focus{outline:none;border-color:#444;}
+.tg-fab{position:fixed;bottom:24px;right:20px;width:56px;height:56px;border-radius:50%;background:transparent;border:none;cursor:pointer;z-index:200;display:flex;align-items:center;justify-content:center;transition:transform 0.15s ease;padding:0;}
+.tg-fab:active{transform:scale(0.92);}
+.tg-fab svg{width:48px;height:48px;animation:tg-glow 2.2s ease-in-out infinite;}
+@keyframes tg-glow{0%,100%{filter:drop-shadow(0 0 4px rgba(232,50,42,0.3));}50%{filter:drop-shadow(0 0 12px rgba(232,50,42,0.95));}}
+.tg-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:300;display:none;}
+.tg-overlay.on{display:block;}
+.tg-panel{position:fixed;left:0;right:0;bottom:0;top:5vh;background:#0a0a0a;z-index:301;border-radius:16px 16px 0 0;border-top:1px solid #1c1c1c;display:none;flex-direction:column;max-width:480px;margin:0 auto;}
+.tg-panel.on{display:flex;}
+.tg-hdr{display:flex;align-items:center;justify-content:space-between;padding:18px 20px 14px;border-bottom:1px solid #1c1c1c;flex-shrink:0;}
+.tg-hdr-l{display:flex;align-items:center;gap:10px;}
+.tg-hdr-icon{width:32px;height:32px;border-radius:50%;background:#e8322a;display:flex;align-items:center;justify-content:center;}
+.tg-hdr-icon svg{width:22px;height:22px;}
+.tg-hdr-name{font-size:14px;font-weight:600;color:#f0ede8;letter-spacing:0.5px;}
+.tg-hdr-sub{font-size:9px;letter-spacing:2px;color:#444;text-transform:uppercase;margin-top:1px;}
+.tg-close{background:#181818;border:1px solid #252525;border-radius:6px;width:28px;height:28px;color:#888;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.tg-msgs{flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:10px;}
+.tg-msgs::-webkit-scrollbar{width:0;}
+.tg-empty{text-align:center;color:#3a3a3a;font-size:12px;padding:30px 10px;line-height:1.6;}
+.tg-empty-title{color:#888;font-size:13px;margin-bottom:14px;}
+.tg-quick{display:flex;flex-direction:column;gap:6px;margin-top:14px;}
+.tg-qbtn{background:#0c0c0c;border:1px solid #1c1c1c;border-radius:10px;padding:10px 12px;color:#888;font-size:12px;text-align:left;cursor:pointer;font-family:inherit;}
+.tg-qbtn:active{background:#141414;}
+.tg-msg{max-width:85%;padding:10px 13px;border-radius:14px;font-size:13px;line-height:1.5;word-wrap:break-word;white-space:pre-wrap;}
+.tg-msg.me{align-self:flex-end;background:#e8322a;color:#fff;border-bottom-right-radius:4px;}
+.tg-msg.tg{align-self:flex-start;background:#141414;color:#e0ddd8;border:1px solid #1c1c1c;border-bottom-left-radius:4px;}
+.tg-msg.thinking{align-self:flex-start;background:#141414;color:#666;border:1px solid #1c1c1c;font-style:italic;font-size:12px;}
+.tg-input-row{display:flex;gap:8px;padding:12px 16px 18px;border-top:1px solid #1c1c1c;flex-shrink:0;background:#0a0a0a;}
+.tg-input{flex:1;background:#0c0c0c;border:1px solid #252525;border-radius:18px;color:#f0ede8;font-size:13px;padding:10px 14px;font-family:inherit;resize:none;max-height:90px;min-height:40px;line-height:1.4;}
+.tg-input:focus{outline:none;border-color:#444;}
+.tg-send{background:#e8322a;border:none;border-radius:50%;width:40px;height:40px;color:#fff;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.tg-send:disabled{background:#252525;color:#555;cursor:not-allowed;}
+.tg-send svg{width:18px;height:18px;}
+.tg-clear{background:transparent;border:none;color:#3a3a3a;font-size:10px;letter-spacing:1px;text-transform:uppercase;cursor:pointer;padding:0;margin-right:10px;}
 </style>
 </head>
 <body>
 <div id="root"><div style="color:#e8322a;padding:40px 20px;font-size:14px;">Loading your data...</div></div>
+<button id="tg-fab" class="tg-fab" onclick="tgToggle()" aria-label="Open TrainerGPT" style="display:none">
+  <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M6 14a8 8 0 0 1 8-8h8a8 8 0 0 1 8 8v6a8 8 0 0 1-8 8h-7l-5 4v-4.5A8 8 0 0 1 6 20v-6z" fill="none" stroke="#e8322a" stroke-width="2.2"/>
+    <rect x="10" y="15" width="2.5" height="8" rx="0.5" fill="#e8322a"/>
+    <rect x="23.5" y="15" width="2.5" height="8" rx="0.5" fill="#e8322a"/>
+    <rect x="8" y="17" width="1.5" height="4" rx="0.4" fill="#e8322a"/>
+    <rect x="26.5" y="17" width="1.5" height="4" rx="0.4" fill="#e8322a"/>
+    <rect x="12.5" y="18" width="11" height="2" rx="0.5" fill="#e8322a"/>
+  </svg>
+</button>
+<div id="tg-overlay" class="tg-overlay" onclick="tgToggle()"></div>
+<div id="tg-panel" class="tg-panel">
+  <div class="tg-hdr">
+    <div class="tg-hdr-l">
+      <div class="tg-hdr-icon">
+        <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M6 14a8 8 0 0 1 8-8h8a8 8 0 0 1 8 8v6a8 8 0 0 1-8 8h-7l-5 4v-4.5A8 8 0 0 1 6 20v-6z" fill="none" stroke="#fff" stroke-width="2.2"/>
+          <rect x="10" y="15" width="2.5" height="8" rx="0.5" fill="#fff"/>
+          <rect x="23.5" y="15" width="2.5" height="8" rx="0.5" fill="#fff"/>
+          <rect x="8" y="17" width="1.5" height="4" rx="0.4" fill="#fff"/>
+          <rect x="26.5" y="17" width="1.5" height="4" rx="0.4" fill="#fff"/>
+          <rect x="12.5" y="18" width="11" height="2" rx="0.5" fill="#fff"/>
+        </svg>
+      </div>
+      <div>
+        <div class="tg-hdr-name">TrainerGPT</div>
+        <div class="tg-hdr-sub">Your Coach</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center">
+      <button class="tg-clear" onclick="tgClear()">Clear</button>
+      <button class="tg-close" onclick="tgToggle()">&times;</button>
+    </div>
+  </div>
+  <div id="tg-msgs" class="tg-msgs"></div>
+  <div class="tg-input-row">
+    <textarea id="tg-input" class="tg-input" placeholder="Ask TrainerGPT..." rows="1" onkeydown="tgKey(event)" oninput="tgGrow(this)"></textarea>
+    <button id="tg-send" class="tg-send" onclick="tgSend()" aria-label="Send">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M2 12L22 3L13 22L11 13L2 12Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="currentColor"/>
+      </svg>
+    </button>
+  </div>
+</div>
 <script>
 window.onerror=function(msg,src,line){
   document.getElementById("root").innerHTML="<div style='color:#e8322a;padding:20px;font-size:13px'>Error: "+msg+" (line "+line+")</div>";
@@ -200,7 +277,8 @@ var AW={};
 var S={wo:0,ad:0,view:"log",showWS:false,expandedWk:null,
   smf:false,mt:"",mp:null,mpp:null,ld:false,ae:"",
   exporting:false,expDone:false,activeVid:null,pgOpen:false,
-  syncStatus:"idle"};
+  syncStatus:"idle",
+  tgOpen:false,tgChat:[],tgBusy:false};
 
 var _debTimer=null;
 var _lastSavedTs=null;
@@ -668,6 +746,8 @@ function loadFromLocal(){
 }
 
 function draw(){
+  var fab=document.getElementById("tg-fab");
+  if(fab){fab.style.display="flex";}
   var week=gw(S.wo),day=gday(),dtype=DTYPES[DAYS[S.ad]];
   var h="";
 
@@ -1098,6 +1178,329 @@ function draw(){
 
   var mta=document.getElementById("meal-ta");
   if(mta){mta.addEventListener("input",function(e){S.mt=e.target.value;});}
+}
+
+// ===== TrainerGPT =====
+
+var TG_FOOD_RX=/\b(eat|eaten|ate|eating|food|meal|meals|breakfast|lunch|dinner|snack|snacks|hungry|carb|carbs|protein|fat|fats|cal|cals|calorie|calories|macro|macros|chipotle|mcdonald|chick|wendy|panera|sweetgreen|cava|chopt|burger|pizza|sandwich|salad|sushi|chicken|beef|steak|fish|salmon|tuna|egg|eggs|rice|pasta|bread|cheese|yogurt|smoothie|shake|coffee|drink|drinks|alcohol|beer|wine|vodka|whiskey|tequila|cocktail|sugar|sweets|dessert|fast food|takeout|delivery|doordash|uber eats|grubhub)\b/i;
+
+function tgCtx(){
+  var now=new Date();
+  var dn=DAYS[now.getDay()];
+  var dtype=DTYPES[dn];
+  var todayWk=gw(0);
+  var today=todayWk[now.getDay()];
+  var lines=[];
+  lines.push("USER: Vinny. Goal: fat loss, lean physique for upcoming Vegas trip.");
+  lines.push("DAILY TARGETS: "+PG+"g protein, "+CG+" cal, "+WG+" glasses water.");
+  lines.push("SPLIT: 5:15am, Mon Upper A, Tue Lower+Abs, Wed Cardio, Thu Upper B, Fri Lower+Abs, Sat/Sun rest.");
+  lines.push("");
+  lines.push("=== TODAY ("+dn+", "+dtype+") ===");
+  if(today.weight){lines.push("Weight: "+today.weight+" lbs");}
+  lines.push("Protein: "+today.p+"g / "+PG+"g ("+(PG-today.p>0?(PG-today.p)+"g remaining":"target hit")+")");
+  lines.push("Calories: "+today.cal+" / "+CG);
+  lines.push("Carbs: "+today.carbs+"g, Fat: "+today.fat+"g");
+  lines.push("Water: "+today.water+"/"+WG+" glasses");
+  if(today.meals.length){
+    lines.push("Meals logged today:");
+    for(var i=0;i<today.meals.length;i++){
+      var m=today.meals[i];
+      lines.push("  - "+m.name+" ("+m.protein+"g P, "+m.carbs+"g C, "+m.fat+"g F, "+m.calories+" cal)");
+    }
+  }else{
+    lines.push("No meals logged yet today.");
+  }
+  if(dtype!=="Rest"&&today.workout){
+    lines.push("Workout: "+(today.workout.completed?"COMPLETED ("+today.workout.rating+")":"not yet completed"));
+    if(today.workout.notes){lines.push("Workout notes: "+today.workout.notes);}
+  }
+  lines.push("");
+  lines.push("=== THIS WEEK ===");
+  var wkts=0,pSum=0,pDays=0,wts=[];
+  for(var di=0;di<7;di++){
+    var wd=todayWk[di];
+    if(wd.workout&&wd.workout.completed){wkts++;}
+    if(wd.p>0){pSum+=wd.p;pDays++;}
+    if(wd.weight){wts.push(parseFloat(wd.weight));}
+  }
+  lines.push("Workouts completed: "+wkts+"/5");
+  lines.push("Avg protein (logged days): "+(pDays?Math.round(pSum/pDays):0)+"g");
+  if(wts.length){
+    var avgWt=wts.reduce(function(a,b){return a+b;},0)/wts.length;
+    lines.push("Weight range this week: "+Math.min.apply(null,wts).toFixed(1)+"-"+Math.max.apply(null,wts).toFixed(1)+" lbs (avg "+avgWt.toFixed(1)+")");
+  }
+  // Last week trend
+  var lastWk=gw(-1);
+  var lastWts=[];for(var li=0;li<7;li++){if(lastWk[li].weight){lastWts.push(parseFloat(lastWk[li].weight));}}
+  if(lastWts.length&&wts.length){
+    var lastAvg=lastWts.reduce(function(a,b){return a+b;},0)/lastWts.length;
+    var thisAvg=wts.reduce(function(a,b){return a+b;},0)/wts.length;
+    var delta=(thisAvg-lastAvg).toFixed(1);
+    lines.push("Weight delta vs last week avg: "+(delta>0?"+":"")+delta+" lbs");
+  }
+  return lines.join("\n");
+}
+
+function tgSysPrompt(){
+  return "You are TrainerGPT, Vinny's personal AI fitness and nutrition coach. You live inside his fitness tracker app.\n\n"+
+    "PERSONALITY: Direct, honest, knowledgeable. You care about his results so you don't sugarcoat. You're not a hype machine and not a lecturer. Talk like a smart friend who happens to be a coach. Use casual language but be substantive. Push back when he's making bad calls. Give him a clear answer, not a list of options.\n\n"+
+    "STYLE: Keep responses tight. 2-4 short paragraphs max for most questions. Use line breaks for readability. NEVER use em dashes, en dashes, or double hyphens. Use commas, periods, or parentheses instead.\n\n"+
+    "WHAT YOU KNOW: His full live tracker state is injected below on every message. You see his weight, today's meals and macros, workouts done, weekly trends. Use this. When he asks 'is this a good lunch?' you already know how much protein he has left for the day. When he asks 'should I lift today?' you know if he's already trained.\n\n"+
+    "WHEN GIVING NUTRITION ADVICE: If web search results are provided, prefer those numbers over estimates. Always tie advice back to his daily protein gap (he chronically under-hits 140g) and his fat loss goal.\n\n"+
+    "CURRENT STATE:\n"+tgCtx();
+}
+
+function tgGreeting(){
+  var now=new Date();
+  var hour=now.getHours();
+  var dn=DAYS[now.getDay()];
+  var dtype=DTYPES[dn];
+  var today=gw(0)[now.getDay()];
+  var proteinLeft=PG-today.p;
+  var workoutDone=today.workout&&today.workout.completed;
+  var mealsLogged=today.meals.length;
+  var waterLogged=today.water;
+  var weight=parseFloat(today.weight)||0;
+  var isRest=dtype==="Rest";
+
+  // Build this week's workout count
+  var wk=gw(0);var wkts=0;
+  for(var i=0;i<7;i++){if(wk[i].workout&&wk[i].workout.completed){wkts++;}}
+
+  var greeting="";
+  var sub="";
+  var btns=[];
+
+  // Early morning before gym
+  if(hour>=4&&hour<6&&!isRest&&!workoutDone){
+    greeting="5:15am. "+dtype+" day. Let's go.";
+    sub="What do you need before you head down?";
+    btns=["What should I eat before lifting?","What's on the plan today?","How do I make the most of "+dtype+"?"];
+  }
+  // Morning, training day, not done yet
+  else if(hour>=6&&hour<12&&!isRest&&!workoutDone){
+    greeting="Good morning. "+dtype+" day and you haven't trained yet.";
+    sub="Clock's ticking. What's up?";
+    btns=["What should I eat before lifting?","Is it too late to train this morning?","What's today's workout look like?"];
+  }
+  // Morning, training day, already done
+  else if(hour>=6&&hour<12&&!isRest&&workoutDone){
+    greeting="Already trained. Respect.";
+    sub="Now let's make sure the rest of the day doesn't undo it.";
+    btns=["What should I eat post-workout?","How much protein do I still need today?","Rate my workout nutrition so far."];
+  }
+  // Morning rest day
+  else if(hour>=6&&hour<12&&isRest){
+    greeting="Rest day. Body's doing the work now.";
+    sub="Still gotta eat right though.";
+    btns=["What should I eat on a rest day?","How many calories on rest days?","What can I do today to help recovery?"];
+  }
+  // Afternoon, protein way behind
+  else if(hour>=12&&hour<17&&proteinLeft>80){
+    greeting="It's the afternoon and you're "+proteinLeft+"g short on protein.";
+    sub="That gap doesn't close itself.";
+    btns=["What should I eat right now for protein?","Give me a high protein lunch idea.","How do I hit "+PG+"g by end of day?"];
+  }
+  // Afternoon, protein on track
+  else if(hour>=12&&hour<17&&proteinLeft<=40&&proteinLeft>0){
+    greeting="Protein's looking solid. "+today.p+"g logged, "+proteinLeft+"g to go.";
+    sub="What else you thinking about?";
+    btns=["What should I eat for dinner?","How are my macros looking overall?","Good lunch ideas to finish strong?"];
+  }
+  // Afternoon, training day, not done
+  else if(hour>=12&&hour<17&&!isRest&&!workoutDone){
+    greeting="Haven't trained yet today. "+dtype+" day.";
+    sub="Still time. What's the plan?";
+    btns=["Should I still train this afternoon?","What should I eat before lifting now?","Will training this late affect sleep?"];
+  }
+  // Afternoon, protein goal hit
+  else if(hour>=12&&hour<17&&proteinLeft<=0){
+    greeting="Protein goal hit. "+today.p+"g logged.";
+    sub="That almost never happens. What's good?";
+    btns=["What should I eat for dinner to stay on track?","How are my calories looking?","Give me a check-in on this week."];
+  }
+  // Evening, protein still short
+  else if(hour>=17&&hour<21&&proteinLeft>40){
+    greeting="Evening. Still "+proteinLeft+"g short on protein.";
+    sub="You've got a few hours. Let's fix it.";
+    btns=["What can I eat right now to close the gap?","High protein dinner ideas?","Is a shake enough to make up the difference?"];
+  }
+  // Evening, workout not done
+  else if(hour>=17&&hour<21&&!isRest&&!workoutDone){
+    greeting="It's evening and "+dtype+" is still on the list.";
+    sub="Late gym or skip? Talk to me.";
+    btns=["Is it worth training this late?","How does evening lifting affect sleep?","What if I just do a shorter session?"];
+  }
+  // Evening, good day
+  else if(hour>=17&&hour<21&&proteinLeft<=40){
+    greeting="Evening check-in. "+today.p+"g protein, "+mealsLogged+" meals logged.";
+    sub="Day's looking "+( proteinLeft<=0?"dialed in.":"close to dialed in.");
+    btns=["What should I have for dinner?","How are my macros for the day?","Give me a full day summary."];
+  }
+  // Late night
+  else if(hour>=21||hour<4){
+    greeting="Late night. You should be recovering right now.";
+    sub="What's on your mind?";
+    btns=["Does eating late affect fat loss?","What's a good late night snack that won't hurt?","How much sleep do I actually need for this goal?"];
+  }
+  // Monday, new week energy
+  else if(dn==="Mon"&&!workoutDone){
+    greeting="Monday. Upper A day. Week "+wkts+" workouts in.";
+    sub="Let's start it right.";
+    btns=["What should I eat before Upper A?","What are the key lifts today?","How do I make this week better than last?"];
+  }
+  // Friday, end of week
+  else if(dn==="Fri"){
+    greeting="Friday. Lower+Abs. Last training day of the week.";
+    sub="Finish strong.";
+    btns=["What should I focus on for Lower+Abs?","How did this week go?","Good post-workout dinner for Friday?"];
+  }
+  // Fallback: always different based on protein/meals
+  else if(mealsLogged===0){
+    greeting="Nothing logged yet today.";
+    sub="Let's get the day started right.";
+    btns=["What's a good breakfast for fat loss?","What should my first meal look like?","How should I spread my "+PG+"g protein today?"];
+  }
+  else if(waterLogged<3&&hour>12){
+    greeting="You've had "+waterLogged+" glasses of water today.";
+    sub="Hydration affects everything, including fat loss.";
+    btns=["How much water do I actually need?","Does water intake affect the scale?","What else should I be doing for recovery?"];
+  }
+  else{
+    greeting="What's up booski.";
+    sub="I know your day, your week, your goals. Ask me anything.";
+    btns=["How am I doing on protein today?","What should I eat right now?","Give me a quick check-in on this week."];
+  }
+
+  return{greeting:greeting,sub:sub,btns:btns};
+}
+
+function tgRender(){
+  var box=document.getElementById("tg-msgs");
+  if(!box)return;
+  if(S.tgChat.length===0){
+    var g=tgGreeting();
+    box.innerHTML="<div class='tg-empty'>"+
+      "<div class='tg-empty-title'>"+tgEsc(g.greeting)+"</div>"+
+      tgEsc(g.sub)+
+      "<div class='tg-quick'>"+
+      g.btns.map(function(b){return "<button class='tg-qbtn' onclick=\"tgQuick('"+b.replace(/'/g,"\\'")+"')\">"+tgEsc(b)+"</button>";}).join("")+
+      "</div>"+
+      "</div>";
+    return;
+  }
+  var h="";
+  for(var i=0;i<S.tgChat.length;i++){
+    var m=S.tgChat[i];
+    var cls=m.role==="user"?"me":(m.thinking?"tg thinking":"tg");
+    h+="<div class='tg-msg "+cls+"'>"+tgEsc(m.content)+"</div>";
+  }
+  box.innerHTML=h;
+  setTimeout(function(){box.scrollTop=box.scrollHeight;},10);
+}
+
+function tgEsc(s){
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+function tgToggle(){
+  S.tgOpen=!S.tgOpen;
+  document.getElementById("tg-overlay").classList.toggle("on",S.tgOpen);
+  document.getElementById("tg-panel").classList.toggle("on",S.tgOpen);
+  if(S.tgOpen){
+    tgRender();
+    setTimeout(function(){
+      var inp=document.getElementById("tg-input");
+      if(inp){inp.focus();}
+    },100);
+  }
+}
+
+function tgClear(){
+  if(S.tgChat.length===0)return;
+  if(confirm("Clear this conversation?")){
+    S.tgChat=[];
+    tgRender();
+  }
+}
+
+function tgKey(e){
+  if(e.key==="Enter"&&!e.shiftKey){
+    e.preventDefault();
+    tgSend();
+  }
+}
+
+function tgGrow(el){
+  el.style.height="auto";
+  el.style.height=Math.min(el.scrollHeight,90)+"px";
+}
+
+function tgQuick(txt){
+  var inp=document.getElementById("tg-input");
+  if(inp){inp.value=txt;}
+  tgSend();
+}
+
+function tgSend(){
+  if(S.tgBusy)return;
+  var inp=document.getElementById("tg-input");
+  var txt=(inp&&inp.value||"").trim();
+  if(!txt)return;
+  inp.value="";
+  inp.style.height="40px";
+  S.tgChat.push({role:"user",content:txt});
+  S.tgChat.push({role:"assistant",content:"thinking...",thinking:true});
+  S.tgBusy=true;
+  var sendBtn=document.getElementById("tg-send");
+  if(sendBtn){sendBtn.disabled=true;}
+  tgRender();
+
+  // Build messages array (drop the thinking placeholder)
+  var msgs=[];
+  for(var i=0;i<S.tgChat.length-1;i++){
+    var m=S.tgChat[i];
+    msgs.push({role:m.role,content:m.content});
+  }
+
+  var body={
+    model:"claude-sonnet-4-20250514",
+    max_tokens:1024,
+    system:tgSysPrompt(),
+    messages:msgs
+  };
+
+  // Detect food/nutrition questions and enable web search
+  if(TG_FOOD_RX.test(txt)){
+    body.tools=[{type:"web_search_20250305",name:"web_search",max_uses:2}];
+  }
+
+  fetch(PROXY,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify(body)
+  }).then(function(r){return r.json();}).then(function(data){
+    var reply="";
+    if(data.content&&data.content.length){
+      for(var ci=0;ci<data.content.length;ci++){
+        var blk=data.content[ci];
+        if(blk.type==="text"&&blk.text){reply+=blk.text;}
+      }
+    }
+    if(!reply){reply=data.error?("Error: "+(data.error.message||"unknown")):"No response. Try again.";}
+    // Remove thinking placeholder, push real reply
+    S.tgChat.pop();
+    S.tgChat.push({role:"assistant",content:reply.trim()});
+    S.tgBusy=false;
+    if(sendBtn){sendBtn.disabled=false;}
+    tgRender();
+  }).catch(function(err){
+    S.tgChat.pop();
+    S.tgChat.push({role:"assistant",content:"Couldn't reach the server. Check your connection and try again."});
+    S.tgBusy=false;
+    if(sendBtn){sendBtn.disabled=false;}
+    tgRender();
+  });
 }
 
 (function(){
