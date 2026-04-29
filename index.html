@@ -208,6 +208,32 @@ body.tg-locked{position:fixed;width:100%;overflow:hidden;}
 .goal-section-header.heat-2{color:#5a3a3a !important;}
 .goal-section-header.heat-3{color:#8a4040 !important;}
 .goal-section-header.heat-4{color:#a04030 !important;}
+.shoe-row-tap{cursor:pointer;-webkit-tap-highlight-color:rgba(232,50,42,0.15);transition:background 0.2s;}
+.shoe-row-tap:active{background:#161616;}
+.sm-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:310;display:none;opacity:0;transition:opacity 0.3s ease;}
+.sm-overlay.on{display:block;opacity:1;}
+.sm-panel{position:fixed;left:0;right:0;bottom:0;background:#0a0a0a;z-index:311;border-radius:18px 18px 0 0;border-top:1px solid #1c1c1c;box-shadow:0 -8px 40px rgba(232,50,42,0.18);max-width:480px;margin:0 auto;transform:translateY(100%);transition:transform 0.5s cubic-bezier(0.22,1,0.36,1);max-height:92vh;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
+.sm-panel.on{transform:translateY(0);}
+.sm-hdr{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 8px;border-bottom:1px solid #1c1c1c;}
+.sm-hdr-lbl{font-size:11px;font-weight:600;letter-spacing:2px;color:#888;text-transform:uppercase;}
+.sm-close{background:transparent;border:none;color:#888;font-size:28px;line-height:1;cursor:pointer;padding:0 4px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:50%;transition:background 0.15s,color 0.15s;}
+.sm-close:active{background:#1c1c1c;color:#fff;}
+.sm-hero{padding:24px 20px 16px;text-align:center;}
+.sm-hero-img{width:200px;height:140px;object-fit:cover;border-radius:12px;border:1px solid #1c1c1c;display:block;margin:0 auto 16px;}
+.sm-hero-name{font-size:17px;font-weight:500;color:#f0ede8;margin-bottom:4px;}
+.sm-hero-price{font-size:26px;font-weight:700;color:#fff;letter-spacing:0.5px;}
+.sm-hero-tax{font-size:11px;color:#888;letter-spacing:1.5px;text-transform:uppercase;margin-top:4px;}
+.sm-divider{height:1px;background:#1c1c1c;margin:0 20px;}
+.sm-details{display:grid;grid-template-columns:repeat(3,1fr);padding:18px 20px;gap:8px;}
+.sm-detail-cell{text-align:center;}
+.sm-detail-lbl{font-size:9px;color:#666;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px;font-weight:600;}
+.sm-detail-val{font-size:13px;color:#f0ede8;font-weight:500;}
+.sm-actions{padding:8px 20px 24px;display:flex;flex-direction:column;gap:10px;}
+.sm-btn-primary{display:flex;align-items:center;justify-content:center;gap:8px;background:#e8322a;border:none;border-radius:10px;padding:14px 16px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;text-decoration:none;-webkit-tap-highlight-color:transparent;transition:transform 0.1s,box-shadow 0.2s;}
+.sm-btn-primary:active{transform:scale(0.98);}
+.sm-btn-primary:hover{box-shadow:0 0 20px rgba(232,50,42,0.5);}
+.sm-btn-secondary{background:transparent;border:1px solid #2a2a2a;border-radius:10px;padding:12px 16px;color:#999;font-size:14px;font-weight:500;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.sm-btn-secondary:active{background:#1c1c1c;}
 </style>
 </head>
 <body>
@@ -262,6 +288,41 @@ body.tg-locked{position:fixed;width:100%;overflow:hidden;}
         <path d="M2 12L22 3L13 22L11 13L2 12Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="currentColor"/>
       </svg>
     </button>
+  </div>
+</div>
+<div id="sm-overlay" class="sm-overlay" onclick="closeShoeModal()"></div>
+<div id="sm-panel" class="sm-panel" role="dialog" aria-modal="true" aria-label="The Reward">
+  <div class="sm-hdr">
+    <div class="sm-hdr-lbl">The Reward</div>
+    <button class="sm-close" onclick="closeShoeModal()" aria-label="Close">&times;</button>
+  </div>
+  <div class="sm-hero">
+    <img id="sm-hero-img" class="sm-hero-img" alt="LV Trainer Sneaker">
+    <div id="sm-hero-name" class="sm-hero-name"></div>
+    <div id="sm-hero-price" class="sm-hero-price"></div>
+    <div id="sm-hero-tax" class="sm-hero-tax"></div>
+  </div>
+  <div class="sm-divider"></div>
+  <div class="sm-details">
+    <div class="sm-detail-cell">
+      <div class="sm-detail-lbl">Earn By</div>
+      <div class="sm-detail-val">Dec 1, 2026</div>
+    </div>
+    <div class="sm-detail-cell">
+      <div class="sm-detail-lbl">Saved</div>
+      <div id="sm-detail-saved" class="sm-detail-val">$0</div>
+    </div>
+    <div class="sm-detail-cell">
+      <div class="sm-detail-lbl">Status</div>
+      <div id="sm-detail-status" class="sm-detail-val">0 of 4</div>
+    </div>
+  </div>
+  <div class="sm-actions">
+    <button class="sm-btn-primary" onclick="goToShoe()">
+      <span>View on louisvuitton.com</span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"></path><path d="M8 7h9v9"></path></svg>
+    </button>
+    <button class="sm-btn-secondary" onclick="closeShoeModal()">Close</button>
   </div>
 </div>
 <script>
@@ -724,14 +785,10 @@ function renderGoalCard(){
   h+="<button onclick='S.showGoal=false;draw()' style='background:#181818;border:1px solid #252525;border-radius:6px;color:#888;font-size:10px;cursor:pointer;padding:4px 10px'>Back</button>";
   h+="</div>";
 
-  h+="<div style='display:flex;align-items:center;gap:10px;margin-bottom:12px;position:relative'>";
+  h+="<div class='shoe-row-tap' onclick='openShoeModal()' style='display:flex;align-items:center;gap:10px;margin-bottom:12px;position:relative;border-radius:10px;padding:6px;margin-left:-6px;margin-right:-6px'>";
   h+="<img class='goal-shoe "+shoeAura+"' src='"+SHOE_IMG+"' style='width:64px;height:48px;object-fit:cover;border-radius:8px;border:1px solid #1c1c1c;flex-shrink:0'>";
   h+="<div style='flex:1;min-width:0'>";
-  if(gs.allUnlocked){
-    h+="<a href='"+GOAL.shoeUrl+"' target='_blank' style='font-size:15px;font-weight:500;color:#f0ede8;text-decoration:none'>"+GOAL.shoeName+"</a>";
-  }else{
-    h+="<div style='font-size:15px;font-weight:500;color:#f0ede8'>"+GOAL.shoeName+"</div>";
-  }
+  h+="<div style='font-size:15px;font-weight:500;color:#f0ede8'>"+GOAL.shoeName+"</div>";
   h+="<div style='display:flex;justify-content:space-between;align-items:center;margin-top:2px'>";
   h+="<div style='font-size:11px;color:#555'>Earn it by Dec 1, 2026</div>";
   h+="<div style='font-size:13px;font-weight:500;color:#f0ede8'>$"+GOAL.shoePrice.toLocaleString()+"</div>";
@@ -818,7 +875,7 @@ function renderGoalCard(){
     h+="<div class='goal-earned-banner'>";
     h+="<div style='font-size:18px;font-weight:600;color:#10b981;margin-bottom:4px;letter-spacing:2px'>EARNED</div>";
     h+="<div style='font-size:12px;color:#10b981;opacity:0.85'>You did it. Time to make it official.</div>";
-    h+="<a class='goal-buy-btn' href='"+GOAL.shoeUrl+"' target='_blank'>Buy Now</a>";
+    h+="<button class='goal-buy-btn' onclick='goToShoe()' style='border:none;cursor:pointer;font-family:inherit'>Buy Now</button>";
     h+="</div>";
   }
   h+="</div>";
@@ -1778,6 +1835,45 @@ function tgToggle(){
     document.body.classList.remove("tg-locked");
     document.body.style.top="";
     window.scrollTo(0,_tgScrollY);
+  }
+}
+
+var _smScrollY=0;
+function openShoeModal(){
+  var gs=calcGoalStats();
+  var unlockedCount=0;
+  if(gs.qualWorkoutWeeks>=GOAL.targetWeeks)unlockedCount++;
+  if(gs.qualProteinWeeks>=GOAL.targetWeeks)unlockedCount++;
+  if(gs.qualWaterWeeks>=GOAL.targetWeeks)unlockedCount++;
+  if(gs.weightHitGoal)unlockedCount++;
+  var img=document.getElementById("sm-hero-img");
+  if(img&&img.getAttribute("src")!==SHOE_IMG){img.setAttribute("src",SHOE_IMG);}
+  document.getElementById("sm-hero-name").textContent=GOAL.shoeName;
+  document.getElementById("sm-hero-price").textContent="$"+GOAL.shoePrice.toLocaleString();
+  document.getElementById("sm-hero-tax").textContent="$"+GOAL.shoePriceWithTax.toLocaleString()+" with IL tax";
+  document.getElementById("sm-detail-saved").textContent="$"+Math.round(gs.savedNow).toLocaleString();
+  document.getElementById("sm-detail-status").textContent=unlockedCount+" of 4";
+  _smScrollY=window.scrollY||window.pageYOffset||0;
+  document.body.style.top=(-_smScrollY)+"px";
+  document.body.classList.add("tg-locked");
+  document.getElementById("sm-overlay").classList.add("on");
+  document.getElementById("sm-panel").classList.add("on");
+}
+
+function closeShoeModal(){
+  document.getElementById("sm-overlay").classList.remove("on");
+  document.getElementById("sm-panel").classList.remove("on");
+  document.body.classList.remove("tg-locked");
+  document.body.style.top="";
+  window.scrollTo(0,_smScrollY);
+}
+
+function goToShoe(){
+  try{
+    var w=window.open(GOAL.shoeUrl,"_blank");
+    if(!w){window.location.href=GOAL.shoeUrl;}
+  }catch(e){
+    window.location.href=GOAL.shoeUrl;
   }
 }
 
