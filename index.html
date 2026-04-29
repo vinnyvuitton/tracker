@@ -132,7 +132,7 @@ body.tg-locked{position:fixed;width:100%;overflow:hidden;}
 .tg-meal-confirm{flex:1;background:#e8322a;border:none;border-radius:8px;padding:9px 0;color:#fff;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;}
 .tg-meal-cancel{background:#1a1a1a;border:1px solid #252525;border-radius:8px;padding:9px 14px;color:#888;font-size:12px;cursor:pointer;font-family:inherit;}
 .tg-input-row{display:flex;gap:8px;padding:12px 16px 18px;border-top:1px solid #1c1c1c;flex-shrink:0;background:#0a0a0a;}
-.tg-input{flex:1;background:#0c0c0c;border:1px solid #252525;border-radius:18px;color:#f0ede8;font-size:13px;padding:10px 14px;font-family:inherit;resize:none;max-height:90px;min-height:40px;line-height:1.4;}
+.tg-input{flex:1;background:#0c0c0c;border:1px solid #252525;border-radius:18px;color:#f0ede8;font-size:16px;padding:10px 14px;font-family:inherit;resize:none;max-height:90px;min-height:40px;line-height:1.4;}
 .tg-input:focus{outline:none;border-color:#444;}
 .tg-send{background:#e8322a;border:none;border-radius:50%;width:40px;height:40px;color:#fff;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
 .tg-send:disabled{background:#252525;color:#555;cursor:not-allowed;}
@@ -610,6 +610,20 @@ function exTotalCount(){
 
 function isDayQualifiedWorkout(dayData,dayName){
   if(!PLAN[dayName]){return false;}
+  if(!dayData){return false;}
+  // Explicit completion signals always qualify (any day type)
+  if(dayData.workout&&(dayData.workout.completed||dayData.workout.rating||dayData.workout.notes||dayData.workout.notePhoto||dayData.workout.notePhotoDesc)){return true;}
+  // Cardio days: treadmill photo, cardio rating, or cardio note all qualify
+  var dtype=DTYPES[dayName];
+  if(dtype==="Cardio"){
+    if(dayData.cardioPhoto||dayData.cardioPhotoDesc)return true;
+    if(dayData.exercises&&dayData.exercises["cardio-session"]){
+      var cs=dayData.exercises["cardio-session"];
+      if(cs.rating||cs.note)return true;
+    }
+    return false;
+  }
+  // Lifting days: 50% of exercises marked done (existing rule)
   var totalEx=0;
   var secs=PLAN[dayName].sections;
   for(var si=0;si<secs.length;si++){totalEx+=secs[si].exs.length;}
@@ -1035,7 +1049,7 @@ function doExport(wo){
   var totalP=0,wkts=0,pdays=0,wts=[];
   for(var di=0;di<7;di++){
     var d=wk[di];totalP+=d.p;
-    if(d.workout&&d.workout.completed){wkts++;}
+    if(hasTrainedToday(d)){wkts++;}
     if(d.p>=PG){pdays++;}
     if(d.weight){wts.push(parseFloat(d.weight));}
   }
@@ -1119,7 +1133,7 @@ function wkstats(wk){
   var totalP=0,wkts=0,pdays=0,wts=[];
   for(var i=0;i<7;i++){
     totalP+=wk[i].p;
-    if(wk[i].workout&&wk[i].workout.completed){wkts++;}
+    if(hasTrainedToday(wk[i])){wkts++;}
     if(wk[i].p>=PG){pdays++;}
     if(wk[i].weight){wts.push(parseFloat(wk[i].weight));}
   }
@@ -1273,7 +1287,7 @@ function draw(){
             h+="<div style='text-align:right'><div style='font-size:13px;font-weight:500;color:"+pcolor(wd.p)+"'>"+wd.p+"g</div>";
             h+="<div style='font-size:9px;color:#383838'>"+wd.cal+" kcal</div>";
             if(wd.weight){h+="<div style='font-size:10px;color:#f59e0b;margin-top:1px'>"+wd.weight+" lbs</div>";}
-            if(wd.workout&&wd.workout.completed){h+="<div style='font-size:8px;color:#e8322a;margin-top:1px'>trained</div>";}
+            if(hasTrainedToday(wd)){h+="<div style='font-size:8px;color:#e8322a;margin-top:1px'>trained</div>";}
             h+="</div></div>";
           }
           h+="<button class='expbtn"+(S.expDone?" done":"")+"' onclick='event.stopPropagation();doExport("+wko+")' "+(S.exporting?"disabled":"")+">"+
@@ -1307,7 +1321,7 @@ function draw(){
     var tabDateNum=tabDate.getDate();
     var tabMo=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][tabDate.getMonth()];
     h+="<div class='tday'>"+dn+"</div><div class='ttype'>"+tabMo+" "+tabDateNum+"</div>";
-    if(week[ti].workout&&week[ti].workout.completed){h+="<div class='tdone'>done</div>";}
+    if(hasTrainedToday(week[ti])){h+="<div class='tdone'>done</div>";}
     h+="</div>";
   }
   h+="</div>";
@@ -1664,16 +1678,32 @@ function tgCtx(){
   }else{
     lines.push("No meals logged yet today.");
   }
-  if(dtype!=="Rest"&&today.workout){
-    lines.push("Workout: "+(today.workout.completed?"COMPLETED ("+today.workout.rating+")":"not yet completed"));
-    if(today.workout.notes){lines.push("Workout notes: "+today.workout.notes);}
+  if(dtype!=="Rest"){
+    var trainedToday=hasTrainedToday(today);
+    var workoutLine="Workout: "+(trainedToday?"TRAINED":"not yet trained");
+    if(trainedToday){
+      var ratingPart="";
+      if(today.workout&&today.workout.rating){ratingPart=today.workout.rating;}
+      if(!ratingPart&&today.exercises&&today.exercises["cardio-session"]&&today.exercises["cardio-session"].rating){
+        ratingPart=today.exercises["cardio-session"].rating;
+      }
+      if(ratingPart){workoutLine+=" ("+ratingPart+")";}
+      if(dtype==="Cardio"){
+        if(today.cardioPhoto||today.cardioPhotoDesc){workoutLine+=" - treadmill screen logged";}
+        if(today.exercises&&today.exercises["cardio-session"]&&today.exercises["cardio-session"].note){
+          workoutLine+="\nCardio note: "+today.exercises["cardio-session"].note;
+        }
+      }
+    }
+    lines.push(workoutLine);
+    if(today.workout&&today.workout.notes){lines.push("Workout notes: "+today.workout.notes);}
   }
   lines.push("");
   lines.push("=== THIS WEEK ===");
   var wkts=0,pSum=0,pDays=0,wts=[];
   for(var di=0;di<7;di++){
     var wd=todayWk[di];
-    if(wd.workout&&wd.workout.completed){wkts++;}
+    if(hasTrainedToday(wd)){wkts++;}
     if(wd.p>0){pSum+=wd.p;pDays++;}
     if(wd.weight){wts.push(parseFloat(wd.weight));}
   }
@@ -1711,6 +1741,20 @@ function tgSysPrompt(){
     +"CURRENT STATE:\n"+tgCtx();
 }
 
+function hasTrainedToday(d){
+  if(!d)return false;
+  if(d.workout&&(d.workout.completed||d.workout.rating||d.workout.notes||d.workout.notePhoto||d.workout.notePhotoDesc))return true;
+  if(d.cardioPhoto||d.cardioPhotoDesc)return true;
+  if(d.exercises){
+    var keys=Object.keys(d.exercises);
+    for(var i=0;i<keys.length;i++){
+      var ex=d.exercises[keys[i]];
+      if(ex&&(ex.done||ex.rating||ex.note))return true;
+    }
+  }
+  return false;
+}
+
 function tgGreeting(){
   var now=new Date();
   var hour=now.getHours();
@@ -1718,7 +1762,7 @@ function tgGreeting(){
   var dtype=DTYPES[dn];
   var today=gw(0)[now.getDay()];
   var proteinLeft=PG-today.p;
-  var workoutDone=today.workout&&today.workout.completed;
+  var workoutDone=hasTrainedToday(today);
   var mealsLogged=today.meals.length;
   var waterLogged=today.water;
   var isRest=dtype==="Rest";
