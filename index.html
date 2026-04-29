@@ -70,6 +70,12 @@ button,textarea,input{font-family:inherit;}
 .ex-note{background:#0c0c0c;border:1px solid #1a1a1a;border-radius:8px;padding:8px 10px;font-size:12px;color:#555;cursor:pointer;margin-top:8px;}
 .ex-note.has{color:#888;}
 .ex-textarea{width:100%;background:#0c0c0c;border:1px solid #f59e0b;border-radius:8px;color:#f0ede8;font-size:12px;padding:8px 10px;resize:none;height:56px;display:block;margin-top:8px;}
+.cann-btn{flex:1;height:48px;border-radius:12px;border:1px solid #252525;background:#181818;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:24px;font-family:inherit;line-height:1;transition:all 0.15s;-webkit-tap-highlight-color:rgba(232,50,42,0.15);}
+.cann-btn:active{transform:scale(0.96);}
+.cann-used{border-color:#e8322a;background:rgba(232,50,42,0.09);}
+.cann-clean{border-color:#10b981;background:rgba(16,185,129,0.09);}
+.cann-note{width:100%;background:#0c0c0c;border:1px solid #252525;border-radius:8px;color:#f0ede8;font-size:16px;padding:9px 11px;resize:none;height:54px;display:block;margin-top:10px;font-family:inherit;line-height:1.4;}
+.cann-note:focus{outline:none;border-color:#e8322a;}
 .pgtoggle{background:transparent;border:1px solid #252525;border-radius:8px;padding:6px 14px;color:#555;font-size:11px;cursor:pointer;width:100%;margin:10px 0;}
 .pgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px;}
 .pslot{background:#0c0c0c;border:1px dashed #252525;border-radius:10px;aspect-ratio:3/4;position:relative;overflow:hidden;cursor:pointer;}
@@ -524,7 +530,8 @@ function wlbl(o){
 
 function nd(){
   return{meals:[],water:0,weight:"",photoFront:null,photoSide:null,photoFrontDesc:null,photoSideDesc:null,
-    workout:{completed:false,rating:"",notes:""},exercises:{},p:0,cal:0,carbs:0,fat:0};
+    workout:{completed:false,rating:"",notes:""},exercises:{},p:0,cal:0,carbs:0,fat:0,
+    cannabis:"",cannabisNote:""};
 }
 
 function gw(o){
@@ -592,6 +599,23 @@ function setActive(nm){
   if(!d.exercises[nm]){d.exercises[nm]={done:false,rating:"",note:"",active:false};}
   if(!d.exercises[nm].done){d.exercises[nm].active=!d.exercises[nm].active;}
   AW[wkKey(S.wo)]=wk;scheduleSave();draw();
+}
+
+function setCannabis(state){
+  sday(function(d){
+    if(d.cannabis===state){
+      d.cannabis="";
+      d.cannabisNote="";
+    }else{
+      d.cannabis=state;
+      if(state!=="used"){d.cannabisNote="";}
+    }
+    return d;
+  });
+}
+
+function saveCannabisNote(val){
+  sdayNoRedraw(function(d){d.cannabisNote=val;return d;});
 }
 
 function exDoneCount(){
@@ -814,6 +838,8 @@ function renderGoalCard(){
   h+="<div style='background:#0c0c0c;border-radius:8px;padding:10px;text-align:center'>";
   h+="<div class='goal-days-num "+daysClass+"' style='font-size:20px;font-weight:500;color:#e8322a'>"+gs.daysLeft+"</div>";
   h+="<div style='font-size:9px;color:#444;text-transform:uppercase;letter-spacing:1px;margin-top:2px'>days left</div>";
+  var weeksLeft=Math.max(0,Math.round(gs.daysLeft/7));
+  h+="<div style='font-size:10px;color:#666;margin-top:4px'>&asymp; "+weeksLeft+" "+(weeksLeft===1?"week":"weeks")+"</div>";
   h+="</div>";
   h+="<div style='background:#0c0c0c;border-radius:8px;padding:10px;text-align:center'>";
   h+="<div style='font-size:14px;font-weight:500;color:#f0ede8'>"+gs.affordStr+"</div>";
@@ -892,6 +918,128 @@ function renderGoalCard(){
     h+="<button class='goal-buy-btn' onclick='goToShoe()' style='border:none;cursor:pointer;font-family:inherit'>Buy Now</button>";
     h+="</div>";
   }
+  h+="</div>";
+  return h;
+}
+
+function calcCannabisStats(){
+  var totalClean=0;
+  var thisWeekClean=0;
+  var thisWeekLogged=0;
+  var bestStreak=0;
+  var currentStreak=0;
+  var streakActive=false;
+  var weekStart=WS;
+  var weekEnd=WS+7*86400000;
+  var nowTs=Date.now();
+  var dayMs=86400000;
+  var run=0;
+  var lastWasCleanOrToday=true;
+  // Walk every day from epoch to today
+  var startTs=GOAL.epochTs;
+  var endTs=nowTs;
+  // Iterate day-by-day using the same Sunday-week storage layout
+  var wkKeys=Object.keys(AW).map(Number).sort(function(a,b){return a-b;});
+  // Build a date -> state map from AW
+  var stateByDay={};
+  for(var ki=0;ki<wkKeys.length;ki++){
+    var wkKeyTs=wkKeys[ki];
+    if(!Array.isArray(AW[wkKeyTs]))continue;
+    for(var di=0;di<7;di++){
+      var dayTs=wkKeyTs+di*dayMs;
+      if(dayTs<GOAL.epochTs)continue;
+      if(dayTs>endTs+dayMs)continue;
+      var d=AW[wkKeyTs][di];
+      if(!d)continue;
+      var state=d.cannabis||"";
+      if(state){stateByDay[dayTs]=state;}
+    }
+  }
+  // Compute totals and weekly stats
+  var keysList=Object.keys(stateByDay);
+  for(var li=0;li<keysList.length;li++){
+    var ts=Number(keysList[li]);
+    var st=stateByDay[ts];
+    if(st==="clean")totalClean++;
+    if(ts>=weekStart&&ts<weekEnd){
+      thisWeekLogged++;
+      if(st==="clean")thisWeekClean++;
+    }
+  }
+  // Compute streaks by walking day-by-day from epoch to today
+  var cursor=GOAL.epochTs;
+  var todayMidnight=new Date();
+  todayMidnight.setHours(0,0,0,0);
+  var todayTs=todayMidnight.getTime();
+  var streakRun=0;
+  while(cursor<=todayTs){
+    var st2=stateByDay[cursor];
+    if(st2==="clean"){
+      streakRun++;
+      if(streakRun>bestStreak)bestStreak=streakRun;
+    }else{
+      streakRun=0;
+    }
+    cursor+=dayMs;
+  }
+  // Current streak = streakRun at end of walk if last logged day was clean and is today or yesterday
+  // (so a clean day yesterday with nothing logged today is still considered "active")
+  var lastClean=stateByDay[todayTs]==="clean";
+  var yesterdayTs=todayTs-dayMs;
+  var yesterdayClean=stateByDay[yesterdayTs]==="clean";
+  if(lastClean){
+    currentStreak=streakRun;
+    streakActive=true;
+  }else if(yesterdayClean&&!stateByDay[todayTs]){
+    // Today not logged yet, yesterday was clean: count back from yesterday
+    var back=yesterdayTs;var run2=0;
+    while(back>=GOAL.epochTs&&stateByDay[back]==="clean"){run2++;back-=dayMs;}
+    currentStreak=run2;
+    streakActive=true;
+  }
+  return{
+    totalClean:totalClean,
+    thisWeekClean:thisWeekClean,
+    thisWeekLogged:thisWeekLogged,
+    bestStreak:bestStreak,
+    currentStreak:currentStreak,
+    streakActive:streakActive
+  };
+}
+
+function renderCannabisCard(){
+  var cs=calcCannabisStats();
+  var weekLabel=cs.thisWeekLogged>0?cs.thisWeekClean+"/"+cs.thisWeekLogged:"0/0";
+  var endTs=GOAL.epochTs+(GOAL.targetWeeks*7-1)*86400000;
+  var startD=new Date(GOAL.epochTs);
+  var endD=new Date(endTs);
+  var mos=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  var winLbl=mos[startD.getMonth()]+" "+startD.getDate()+" - "+mos[endD.getMonth()]+" "+endD.getDate();
+  var h="<div class='goal-card' style='margin-top:12px'>";
+  h+="<div class='slbl' style='color:#888;margin-bottom:12px'>&#127807; Cannabis Use</div>";
+  h+="<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:12px'>";
+  h+="<div style='background:#0c0c0c;border-radius:8px;padding:8px 4px;text-align:center'>";
+  h+="<div style='font-size:13px;font-weight:500;color:#10b981'>"+cs.totalClean+"</div>";
+  h+="<div style='font-size:9px;color:#444;letter-spacing:1px;text-transform:uppercase;margin-top:1px'>Total clean</div></div>";
+  h+="<div style='background:#0c0c0c;border-radius:8px;padding:8px 4px;text-align:center'>";
+  h+="<div style='font-size:13px;font-weight:500;color:#10b981'>"+weekLabel+"</div>";
+  h+="<div style='font-size:9px;color:#444;letter-spacing:1px;text-transform:uppercase;margin-top:1px'>This week</div></div>";
+  h+="<div style='background:#0c0c0c;border-radius:8px;padding:8px 4px;text-align:center'>";
+  h+="<div style='font-size:13px;font-weight:500;color:#10b981'>"+cs.bestStreak+"</div>";
+  h+="<div style='font-size:9px;color:#444;letter-spacing:1px;text-transform:uppercase;margin-top:1px'>Best streak</div></div>";
+  h+="</div>";
+  h+="<div style='border-top:1px solid #1c1c1c;padding-top:10px'>";
+  h+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:6px'>";
+  h+="<span style='font-size:11px;color:#555'>Current streak</span>";
+  h+="<div><span style='font-size:13px;font-weight:500;color:#f0ede8'>"+cs.currentStreak+(cs.currentStreak===1?" day":" days")+"</span>";
+  if(cs.streakActive&&cs.currentStreak>0){
+    h+="<span style='display:inline-block;background:rgba(16,185,129,0.13);border-radius:6px;padding:2px 7px;font-size:9px;color:#10b981;letter-spacing:1px;text-transform:uppercase;margin-left:6px'>Active</span>";
+  }
+  h+="</div></div>";
+  h+="<div style='display:flex;justify-content:space-between;align-items:center'>";
+  h+="<span style='font-size:11px;color:#555'>20-week window</span>";
+  h+="<span style='font-size:11px;color:#555'>"+winLbl+"</span>";
+  h+="</div></div>";
   h+="</div>";
   return h;
 }
@@ -1307,6 +1455,7 @@ function draw(){
   if(S.showGoal){
     h+="<div class='pg'>";
     h+=renderGoalCard();
+    h+=renderCannabisCard();
     h+="</div>";
     document.getElementById("root").innerHTML=h;
     updateSyncBar();
@@ -1384,7 +1533,7 @@ function draw(){
 
     h+="<div class='card'>";
     h+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px'>";
-    h+="<div><div class='slbl'>Water</div><div style='font-size:16px;font-weight:500;color:#3b82f6'>"+day.water+" / "+WG+" glasses</div></div>";
+    h+="<div><div class='slbl' style='color:#888'>&#128167; Water</div><div style='font-size:16px;font-weight:500;color:#3b82f6'>"+day.water+" / "+WG+" glasses</div></div>";
     h+="<div style='display:flex;gap:6px'>";
     h+="<button onclick='sday(function(d){d.water=Math.max(0,d.water-1);return d;})' style='background:#181818;border:1px solid #252525;border-radius:8px;width:32px;height:32px;font-size:16px;color:#888;cursor:pointer'>-</button>";
     h+="<button onclick='sday(function(d){d.water=Math.min("+WG+",d.water+1);return d;})' style='background:#3b82f6;border:none;border-radius:8px;width:32px;height:32px;font-size:16px;color:#fff;cursor:pointer'>+</button>";
@@ -1394,6 +1543,21 @@ function draw(){
       h+="<div class='wseg"+(wi<day.water?" on":"")+"' onclick='sday(function(d){d.water="+(wi+1)+";return d;})'></div>";
     }
     h+="</div></div>";
+
+    var cannState=day.cannabis||"";
+    var cannNote=day.cannabisNote||"";
+    h+="<div class='card'>";
+    h+="<div class='slbl' style='color:#888;margin-bottom:12px'>&#127807; Cannabis Use</div>";
+    h+="<div style='display:flex;gap:10px'>";
+    var upCls="cann-btn"+(cannState==="used"?" cann-used":"");
+    var dnCls="cann-btn"+(cannState==="clean"?" cann-clean":"");
+    h+="<button class='"+upCls+"' onclick='setCannabis(\"used\")'>&#128077;</button>";
+    h+="<button class='"+dnCls+"' onclick='setCannabis(\"clean\")'>&#128078;</button>";
+    h+="</div>";
+    if(cannState==="used"){
+      h+="<textarea class='cann-note' id='cann-note-inp' placeholder='Optional - what was the occasion?' oninput='saveCannabisNote(this.value)'>"+(cannNote||"")+"</textarea>";
+    }
+    h+="</div>";
 
     h+="<div class='card'>";
     h+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:12px'>";
@@ -1669,6 +1833,15 @@ function tgCtx(){
   lines.push("Calories: "+today.cal+" / "+CG);
   lines.push("Carbs: "+today.carbs+"g, Fat: "+today.fat+"g");
   lines.push("Water: "+today.water+"/"+WG+" glasses");
+  var cannState=today.cannabis||"";
+  if(cannState==="clean"){
+    lines.push("Cannabis: clean day logged");
+  }else if(cannState==="used"){
+    var cnNote=today.cannabisNote||"";
+    lines.push("Cannabis: used today"+(cnNote?" (note: "+cnNote+")":""));
+  }else{
+    lines.push("Cannabis: not logged yet today");
+  }
   if(today.meals.length){
     lines.push("Meals logged today:");
     for(var i=0;i<today.meals.length;i++){
