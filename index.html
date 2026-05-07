@@ -32,7 +32,7 @@ button,textarea,input{font-family:inherit}
 .shell{position:relative;min-height:100vh}
 .shell::before{content:'';position:fixed;inset:0;max-width:480px;left:50%;transform:translateX(-50%);background:radial-gradient(circle at 18% 8%,rgba(56,233,141,.06),transparent 40%),radial-gradient(circle at 88% 92%,rgba(193,74,50,.05),transparent 40%);pointer-events:none;z-index:0}
 .shell>*{position:relative;z-index:1}
-.hdr{padding:20px 18px 6px}
+.hdr{padding:calc(env(safe-area-inset-top, 14px) + 14px) 18px 6px}
 .hdr-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
 .hdr-l{font-weight:800;font-size:13px;letter-spacing:-.2px;text-transform:uppercase;display:flex;align-items:center;gap:9px;color:var(--ink)}
 .hdr-dot{width:8px;height:8px;background:var(--pop);border-radius:50%;box-shadow:0 0 0 4px rgba(56,233,141,.18)}
