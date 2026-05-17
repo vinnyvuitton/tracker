@@ -1905,8 +1905,8 @@ function renderNutritionViewNew(day,dn){
   h+="<div class='card'>";
   h+="<button class='pgtoggle' onclick='S.pgOpen=!S.pgOpen;draw()'>Progress Photos "+(S.pgOpen?"&#9650;":"&#9660;")+"</button>";
   if(S.pgOpen){
-    h+="<input type='file' id='photo-front' accept='image/*' style='display:none' onchange='hprog(event,\"front\")'>";
-    h+="<input type='file' id='photo-side' accept='image/*' style='display:none' onchange='hprog(event,\"side\")'>";
+    h+="<input type='file' id='photo-front' accept='image/*' style='position:absolute;opacity:0;width:0;height:0;overflow:hidden' onchange='hprog(event,\"front\")'>";
+    h+="<input type='file' id='photo-side' accept='image/*' style='position:absolute;opacity:0;width:0;height:0;overflow:hidden' onchange='hprog(event,\"side\")'>";
     h+="<div class='pgrid'>";
     var sides=["front","side"];
     for(var si=0;si<2;si++){
@@ -1915,7 +1915,7 @@ function renderNutritionViewNew(day,dn){
       if(sp){
         h+="<div class='pslot has'><img src='"+sp+"' class='pimg'><button class='prem' onclick='rprog(\""+sn+"\")'>&times;</button><div class='ptyp'>"+sn+"</div></div>";
       }else{
-        h+="<label class='pslot' onclick='document.getElementById(\"photo-"+sn+"\").click()'><div style='display:flex;align-items:center;justify-content:center;height:100%;font-size:24px;color:var(--mut)'>+</div><div class='ptyp'>"+sn+"</div></label>";
+        h+="<label class='pslot' for='photo-"+sn+"'><div style='display:flex;align-items:center;justify-content:center;height:100%;font-size:24px;color:var(--mut)'>+</div><div class='ptyp'>"+sn+"</div></label>";
       }
     }
     h+="</div>";
@@ -1926,11 +1926,11 @@ function renderNutritionViewNew(day,dn){
   h+="<div class='card'>";
   h+="<div class='slbl'>Day Note</div>";
   h+="<textarea id='workout-notes' class='wo-notes-textarea' placeholder='How was today?'>"+((day.workout&&day.workout.notes)||"")+"</textarea>";
-  h+="<input type='file' id='wonote-photo-inp' accept='image/*' style='display:none' onchange='hwnote(event)'>";
+  h+="<input type='file' id='wonote-photo-inp' accept='image/*' style='position:absolute;opacity:0;width:0;height:0;overflow:hidden' onchange='hwnote(event)'>";
   if(day.workout&&day.workout.notePhoto){
     h+="<div style='position:relative;margin-top:10px'><img src='"+day.workout.notePhoto+"' style='width:100%;border-radius:10px;display:block'><button class='prem' onclick='rmwnote()'>&times;</button></div>";
   }else{
-    h+="<label class='phbtn' style='margin-top:10px;cursor:pointer' onclick='document.getElementById(\"wonote-photo-inp\").click()'>&#128247; Add photo</label>";
+    h+="<label class='phbtn' for='wonote-photo-inp' style='margin-top:10px;cursor:pointer'>&#128247; Add photo</label>";
   }
   h+="</div>";
 
@@ -1976,11 +1976,11 @@ function renderWorkoutViewNew(day,dn){
     }
     h+="</div>";
     h+="<textarea id='cardio-note' class='ex-textarea' placeholder='How did the session feel? Notes...' style='margin-top:0'>"+(cs.note||"")+"</textarea>";
-    h+="<input type='file' id='cardio-photo-inp' accept='image/*' style='display:none' onchange='hcardio(event)'>";
+    h+="<input type='file' id='cardio-photo-inp' accept='image/*' style='position:absolute;opacity:0;width:0;height:0;overflow:hidden' onchange='hcardio(event)'>";
     if(csPhoto){
       h+="<div style='position:relative;margin-top:10px'><img src='"+csPhoto+"' style='width:100%;border-radius:10px;display:block'><button class='prem' onclick='rmcardio()'>&times;</button></div>";
     }else{
-      h+="<label class='phbtn' style='margin-top:10px;cursor:pointer' onclick='document.getElementById(\"cardio-photo-inp\").click()'>&#128247; Treadmill screen</label>";
+      h+="<label class='phbtn' for='cardio-photo-inp' style='margin-top:10px;cursor:pointer'>&#128247; Treadmill screen</label>";
     }
     h+="</div>";
     h+=renderWorkoutNotesNew(day);
@@ -2045,11 +2045,11 @@ function renderWorkoutNotesNew(day){
   h+="<div class='card'>";
   h+="<div class='slbl'>Workout Notes</div>";
   h+="<textarea id='workout-notes' class='wo-notes-textarea' placeholder='How did training feel?'>"+((day.workout&&day.workout.notes)||"")+"</textarea>";
-  h+="<input type='file' id='wonote-photo-inp' accept='image/*' style='display:none' onchange='hwnote(event)'>";
+  h+="<input type='file' id='wonote-photo-inp' accept='image/*' style='position:absolute;opacity:0;width:0;height:0;overflow:hidden' onchange='hwnote(event)'>";
   if(day.workout&&day.workout.notePhoto){
     h+="<div style='position:relative;margin-top:10px'><img src='"+day.workout.notePhoto+"' style='width:100%;border-radius:10px;display:block'><button class='prem' onclick='rmwnote()'>&times;</button></div>";
   }else{
-    h+="<label class='phbtn' style='margin-top:10px;cursor:pointer' onclick='document.getElementById(\"wonote-photo-inp\").click()'>&#128247; Add photo</label>";
+    h+="<label class='phbtn' for='wonote-photo-inp' style='margin-top:10px;cursor:pointer'>&#128247; Add photo</label>";
   }
   h+="</div>";
   return h;
