@@ -1318,6 +1318,7 @@ function hprog(e,side){
       cv.getContext("2d").drawImage(img,0,0,w,h);
       var comp=cv.toDataURL("image/jpeg",0.4);
       sday(function(d){if(side==="front"){d.photoFront=comp;}else{d.photoSide=comp;}return d;});
+      forceSave();
     };
     img.src=reader.result;
   };
@@ -1914,7 +1915,7 @@ function renderNutritionViewNew(day,dn){
       if(sp){
         h+="<div class='pslot has'><img src='"+sp+"' class='pimg'><button class='prem' onclick='rprog(\""+sn+"\")'>&times;</button><div class='ptyp'>"+sn+"</div></div>";
       }else{
-        h+="<label class='pslot' for='photo-"+sn+"' onclick='document.getElementById(\"photo-"+sn+"\").click()'><div style='display:flex;align-items:center;justify-content:center;height:100%;font-size:24px;color:var(--mut)'>+</div><div class='ptyp'>"+sn+"</div></label>";
+        h+="<label class='pslot' onclick='document.getElementById(\"photo-"+sn+"\").click()'><div style='display:flex;align-items:center;justify-content:center;height:100%;font-size:24px;color:var(--mut)'>+</div><div class='ptyp'>"+sn+"</div></label>";
       }
     }
     h+="</div>";
