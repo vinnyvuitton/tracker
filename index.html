@@ -78,7 +78,7 @@ button,textarea,input{font-family:inherit}
 .wseg{flex:1;height:6px;border-radius:3px;background:var(--bg2);cursor:pointer;transition:background .15s}
 .wseg.on{background:var(--info)}
 .addbtn{background:var(--terra);border:none;border-radius:10px;padding:7px 14px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:.3px;text-transform:uppercase}
-.mta{width:100%;background:var(--bg2);border:1px solid var(--ln2);border-radius:10px;color:var(--ink);font-size:13px;padding:11px;resize:none;height:64px;margin-bottom:8px;display:block;font-family:Archivo,sans-serif}
+.mta{width:100%;background:var(--bg2);border:1px solid var(--ln2);border-radius:10px;color:var(--ink);font-size:16px;padding:11px;resize:none;height:64px;margin-bottom:8px;display:block;font-family:Archivo,sans-serif}
 .mta:focus{outline:none;border-color:var(--terra)}
 .phbtn{width:100%;background:var(--bg2);border:1px dashed var(--ln);border-radius:10px;padding:11px 0;color:var(--mut);font-size:12px;cursor:pointer;margin-bottom:10px;font-family:Archivo,sans-serif;font-weight:600;text-align:center;display:flex;align-items:center;justify-content:center;gap:6px}
 .cancelbtn{flex:1;background:transparent;border:1px solid var(--ln);border-radius:10px;color:var(--ink2);font-size:12px;padding:9px 0;cursor:pointer;font-family:Archivo,sans-serif;font-weight:600}
@@ -97,7 +97,7 @@ button,textarea,input{font-family:inherit}
 .erbtn.sel{border-color:var(--success);background:rgba(16,185,129,.1);color:var(--popD)}
 .ex-note{background:var(--bg2);border:1px solid var(--ln2);border-radius:10px;padding:9px 11px;font-size:12.5px;color:var(--mut);cursor:pointer;margin-top:8px;font-family:'Instrument Serif',serif;font-style:italic}
 .ex-note.has{color:var(--ink2);font-style:normal;font-family:Archivo,sans-serif}
-.ex-textarea{width:100%;background:var(--paper);border:1.5px solid var(--gold);border-radius:10px;color:var(--ink);font-size:13px;padding:9px 11px;resize:none;height:60px;display:block;margin-top:8px;font-family:Archivo,sans-serif}
+.ex-textarea{width:100%;background:var(--paper);border:1.5px solid var(--gold);border-radius:10px;color:var(--ink);font-size:16px;padding:9px 11px;resize:none;height:60px;display:block;margin-top:8px;font-family:Archivo,sans-serif}
 .ex-textarea:focus{outline:none;border-color:var(--terra)}
 .ex-hist{font-size:9.5px;letter-spacing:.4px;color:var(--mut);margin-top:4px;font-family:'JetBrains Mono',monospace}
 .ex-hist b{color:var(--terra);font-weight:700}
@@ -116,7 +116,7 @@ body.dark .cann-btn{color:var(--ink);background:var(--bg2);border-color:var(--ln
 .prem{position:absolute;top:6px;right:6px;background:rgba(0,0,0,.75);border:none;border-radius:50%;width:26px;height:26px;color:#fff;font-size:11px;cursor:pointer;z-index:2}
 .ptyp{position:absolute;bottom:6px;left:0;right:0;text-align:center;font-size:9px;color:rgba(255,255,255,.7);letter-spacing:1px;text-transform:uppercase;font-weight:600;text-shadow:0 1px 2px rgba(0,0,0,.5)}
 .pslot:not(.has) .ptyp{color:var(--mut);text-shadow:none}
-.wo-notes-textarea{width:100%;background:var(--bg2);border:1px solid var(--ln2);border-radius:10px;color:var(--ink);font-size:13px;padding:10px 12px;resize:none;height:78px;display:block;font-family:Archivo,sans-serif;line-height:1.4}
+.wo-notes-textarea{width:100%;background:var(--bg2);border:1px solid var(--ln2);border-radius:10px;color:var(--ink);font-size:16px;padding:10px 12px;resize:none;height:78px;display:block;font-family:Archivo,sans-serif;line-height:1.4}
 .wo-notes-textarea:focus{outline:none;border-color:var(--terra)}
 .drow{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--ln2);cursor:pointer}
 .drow:last-child{border-bottom:none}
@@ -475,8 +475,11 @@ body.dark .ex-card.done{background:rgba(16,185,129,.06)}
 body.dark .ex-card.prog{background:rgba(212,168,87,.06)}
 body.dark .mta,body.dark .ex-textarea,body.dark .cann-note,body.dark .wo-notes-textarea,body.dark .tg-input{background:var(--bg2);color:var(--ink);border-color:var(--ln)}
 body.dark .erbtn,body.dark .demo-btn{background:var(--bg2);color:var(--ink);border-color:var(--ln)}
+body.dark .erbtn.sel{border-color:var(--success);background:rgba(16,185,129,.2);color:var(--success)}
 body.dark .pslot{background:var(--bg2);border-color:var(--ln)}
 body.dark .cann-btn{background:var(--bg2);border-color:var(--ln)}
+body.dark .cann-btn.cann-used{background:rgba(193,74,50,.28);border-color:var(--terra);color:var(--terra)}
+body.dark .cann-btn.cann-clean{background:rgba(16,185,129,.22);border-color:var(--success);color:var(--success)}
 body.dark .tg-msg.tg{background:var(--bg2);color:var(--ink);border-color:var(--ln)}
 body.dark .tg-meal-card{background:var(--paper);border-color:var(--terra)}
 body.dark .tg-qbtn{background:var(--bg2);color:var(--ink);border-color:var(--ln)}
@@ -1558,24 +1561,20 @@ function finishExport(wo,txt,descs){
   AW[wkKey(wo)]=wk;
   scheduleSave();
   var fname="vinny-tracker-"+wlbl(wo).replace(/[\s\/,]+/g,"-").replace(/-+/g,"-")+".txt";
-  var blob=new Blob([txt],{type:"text/plain;charset=utf-8"});
-  var shareFile=new File([blob],fname,{type:"text/plain"});
-  if(navigator.share&&navigator.canShare&&navigator.canShare({files:[shareFile]})){
-    navigator.share({files:[shareFile],title:fname}).catch(function(){
-      var url=URL.createObjectURL(blob);
-      var a=document.createElement("a");
-      a.href=url;a.download=fname;
-      document.body.appendChild(a);a.click();document.body.removeChild(a);
-      setTimeout(function(){URL.revokeObjectURL(url);},2000);
-    });
-  }else{
+  try{
+    var blob=new Blob([txt],{type:"text/plain;charset=utf-8"});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement("a");
+    a.href=url; a.download=fname;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){URL.revokeObjectURL(url);},2000);
+  }catch(e){
     try{
-      var url=URL.createObjectURL(blob);
-      var a=document.createElement("a");
-      a.href=url;a.download=fname;
-      document.body.appendChild(a);a.click();document.body.removeChild(a);
-      setTimeout(function(){URL.revokeObjectURL(url);},2000);
-    }catch(e){
+      var dataUri="data:text/plain;charset=utf-8,"+encodeURIComponent(txt);
+      var a2=document.createElement("a");
+      a2.href=dataUri; a2.download=fname;
+      document.body.appendChild(a2); a2.click(); document.body.removeChild(a2);
+    }catch(e2){
       window.open("data:text/plain;charset=utf-8,"+encodeURIComponent(txt),"_blank");
     }
   }
