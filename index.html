@@ -1601,15 +1601,16 @@ function showHowTo(idx){
   overlay.style.display="flex";
   if(!skipGif){
     var searchTerm=EX_SEARCH_MAP[data.n]||(data.n.toLowerCase().replace(/\bdb\b/g,"dumbbell").replace(/\bkb\b/g,"kettlebell").replace(/\bez\b/g,"ez bar").replace(/[()]/g,"").trim());
-    fetch("https://exercisedb.dev/api/v2/exercises/name/"+encodeURIComponent(searchTerm)+"?offset=0&limit=3")
-      .then(function(r){return r.json();})
-      .then(function(res){
-        var gifUrl=null;
-        if(res&&res.exercises&&res.exercises.length>0&&res.exercises[0].gifUrl){gifUrl=res.exercises[0].gifUrl;}
-        else if(Array.isArray(res)&&res.length>0&&res[0].gifUrl){gifUrl=res[0].gifUrl;}
-        content.innerHTML=htContent(data.n,data.tip,gifUrl,false);
-      })
-      .catch(function(){content.innerHTML=htContent(data.n,data.tip,null,false);});
+    fetch(PROXY,{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({action:"exercise",query:searchTerm})
+    })
+    .then(function(r){return r.json();})
+    .then(function(res){
+      var gifUrl=null;
+      if(Array.isArray(res)&&res.length>0&&res[0].gifUrl){gifUrl=res[0].gifUrl;}
+      content.innerHTML=htContent(data.n,data.tip,gifUrl,false);
+    })
+    .catch(function(){content.innerHTML=htContent(data.n,data.tip,null,false);});
   }
 }
 
