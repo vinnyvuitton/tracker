@@ -1819,7 +1819,7 @@ function drawToday(){
 }
 
 function renderNutritionViewNew(day,dn){
-  var pro=day.p||0,cal=day.cal||0,wat=day.water||0;
+  var pro=day.p||0,cal=day.cal||0,wat=day.water||0,fat=day.fat||0;
   var h="";
 
   // Today's Stats (dark hero card)
@@ -1829,13 +1829,22 @@ function renderNutritionViewNew(day,dn){
   h+="<div style='position:relative;display:flex;align-items:center;justify-content:center;flex-shrink:0;width:72px;height:72px'>"+ringMockup(pro,PG,72,"var(--pop)")+"<div style='position:absolute;text-align:center'><div style=\"font-family:'Archivo Black',sans-serif;font-size:14px;letter-spacing:-.3px;color:#fff\">"+pro+"</div><div style='font-size:7px;color:var(--mut2);letter-spacing:.5px;text-transform:uppercase;font-weight:700'>g pro</div></div></div>";
   h+="<div style='flex:1'>";
   h+="<div style=\"font-family:'Archivo Black',sans-serif;font-size:24px;letter-spacing:-.5px;color:#fff\">"+pro+"<span style='font-size:13px;color:var(--mut2);font-weight:400;margin-left:4px;font-family:Archivo,sans-serif'>/ "+PG+"g protein</span></div>";
-  h+="<div style='font-size:11px;color:var(--mut2);margin-top:3px'>"+cal+" / "+CG+" cal</div>";
+  var calLeft=CG-cal;
+  var calHeroCol=calLeft<0?"var(--terra)":calLeft<=300?"#f59e0b":"#10b981";
+  h+="<div style='font-size:11px;margin-top:3px'><span style='color:"+calHeroCol+";font-weight:700'>"+Math.abs(calLeft)+(calLeft<0?" over":" left")+"</span><span style='color:var(--mut2)'> &middot; "+cal+" / "+CG+" cal</span></div>";
   h+="</div></div>";
   h+="<div class='chips'>";
-  h+="<div class='chip' style='background:rgba(255,255,255,.10)'><div class='cv' style='color:#fff'>"+pro+"g</div><div class='cl' style='color:#c5c2bb'>Protein</div></div>";
-  h+="<div class='chip' style='background:rgba(255,255,255,.10)'><div class='cv' style='color:#fff'>"+cal+"</div><div class='cl' style='color:#c5c2bb'>Cal</div></div>";
-  h+="<div class='chip' style='background:rgba(255,255,255,.10)'><div class='cv' style='color:#fff'>"+wat+"</div><div class='cl' style='color:#c5c2bb'>Water</div></div>";
-  h+="<div class='chip' style='background:rgba(255,255,255,.10)'><div class='cv' style='color:#fff'>"+(day.weight||"--")+"</div><div class='cl' style='color:#c5c2bb'>Weight</div></div>";
+  // Protein
+  h+="<div class='chip' style='background:rgba(255,255,255,.10)'><div class='cv' style='color:#fff;font-size:11px;letter-spacing:-.2px'>"+pro+"<span style='color:rgba(255,255,255,.45);font-size:10px;font-weight:600'>/"+PG+"g</span></div><div class='cl' style='color:#c5c2bb'>Protein</div></div>";
+  // Calories - color coded
+  var calChipCol=calLeft<0?"var(--terra)":calLeft<=300?"#f59e0b":"#10b981";
+  h+="<div class='chip' style='background:rgba(255,255,255,.10)'><div class='cv' style='font-size:11px;letter-spacing:-.2px'><span style='color:"+calChipCol+"'>"+cal+"</span><span style='color:rgba(255,255,255,.45);font-size:10px;font-weight:600'>/"+CG+"</span></div><div class='cl' style='color:#c5c2bb'>Cal</div></div>";
+  // Fat
+  h+="<div class='chip' style='background:rgba(255,255,255,.10)'><div class='cv' style='color:#fff'>"+fat+"g</div><div class='cl' style='color:#c5c2bb'>Fat</div></div>";
+  // Water
+  // Water chip omitted - water logging section below is sufficient
+  // Weight
+  h+="<div class='chip' style='background:rgba(255,255,255,.10)'><div class='cv' style='color:#fff'>"+(day.weight||"--")+"</div><div class='cl' style='color:#c5c2bb'>lbs</div></div>";
   h+="</div>";
   h+="</div>";
 
