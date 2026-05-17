@@ -792,7 +792,7 @@ function wlbl(o){
 function nd(){
   return{meals:[],water:0,weight:"",photoFront:null,photoSide:null,photoFrontDesc:null,photoSideDesc:null,
     workout:{completed:false,rating:"",notes:""},exercises:{},p:0,cal:0,carbs:0,fat:0,
-    cannabis:"",cannabisNote:""};
+    cannabis:"",cannabisNote:"",extraActivities:[]};
 }
 
 function gw(o){
@@ -894,8 +894,17 @@ function exTotalCount(){
 }
 
 function isDayQualifiedWorkout(dayData,dayName){
-  if(!PLAN[dayName]){return false;}
   if(!dayData){return false;}
+  // Rest days qualify if rest-activity has been logged with a rating or note
+  if(!PLAN[dayName]){
+    if(dayData.extraActivities&&dayData.extraActivities.length){
+      for(var eai=0;eai<dayData.extraActivities.length;eai++){
+        var ea=dayData.extraActivities[eai];
+        if(ea&&(ea.label||ea.rating||ea.note)){return true;}
+      }
+    }
+    return false;
+  }
   // Explicit completion signals always qualify (any day type)
   if(dayData.workout&&(dayData.workout.completed||dayData.workout.rating||dayData.workout.notes||dayData.workout.notePhoto||dayData.workout.notePhotoDesc)){return true;}
   // Cardio days: treadmill photo, cardio rating, or cardio note all qualify
@@ -1459,6 +1468,113 @@ function rmMeal(idx){
   });
 }
 
+function addExtraActivity(){
+  sday(function(d){
+    if(!d.extraActivities){d.extraActivities=[];}
+    d.extraActivities.push({label:"",rating:"",note:"",photo:null});
+    return d;
+  });
+}
+
+function rmExtraActivity(idx){
+  sday(function(d){
+    if(d.extraActivities){d.extraActivities.splice(idx,1);}
+    return d;
+  });
+}
+
+function saveExtraLabel(idx,val){
+  sdayNoRedraw(function(d){
+    if(!d.extraActivities||!d.extraActivities[idx]){return d;}
+    d.extraActivities[idx].label=val;
+    return d;
+  });
+}
+
+function saveExtraNote(idx,val){
+  sdayNoRedraw(function(d){
+    if(!d.extraActivities||!d.extraActivities[idx]){return d;}
+    d.extraActivities[idx].note=val;
+    return d;
+  });
+}
+
+function setExtraRating(idx,val){
+  sday(function(d){
+    if(!d.extraActivities||!d.extraActivities[idx]){return d;}
+    d.extraActivities[idx].rating=d.extraActivities[idx].rating===val?"":val;
+    return d;
+  });
+}
+
+function hExtraPhoto(e,idx){
+  var f=e.target.files[0];if(!f)return;
+  var reader=new FileReader();
+  reader.onload=function(){
+    var img=new Image();
+    img.onload=function(){
+      var cv=document.createElement("canvas");
+      var mx=800,w=img.width,h=img.height;
+      if(w>mx||h>mx){if(w>h){h=Math.round(h*mx/w);w=mx;}else{w=Math.round(w*mx/h);h=mx;}}
+      cv.width=w;cv.height=h;
+      cv.getContext("2d").drawImage(img,0,0,w,h);
+      var comp=cv.toDataURL("image/jpeg",0.6);
+      sday(function(d){
+        if(!d.extraActivities||!d.extraActivities[idx]){return d;}
+        d.extraActivities[idx].photo=comp;
+        return d;
+      });
+      forceSave();
+    };
+    img.src=reader.result;
+  };
+  reader.readAsDataURL(f);
+}
+
+function rmExtraPhoto(idx){
+  sday(function(d){
+    if(d.extraActivities&&d.extraActivities[idx]){d.extraActivities[idx].photo=null;}
+    return d;
+  });
+}
+
+function renderExtraActivities(day){
+  var items=day.extraActivities||[];
+  var h="<div class='card'>";
+  h+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:12px'>";
+  h+="<div class='slbl' style='margin:0'>Extra Activity</div>";
+  h+="<button onclick='addExtraActivity()' style='background:var(--pop);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:Archivo,sans-serif'>+ Add</button>";
+  h+="</div>";
+  if(items.length===0){
+    h+="<div style='text-align:center;color:var(--mut);font-size:12px;padding:10px 0'>Tap + Add to log an extra workout or activity</div>";
+  }
+  for(var i=0;i<items.length;i++){
+    var it=items[i];
+    h+="<div style='border:1px solid var(--ln2);border-radius:12px;padding:12px;margin-bottom:10px'>";
+    h+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px'>";
+    h+="<div style='font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.5px'>Activity "+(i+1)+"</div>";
+    h+="<button onclick='rmExtraActivity("+i+")' style='background:transparent;border:none;color:var(--mut);font-size:16px;cursor:pointer;padding:0 4px'>&times;</button>";
+    h+="</div>";
+    h+="<input type='text' placeholder='What did you do? (e.g. 60 min treadmill)' value='"+(it.label||"").replace(/'/g,"&#39;")+"' oninput='saveExtraLabel("+i+",this.value)' style='width:100%;background:var(--bg2);border:1px solid var(--ln2);border-radius:10px;padding:11px;font-size:16px;font-family:Archivo,sans-serif;color:var(--ink);box-sizing:border-box;margin-bottom:10px'>";
+    h+="<div style='display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px'>";
+    for(var ri=0;ri<RATINGS.length;ri++){
+      var rv=RATINGS[ri];
+      h+="<button class='erbtn"+(it.rating===rv?" sel":"")+"' onclick='setExtraRating("+i+",\""+rv+"\")'>" +rv+"</button>";
+    }
+    h+="</div>";
+    h+="<textarea class='ex-textarea' placeholder='Notes...' oninput='saveExtraNote("+i+",this.value)' style='margin-top:0'>"+(it.note||"")+"</textarea>";
+    h+="<input type='file' id='extra-photo-"+i+"' accept='image/*' style='position:absolute;opacity:0;width:0;height:0;overflow:hidden' onchange='hExtraPhoto(event,"+i+")'>";
+    if(it.photo){
+      h+="<div style='position:relative;margin-top:8px'><img src='"+it.photo+"' style='width:100%;border-radius:10px;display:block'><button class='prem' onclick='rmExtraPhoto("+i+")'>&times;</button></div>";
+    }else{
+      h+="<label for='extra-photo-"+i+"' class='phbtn' style='margin-top:8px;cursor:pointer'>&#128247; Add photo</label>";
+    }
+    h+="</div>";
+  }
+  h+="</div>";
+  return h;
+}
+
 function doExport(wo){
   S.exporting=true;draw();
   var wk=gw(wo);
@@ -1777,15 +1893,13 @@ function drawToday(){
   h+="</div>";
 
   // View toggle
-  if(!isRest){
-    h+="<div class='vtog'>";
-    h+="<button class='vbtn"+(S.view!=="workout"?" on":"")+"' onclick='S.view=\"nutrition\";draw()'>Nutrition</button>";
-    h+="<button class='vbtn"+(S.view==="workout"?" on":"")+"' onclick='S.view=\"workout\";draw()'>Workout</button>";
-    h+="</div>";
-  }
+  h+="<div class='vtog'>";
+  h+="<button class='vbtn"+(S.view!=="workout"?" on":"")+"' onclick='S.view=\"nutrition\";draw()'>Nutrition</button>";
+  h+="<button class='vbtn"+(S.view==="workout"?" on":"")+"' onclick='S.view=\"workout\";draw()'>Workout</button>";
+  h+="</div>";
 
   h+="<div class='pg'>";
-  if(!isRest&&S.view==="workout"){
+  if(S.view==="workout"){
     h+=renderWorkoutViewNew(day,dn);
   }else{
     h+=renderNutritionViewNew(day,dn);
@@ -1963,7 +2077,17 @@ function renderNutritionViewNew(day,dn){
 
 function renderWorkoutViewNew(day,dn){
   var plan=PLAN[dn];
-  if(!plan){return "<div class='card'>No plan for "+dn+"</div>";}
+  if(!plan){
+    var h="";
+    h+="<div class='card dk'>";
+    h+="<div class='slbl' style='margin:0 0 4px'>Rest Day</div>";
+    h+="<div style=\"font-family:'Archivo Black',sans-serif;font-size:20px;letter-spacing:-.5px\">Log Extra Work</div>";
+    h+="<div style='font-size:11px;color:var(--mut2);margin-top:3px'>Not on the plan but you showed up anyway</div>";
+    h+="</div>";
+    h+=renderExtraActivities(day);
+    h+=renderWorkoutNotesNew(day);
+    return h;
+  }
   var done=exDoneCount();var tot=exTotalCount();
   var isCardio=dn==="Wed";
   var h="";
@@ -2007,6 +2131,7 @@ function renderWorkoutViewNew(day,dn){
       h+="<label class='phbtn' for='cardio-photo-inp' style='margin-top:10px;cursor:pointer'>&#128247; Treadmill screen</label>";
     }
     h+="</div>";
+    h+=renderExtraActivities(day);
     h+=renderWorkoutNotesNew(day);
     return h;
   }
@@ -2060,6 +2185,7 @@ function renderWorkoutViewNew(day,dn){
     h+="</div>";
   }
 
+  h+=renderExtraActivities(day);
   h+=renderWorkoutNotesNew(day);
   return h;
 }
@@ -2234,6 +2360,12 @@ function hasTrainedToday(d){
     for(var i=0;i<keys.length;i++){
       var ex=d.exercises[keys[i]];
       if(ex&&(ex.done||ex.rating||ex.note))return true;
+    }
+  }
+  if(d.extraActivities&&d.extraActivities.length){
+    for(var ei=0;ei<d.extraActivities.length;ei++){
+      var ea=d.extraActivities[ei];
+      if(ea&&(ea.label||ea.rating||ea.note||ea.photo))return true;
     }
   }
   return false;
