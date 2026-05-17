@@ -1606,8 +1606,7 @@ function showHowTo(idx){
     })
     .then(function(r){return r.json();})
     .then(function(res){
-      var gifUrl=null;
-      if(Array.isArray(res)&&res.length>0&&res[0].gifUrl){gifUrl=res[0].gifUrl;}
+      var gifUrl=res&&res.gifUrl?res.gifUrl:null;
       content.innerHTML=htContent(data.n,data.tip,gifUrl,false);
     })
     .catch(function(){content.innerHTML=htContent(data.n,data.tip,null,false);});
