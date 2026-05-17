@@ -1452,34 +1452,83 @@ function doExport(wo){
     if(d.workout&&d.workout.notePhoto){photos.push({di:di,side:"wonote",data:d.workout.notePhoto.split(",")[1]});}
     if(d.meals){for(var mi=0;mi<d.meals.length;mi++){if(d.meals[mi].photo){photos.push({di:di,mi:mi,data:d.meals[mi].photo.split(",")[1]});}}}
   }
-  var totalP=0,wkts=0,pdays=0,wts=[];
+  var totalP=0,totalCal=0,totalCarbs=0,totalFat=0,totalWat=0,wkts=0,pdays=0,caldays=0,wts=[];
   for(var di=0;di<7;di++){
-    var d=wk[di];totalP+=d.p;
+    var d=wk[di];
+    totalP+=d.p||0; totalCal+=d.cal||0; totalCarbs+=d.carbs||0; totalFat+=d.fat||0; totalWat+=d.water||0;
     if(hasTrainedToday(d)){wkts++;}
     if(d.p>=PG){pdays++;}
+    if(d.cal>=CG){caldays++;}
     if(d.weight){wts.push(parseFloat(d.weight));}
   }
   var avgP=Math.round(totalP/7);
+  var avgCal=Math.round(totalCal/7);
+  var avgCarbs=Math.round(totalCarbs/7);
+  var avgFat=Math.round(totalFat/7);
+  var avgWat=(totalWat/7).toFixed(1);
   var lwts=wts.filter(function(w){return w>0;});
   var avgWt=lwts.length?(lwts.reduce(function(a,b){return a+b;},0)/lwts.length).toFixed(1):"--";
-  var lines=["WEEKLY CHECK-IN - "+wlbl(wo),
-    "Workouts: "+wkts+"/5",
-    "Avg protein: "+avgP+"g (goal: "+PG+"g)",
-    "Protein days: "+pdays+"/7",
-    "Avg weight: "+avgWt+" lbs"];
+  var minWt=lwts.length?Math.min.apply(null,lwts).toFixed(1):"--";
+  var maxWt=lwts.length?Math.max.apply(null,lwts).toFixed(1):"--";
+  var sep="----------------------------------------";
+  var lines=["=== WEEKLY CHECK-IN: "+wlbl(wo)+" ===",""];
+  lines.push("SUMMARY");
+  lines.push(sep);
+  lines.push("Workouts completed:  "+wkts+"/5");
+  lines.push("Protein days hit:    "+pdays+"/7  (goal: "+PG+"g)");
+  lines.push("Avg protein:         "+avgP+"g / "+PG+"g goal");
+  lines.push("Avg calories:        "+avgCal+" / "+CG+" goal");
+  lines.push("Avg carbs:           "+avgCarbs+"g");
+  lines.push("Avg fat:             "+avgFat+"g");
+  lines.push("Avg water:           "+avgWat+" / "+WG+" glasses");
+  lines.push("Avg weight:          "+avgWt+" lbs");
+  lines.push("Weight range:        "+minWt+" - "+maxWt+" lbs");
+  lines.push("");
+  lines.push("DAILY LOG");
+  lines.push(sep);
+  var wkStart=new Date(WS+wo*604800000);
+  for(var di=0;di<7;di++){
+    var d=wk[di];
+    var dayDate=new Date(wkStart.getTime()+di*86400000);
+    var mo=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    var dlbl=DAYS[di]+" "+mo[dayDate.getMonth()]+" "+dayDate.getDate();
+    lines.push(dlbl);
+    lines.push("  Weight:    "+(d.weight?d.weight+" lbs":"not logged"));
+    lines.push("  Protein:   "+(d.p||0)+"g"+(d.p>=PG?" [HIT]":" ["+Math.max(0,PG-(d.p||0))+"g short]"));
+    lines.push("  Calories:  "+(d.cal||0)+(d.cal>=CG?" [at/over goal]":""));
+    lines.push("  Carbs:     "+(d.carbs||0)+"g");
+    lines.push("  Fat:       "+(d.fat||0)+"g");
+    lines.push("  Water:     "+(d.water||0)+"/"+WG+" glasses");
+    if(d.cannabis){lines.push("  Cannabis:  "+d.cannabis+(d.cannabisNote?" ("+d.cannabisNote+")":""));}
+    if(d.meals&&d.meals.length){
+      lines.push("  Meals:");
+      for(var mi=0;mi<d.meals.length;mi++){
+        var m=d.meals[mi];
+        lines.push("    - "+m.name+" | "+m.protein+"g P  "+m.calories+"cal  "+m.carbs+"g C  "+m.fat+"g F");
+      }
+    }
+    if(d.workout&&d.workout.notes){lines.push("  Day notes: "+d.workout.notes);}
+    var didTrain=hasTrainedToday(d);
+    lines.push("  Trained:   "+(didTrain?"yes":"no"));
+    lines.push("");
+  }
   var exFb=[];
   for(var di=0;di<7;di++){
     var d=wk[di];
-    if(d.workout&&d.workout.notes){exFb.push(DAYS[di]+" (day notes): "+d.workout.notes);}
     if(d.exercises){
       var eks=Object.keys(d.exercises);
       for(var eki=0;eki<eks.length;eki++){
         var ex=d.exercises[eks[eki]];
-        if(ex.rating||ex.note){exFb.push(DAYS[di]+" "+eks[eki]+": "+(ex.rating||"")+(ex.note?" - "+ex.note:""));}
+        if(ex.rating||ex.note){exFb.push(DAYS[di]+" - "+eks[eki]+": "+(ex.rating||"")+(ex.note?" ("+ex.note+")":""));}
       }
     }
   }
-  if(exFb.length){lines.push("Workout notes + exercise feedback:");for(var fi=0;fi<exFb.length;fi++){lines.push("  "+exFb[fi]);}}
+  if(exFb.length){
+    lines.push("EXERCISE FEEDBACK");
+    lines.push(sep);
+    for(var fi=0;fi<exFb.length;fi++){lines.push("  "+exFb[fi]);}
+    lines.push("");
+  }
   var txt=lines.join("\n");
   if(photos.length===0){finishExport(wo,txt,{});return;}
   var descs={},pending=photos.length;
@@ -1508,13 +1557,27 @@ function finishExport(wo,txt,descs){
   }
   AW[wkKey(wo)]=wk;
   scheduleSave();
-  navigator.clipboard.writeText(txt).then(function(){
-    S.exporting=false;S.expDone=true;draw();
-    setTimeout(function(){S.expDone=false;draw();},3000);
-  }).catch(function(){
-    S.exporting=false;S.expDone=true;draw();
-    setTimeout(function(){S.expDone=false;draw();},3000);
-  });
+  var fname="vinny-tracker-"+wlbl(wo).replace(/[\s\/,]+/g,"-").replace(/-+/g,"-")+".txt";
+  try{
+    var blob=new Blob([txt],{type:"text/plain;charset=utf-8"});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement("a");
+    a.href=url; a.download=fname;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){URL.revokeObjectURL(url);},2000);
+  }catch(e){
+    try{
+      var dataUri="data:text/plain;charset=utf-8,"+encodeURIComponent(txt);
+      var a2=document.createElement("a");
+      a2.href=dataUri; a2.download=fname;
+      document.body.appendChild(a2); a2.click(); document.body.removeChild(a2);
+    }catch(e2){
+      window.open("data:text/plain;charset=utf-8,"+encodeURIComponent(txt),"_blank");
+    }
+  }
+  navigator.clipboard.writeText(txt).catch(function(){});
+  S.exporting=false;S.expDone=true;draw();
+  setTimeout(function(){S.expDone=false;draw();},4000);
 }
 
 function pcolor(v){return v>=PG?"#10b981":v>0?"#f59e0b":"#2a2a2a";}
