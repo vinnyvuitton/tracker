@@ -1558,20 +1558,24 @@ function finishExport(wo,txt,descs){
   AW[wkKey(wo)]=wk;
   scheduleSave();
   var fname="vinny-tracker-"+wlbl(wo).replace(/[\s\/,]+/g,"-").replace(/-+/g,"-")+".txt";
-  try{
-    var blob=new Blob([txt],{type:"text/plain;charset=utf-8"});
-    var url=URL.createObjectURL(blob);
-    var a=document.createElement("a");
-    a.href=url; a.download=fname;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(function(){URL.revokeObjectURL(url);},2000);
-  }catch(e){
+  var blob=new Blob([txt],{type:"text/plain;charset=utf-8"});
+  var shareFile=new File([blob],fname,{type:"text/plain"});
+  if(navigator.share&&navigator.canShare&&navigator.canShare({files:[shareFile]})){
+    navigator.share({files:[shareFile],title:fname}).catch(function(){
+      var url=URL.createObjectURL(blob);
+      var a=document.createElement("a");
+      a.href=url;a.download=fname;
+      document.body.appendChild(a);a.click();document.body.removeChild(a);
+      setTimeout(function(){URL.revokeObjectURL(url);},2000);
+    });
+  }else{
     try{
-      var dataUri="data:text/plain;charset=utf-8,"+encodeURIComponent(txt);
-      var a2=document.createElement("a");
-      a2.href=dataUri; a2.download=fname;
-      document.body.appendChild(a2); a2.click(); document.body.removeChild(a2);
-    }catch(e2){
+      var url=URL.createObjectURL(blob);
+      var a=document.createElement("a");
+      a.href=url;a.download=fname;
+      document.body.appendChild(a);a.click();document.body.removeChild(a);
+      setTimeout(function(){URL.revokeObjectURL(url);},2000);
+    }catch(e){
       window.open("data:text/plain;charset=utf-8,"+encodeURIComponent(txt),"_blank");
     }
   }
