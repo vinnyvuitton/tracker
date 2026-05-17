@@ -1418,13 +1418,28 @@ function analyzeMeal(){
   var content=[];
   if(S.mp){content.push({type:"image",source:{type:"base64",media_type:"image/jpeg",data:S.mp}});}
   var prompt=S.mp
-    ?"Analyze this food photo"+(S.mt?" plus: "+S.mt:"")+". Return ONLY raw JSON no markdown: {\"name\":\"meal name\",\"protein\":25,\"carbs\":30,\"fat\":10,\"calories\":300}"
-    :"Analyze: "+S.mt+". Return ONLY raw JSON no markdown: {\"name\":\"meal name\",\"protein\":25,\"carbs\":30,\"fat\":10,\"calories\":300}";
+    ?"Analyze this food photo"+(S.mt?" combined with: "+S.mt:"")+". Identify every item, estimate realistic portion sizes from what is visible, and use exact nutrition label data for any branded products. Sum all items into one total. Return ONLY raw JSON: {\"name\":\"brief description\",\"protein\":25,\"carbs\":30,\"fat\":10,\"calories\":300}"
+    :"Calculate exact macros for: "+S.mt+". Use official nutrition label data for all branded and restaurant items. Sum all items into one total. Return ONLY raw JSON: {\"name\":\"brief description\",\"protein\":25,\"carbs\":30,\"fat\":10,\"calories\":300}";
   content.push({type:"text",text:prompt});
-  callAPI([{role:"user",content:content}],400,function(err,txt){
-    if(err){S.ld=false;S.ae="Could not analyze. Try again.";draw();return;}
+  var sys="You are a precise nutrition macro calculator. Output only a single raw JSON object with keys: name, protein, carbs, fat, calories. No markdown, no explanation, no extra text.\n\n"+
+    "METHOD: For each food item mentioned or visible, identify the specific product (brand name, variety, size) and look up its exact nutrition label data. "+
+    "Determine the realistic quantity/serving size based on context or what is visible. Calculate macros per item. Sum all items for the final total.\n\n"+
+    "RULES:\n"+
+    "- Use official nutrition label values for branded products, not generic estimates\n"+
+    "- Quantity matters: '3 scoops' means 3x one serving, 'two thighs' means 2x, etc.\n"+
+    "- For restaurant items use publicly available nutrition data\n"+
+    "- When unsure of exact product, use the closest specific match, not a generic\n"+
+    "- Be precise. This user tracks 160g protein/day so accuracy is critical";
+  fetch(PROXY,{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:300,temperature:0,system:sys,messages:[{role:"user",content:content}]})
+  }).then(function(r){return r.json();}).then(function(data){
+    var txt="";
+    if(data.content){for(var i=0;i<data.content.length;i++){if(data.content[i].type==="text"){txt=data.content[i].text;break;}}}
+    if(!txt){S.ld=false;S.ae="Could not analyze. Try again.";draw();return;}
     try{
-      var p=JSON.parse(txt.replace(/```json|```/g,"").trim());
+      var clean=txt.replace(/```json|```/g,"").trim();
+      var m=clean.match(/\{[\s\S]*\}/);if(m){clean=m[0];}
+      var p=JSON.parse(clean);
       var prev=S.mpp,inp=S.mt;
       sday(function(d){
         d.meals.push({name:p.name||"Meal",protein:p.protein||0,carbs:p.carbs||0,fat:p.fat||0,calories:p.calories||0,input:inp,photo:prev});
@@ -1433,7 +1448,7 @@ function analyzeMeal(){
       });
       S.mt="";S.mp=null;S.mpp=null;S.smf=false;S.ld=false;S.ae="";draw();
     }catch(e){S.ld=false;S.ae="Could not parse. Try again.";draw();}
-  });
+  }).catch(function(){S.ld=false;S.ae="Could not analyze. Try again.";draw();});
 }
 
 function rmMeal(idx){
