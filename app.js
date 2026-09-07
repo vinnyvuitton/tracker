@@ -216,7 +216,10 @@
 
   function weekStrip() {
     var start = startOfWeek(state.selectedDate);
-    var html = '<div class="week-strip">';
+    var end = addDays(start, 6);
+    var html = '<div class="week-controls"><button class="secondary" data-week-shift="-7" aria-label="Previous week">‹</button><strong>' +
+      esc(formatDate(start, { month: "short", day: "numeric" })) + " to " + esc(formatDate(end, { month: "short", day: "numeric" })) +
+      '</strong><button class="ghost" data-this-week>Today</button><button class="secondary" data-week-shift="7" aria-label="Next week">›</button></div><div class="week-strip">';
     for (var i = 0; i < 7; i++) {
       var iso = addDays(start, i);
       html += '<button class="day-button ' + (iso === state.selectedDate ? "active " : "") + (i === 3 ? "official" : "") + '" data-date="' + iso + '"><strong>' + DAYS[i] + '</strong><span>' + Number(iso.slice(8)) + '</span></button>';
@@ -438,6 +441,8 @@
 
   function bindViewEvents() {
     document.querySelectorAll("[data-date]").forEach(function (button) { button.addEventListener("click", function () { state.selectedDate = button.dataset.date; render(); }); });
+    document.querySelectorAll("[data-week-shift]").forEach(function (button) { button.addEventListener("click", function () { state.selectedDate = addDays(state.selectedDate, Number(button.dataset.weekShift)); render(); }); });
+    document.querySelectorAll("[data-this-week]").forEach(function (button) { button.addEventListener("click", function () { state.selectedDate = TODAY; render(); }); });
     if (state.view !== "today") {
       var copy = document.getElementById("copy-checkin");
       if (copy) copy.addEventListener("click", copyCheckin);

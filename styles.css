@@ -34,6 +34,8 @@ p { color: var(--muted); line-height: 1.45; }
 .sync.good .sync-dot { background: var(--good); }
 .sync.bad .sync-dot { background: var(--accent); }
 
+.week-controls { display: grid; grid-template-columns: auto 1fr auto auto; gap: 8px; align-items: center; margin-bottom: 9px; }
+.week-controls strong { text-align: center; font-size: 12px; }
 .week-strip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-bottom: 18px; }
 .day-button { appearance: none; border: 1px solid var(--line); background: var(--panel); color: var(--muted); border-radius: 12px; padding: 9px 2px; text-align: center; }
 .day-button strong, .day-button span { display: block; }
