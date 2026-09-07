@@ -1,0 +1,14 @@
+name = "vinny-workout-api"
+main = "worker.js"
+compatibility_date = "2026-09-07"
+
+[vars]
+ALLOWED_ORIGIN = "https://vinnyvuitton.github.io"
+ALLOW_LOCAL_DEV = "false"
+
+[[kv_namespaces]]
+binding = "TRACKER_KV"
+id = "REPLACE_WITH_EXISTING_KV_NAMESPACE_ID"
+
+# Set TRACKER_TOKEN as an encrypted Worker secret.
+# Never put its value in this file or in GitHub.

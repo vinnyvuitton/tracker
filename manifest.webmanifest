@@ -1,0 +1,9 @@
+{
+  "name": "Vinny Workout 2.0",
+  "short_name": "Workout 2.0",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0b0b0d",
+  "theme_color": "#0b0b0d",
+  "description": "Private fitness, nutrition, and progress tracker for Vinny's 2026 goal."
+}
