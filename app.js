@@ -110,6 +110,29 @@
     }
   };
 
+  var SPECIAL_DAYS = {
+    "2026-09-07": {
+      title: "Baseline Day",
+      subtitle: "No formal workout required today",
+      type: "Preparation",
+      sections: [{ label: "Set the starting point", exercises: [
+        ex("Morning Weight", "Record 150.6 lb", "Your starting weight is already saved."),
+        ex("Baseline Photos", "Front, side, and back if desired", "Keep these private and use the same setup for future comparisons."),
+        ex("Easy Walk", "Optional 10 to 20 minutes", "Only if you feel like moving. This is not a test.")
+      ] }]
+    },
+    "2026-09-08": {
+      title: "Equipment Setup",
+      subtitle: "Learn the FEIERDUN weights and bench before training",
+      type: "Preparation",
+      sections: [{ label: "Safety and practice", exercises: [
+        ex("Assemble Both Dumbbells", "Practice adding and removing plates", "Load both sides evenly and tighten every collar firmly."),
+        ex("Check the Bench", "Test every angle and locking pin", "The bench should not shift or wobble before you put weight over it."),
+        ex("Practice Light Reps", "Optional 5 reps of a press, row, squat, and hinge", "Use very light weight. Stop if anything feels unstable or painful.")
+      ] }]
+    }
+  };
+
   var state = {
     view: "today",
     selectedDate: TODAY,
@@ -188,10 +211,16 @@
   }
 
   function allExercises(dayName) {
+    return exercisesForPlan(PLAN[dayName]);
+  }
+
+  function exercisesForPlan(plan) {
     var out = [];
-    PLAN[dayName].sections.forEach(function (section) { section.exercises.forEach(function (exercise) { out.push(exercise); }); });
+    plan.sections.forEach(function (section) { section.exercises.forEach(function (exercise) { out.push(exercise); }); });
     return out;
   }
+
+  function planForDate(iso) { return SPECIAL_DAYS[iso] || PLAN[dayKey(iso)]; }
 
   function exerciseId(name) { return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); }
 
@@ -230,7 +259,7 @@
   function renderToday() {
     var iso = state.selectedDate;
     var key = dayKey(iso);
-    var plan = PLAN[key];
+    var plan = planForDate(iso);
     var day = getDay(iso);
     var t = totals(day);
     var html = header(plan.title, formatDate(iso)) + weekStrip();
@@ -276,8 +305,9 @@
   function photoRefValue(ref) { return typeof ref === "string" ? ref : ref && ref.id ? "r2:" + ref.id : ""; }
 
   function renderWorkout(day, plan) {
-    var done = allExercises(dayKey(state.selectedDate)).filter(function (exercise) { return day.exercises[exerciseId(exercise.name)] && day.exercises[exerciseId(exercise.name)].done; }).length;
-    var total = allExercises(dayKey(state.selectedDate)).length;
+    var todayExercises = exercisesForPlan(plan);
+    var done = todayExercises.filter(function (exercise) { return day.exercises[exerciseId(exercise.name)] && day.exercises[exerciseId(exercise.name)].done; }).length;
+    var total = todayExercises.length;
     var html = '<section class="card"><div class="card-head workout-title"><div><p class="eyebrow">' + esc(plan.type) + '</p><h2>' + esc(plan.title) + '</h2><p>' + esc(plan.subtitle) + '</p></div><div class="stat">' + done + '<small> / ' + total + '</small></div></div>';
     if (plan.type === "Strength") html += '<div class="notice">Calibration week: choose a load that leaves about 3 good reps in reserve. Technique comes first.</div>';
     plan.sections.forEach(function (section) {
@@ -285,10 +315,10 @@
       section.exercises.forEach(function (exercise) {
         var id = exerciseId(exercise.name);
         var log = day.exercises[id] || {};
-        var firstLabel = plan.type === "Strength" ? "Load used" : "Speed / incline";
-        var secondLabel = plan.type === "Strength" ? "Reps completed" : "Minutes completed";
-        var firstPlaceholder = plan.type === "Strength" ? "Example: 15 lb each" : "Example: 3.1 mph / 4 incline";
-        var secondPlaceholder = plan.type === "Strength" ? "Example: 12, 12, 11" : "Example: 20";
+        var firstLabel = plan.type === "Strength" ? "Load used" : plan.type === "Cardio" ? "Speed / incline" : "Setup used";
+        var secondLabel = plan.type === "Strength" ? "Reps completed" : plan.type === "Cardio" ? "Minutes completed" : "Notes";
+        var firstPlaceholder = plan.type === "Strength" ? "Example: 15 lb each" : plan.type === "Cardio" ? "Example: 3.1 mph / 4 incline" : "Optional";
+        var secondPlaceholder = plan.type === "Strength" ? "Example: 12, 12, 11" : plan.type === "Cardio" ? "Example: 20" : "Optional";
         html += '<div class="exercise"><div class="exercise-main"><input type="checkbox" data-exercise-done="' + id + '" ' + (log.done ? "checked" : "") + ' aria-label="Complete ' + esc(exercise.name) + '"><div><div class="exercise-name">' + esc(exercise.name) + '</div><div class="exercise-prescription">' + esc(exercise.prescription) + '</div><p class="exercise-tip">' + esc(exercise.tip) + '</p></div></div>' +
           '<div class="exercise-log"><label class="field">' + firstLabel + '<input data-exercise-load="' + id + '" value="' + esc(log.load || "") + '" placeholder="' + firstPlaceholder + '"></label><label class="field">' + secondLabel + '<input data-exercise-reps="' + id + '" value="' + esc(log.reps || "") + '" placeholder="' + secondPlaceholder + '"></label></div></div>';
       });
@@ -369,7 +399,7 @@
     var result = { loggedDays: 0, strengthDone: 0, strengthPlanned: 0, cardioDone: 0, cardioPlanned: 0, proteinDays: 0, calorieDays: 0, weights: [], latestWeight: 0 };
     for (var iso = startIso; iso <= endIso; iso = addDays(iso, 1)) {
       var day = state.data.days[iso];
-      var plan = PLAN[dayKey(iso)];
+      var plan = planForDate(iso);
       if (plan.type === "Strength") result.strengthPlanned++;
       if (plan.type === "Cardio") result.cardioPlanned++;
       if (!day) continue;
@@ -390,7 +420,7 @@
   function sessionComplete(day, plan) {
     if (!day) return false;
     if (day.workout && day.workout.completed) return true;
-    var planned = allExercises(DAYS.find(function (key) { return PLAN[key] === plan; }));
+    var planned = exercisesForPlan(plan);
     var completed = planned.filter(function (exercise) { return day.exercises && day.exercises[exerciseId(exercise.name)] && day.exercises[exerciseId(exercise.name)].done; }).length;
     return planned.length > 0 && completed / planned.length >= 0.5;
   }
@@ -407,8 +437,8 @@
       if (!day) continue;
       if (day.workout && day.workout.notes) notes.push(formatDate(iso, { weekday: "short" }) + ": " + day.workout.notes);
       var exerciseLines = [];
-      var plan = PLAN[dayKey(iso)];
-      allExercises(dayKey(iso)).forEach(function (exercise) {
+      var plan = planForDate(iso);
+      exercisesForPlan(plan).forEach(function (exercise) {
         var log = day.exercises && day.exercises[exerciseId(exercise.name)];
         if (!log || (!log.done && !log.load && !log.reps)) return;
         exerciseLines.push("  " + (log.done ? "✓ " : "• ") + exercise.name + (log.load ? " | " + log.load : "") + (log.reps ? " | " + log.reps : ""));
@@ -471,7 +501,7 @@
     var day = getDay(state.selectedDate);
     if (!day.exercises[id]) day.exercises[id] = {};
     day.exercises[id][field] = value;
-    var planned = allExercises(dayKey(state.selectedDate));
+    var planned = exercisesForPlan(planForDate(state.selectedDate));
     day.workout.completed = planned.every(function (exercise) { return day.exercises[exerciseId(exercise.name)] && day.exercises[exerciseId(exercise.name)].done; });
     queueSave(field === "done");
   }
