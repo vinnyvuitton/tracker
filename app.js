@@ -192,7 +192,7 @@
   function defaultData() {
     return {
       schemaVersion: 2,
-      profile: { name: "Vinny", age: 35, height: "5 ft 6 in", baselineWeight: 150.6, startDate: "2026-09-09" },
+      profile: { name: "Vinny", age: 35, height: "5 ft 6 in", baselineWeight: 150.6, startDate: "2026-09-10" },
       targets: { calories: 1700, protein: 150, water: 10, checkpointWeight: 140, deadline: "2026-12-31" },
       days: {},
       preferences: { notifications: true },
@@ -481,7 +481,7 @@
   }
 
   function renderGoalProgress() {
-    var stats = periodStats("2026-09-09", TODAY);
+    var stats = periodStats(state.data.profile.startDate || "2026-09-10", TODAY);
     var start = state.data.profile.baselineWeight;
     var latest = stats.latestWeight || start;
     var weightProgress = pct(start - latest, start - state.data.targets.checkpointWeight);
@@ -497,7 +497,7 @@
   }
 
   function renderPlan() {
-    var html = header("The Plan", "September 9 to December 31");
+    var html = header("The Plan", "September 10 to December 31");
     html += '<section class="card"><div class="notice">Four strength days, two cardio days, and one active recovery day. Week 1 establishes safe working weights.</div></section>';
     DAYS.forEach(function (key) {
       var plan = PLAN[key];
@@ -946,10 +946,12 @@
   }
 
   function ensureDataShape(data) {
+    data.profile = Object.assign(defaultData().profile, data.profile || {});
+    if (data.profile.startDate === "2026-09-09") data.profile.startDate = "2026-09-10";
     data.targets = Object.assign(defaultData().targets, data.targets || {});
     delete data.targets.steps;
     data.preferences = Object.assign({ notifications: true }, data.preferences || {});
-    data.meta = Object.assign({}, data.meta || {}, { planVersion: "workout-2.1-2026-09-08" });
+    data.meta = Object.assign({}, data.meta || {}, { planVersion: "workout-2.1-2026-09-09" });
     Object.keys(data.days || {}).forEach(function (iso) {
       var day = data.days[iso];
       day.meals = Array.isArray(day.meals) ? day.meals : [];
