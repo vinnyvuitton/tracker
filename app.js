@@ -59,7 +59,7 @@
     },
     Wed: {
       title: "Cardio 1",
-      subtitle: "Day 1 starts Wednesday, September 9",
+      subtitle: "Guided treadmill conditioning",
       type: "Cardio",
       cardioSegments: cardioOne(),
       sections: [{ label: "Treadmill", exercises: [ex("60-Minute Guided Walk", "Follow the eight guided stages", "Start the dashboard timer when the treadmill begins, then watch YouTube. Each alert leads with the exact speed and incline setting.")] }]
@@ -72,7 +72,7 @@
         { label: "Main Work", exercises: [
           ex("Incline Dumbbell Bench Press", "3 sets of 8 to 12", "Set the bench to a modest incline and keep your shoulder blades set.", load(13, 2)),
           ex("Chest Supported Dumbbell Row", "3 sets of 10 to 15", "Keep your chest on the bench and squeeze your shoulder blades.", load(17, 2)),
-          ex("Push Up", "2 controlled sets, stop with 2 reps left", "Keep a straight line from head to heels. Elevate your hands if needed.")
+          ex("Push Up", "2 sets of 6 to 12 clean reps", "Stop each set when you believe you could still do 2 more good reps. If you cannot reach 6 on the floor, put your hands on the bench. If 12 feels easy, record that so we can progress it.")
         ] },
         { label: "Build", exercises: [
           ex("Incline Rear Delt Raise", "2 sets of 12 to 20", "Use a light load and move from the shoulders.", load(6, 2)),
@@ -127,6 +127,14 @@
         ex("Assemble Both Dumbbells", "Practice adding and removing plates", "Load both sides evenly and tighten every collar firmly."),
         ex("Check the Bench", "Test every angle and locking pin", "The bench should not shift or wobble before you put weight over it."),
         ex("Practice Light Reps", "Optional 5 reps of a press, row, squat, and hinge", "Use very light weight. Stop if anything feels unstable or painful.")
+      ] }]
+    },
+    "2026-09-09": {
+      title: "Recovery Day",
+      subtitle: "Let your stomach settle—training starts Thursday",
+      type: "Recovery",
+      sections: [{ label: "Today", exercises: [
+        ex("Rest and Recover", "No formal workout today", "Sip fluids, eat as tolerated, and do not try to make up the treadmill session tonight. Resume with Thursday's weights only if you feel back to normal.")
       ] }]
     }
   };
@@ -345,9 +353,9 @@
       '<div class="row wrap"><label class="field">Weight, lb<input id="weight" type="number" inputmode="decimal" min="90" max="300" step="0.1" value="' + esc(day.weight) + '"></label>' +
       '<label class="field">Water, glasses<input id="water" type="number" inputmode="numeric" min="0" max="30" step="1" value="' + esc(day.water) + '"></label></div></section>';
 
+    html += renderMeals(day, t);
     html += renderPhotos(day, iso);
     html += renderWorkout(day, plan, iso);
-    html += renderMeals(day, t);
     html += '<section class="card"><div class="card-head"><div><h2>Day note</h2><p>Energy, sleep, soreness, schedule, or anything I should know</p></div></div>' +
       '<textarea id="day-note" placeholder="Optional note">' + esc(day.workout.notes) + '</textarea></section>';
     return html;
