@@ -62,7 +62,7 @@
       subtitle: "Day 1 starts Wednesday, September 9",
       type: "Cardio",
       cardioSegments: cardioOne(),
-      sections: [{ label: "Treadmill", exercises: [ex("30-Minute Guided Walk", "Follow the six 5-minute stages", "Start the dashboard timer, then watch YouTube. Your phone will alert you at every change.")] }]
+      sections: [{ label: "Treadmill", exercises: [ex("60-Minute Guided Walk", "Follow the eight guided stages", "Start the dashboard timer when the treadmill begins, then watch YouTube. Each alert leads with the exact speed and incline setting.")] }]
     },
     Thu: {
       title: "Upper B",
@@ -154,25 +154,32 @@
 
   function cardioOne() {
     return [
-      cardio(0, 5, 2.5, 0, "Easy warmup"), cardio(5, 10, 2.8, 2, "Settle into a brisk walk"),
-      cardio(10, 15, 3.0, 3, "Effort check: easy +1% incline; right stay; hard -1%"),
-      cardio(15, 20, 3.0, 4, "Strong and controlled—do not hold the rails"),
-      cardio(20, 25, 2.9, 3, "Second effort check: easy +1%; right stay; hard -1%"),
-      cardio(25, 30, 2.4, 0, "Cooldown")
+      cardio(0, 5, 2.5, 0, "Easy warmup"),
+      cardio(5, 10, 2.8, 1.5, "Settle into a brisk walk"),
+      cardio(10, 20, 3.0, 3, "Build into steady work—stay tall and avoid holding the rails"),
+      cardio(20, 30, 3.1, 4, "Target 6–7/10 effort. If too easy, use incline 5; if too hard, use incline 3"),
+      cardio(30, 40, 3.1, 5, "Strong, controlled work—short sentences should still be possible"),
+      cardio(40, 50, 3.0, 3.5, "Target 6–7/10. If too easy, use incline 4.5; if too hard, use incline 2.5"),
+      cardio(50, 55, 2.7, 1, "Begin cooldown"),
+      cardio(55, 60, 2.4, 0, "Easy cooldown")
     ];
   }
 
   function cardioTwo() {
     return [
       cardio(0, 5, 2.5, 0, "Easy warmup"), cardio(5, 10, 2.9, 2, "Smooth brisk walk"),
-      cardio(10, 15, 3.0, 3, "Effort check: easy +1% incline; right stay; hard -1%"),
+      cardio(10, 15, 3.0, 3, "Effort check: easy add 1 incline level; right stay; hard subtract 1"),
       cardio(15, 20, 3.1, 3, "Stay tall and keep your hands off the rails"),
-      cardio(20, 25, 3.0, 2, "Second effort check: easy +1%; right stay; hard -1%"),
+      cardio(20, 25, 3.0, 2, "Second effort check: easy add 1 incline level; right stay; hard subtract 1"),
       cardio(25, 30, 2.4, 0, "Cooldown")
     ];
   }
 
   function cardio(start, end, speed, incline, cue) { return { start: start, end: end, speed: speed, incline: incline, cue: cue }; }
+
+  function cardioDuration(plan) {
+    return plan && plan.cardioSegments && plan.cardioSegments.length ? plan.cardioSegments[plan.cardioSegments.length - 1].end : 0;
+  }
 
   function defaultData() {
     return {
@@ -384,8 +391,8 @@
         var log = day.exercises[id] || {};
         var firstLabel = plan.type === "Strength" ? "Load used" : plan.type === "Cardio" ? "Adjustments made" : "Setup used";
         var secondLabel = plan.type === "Strength" ? "Reps completed" : plan.type === "Cardio" ? "Minutes completed" : "Notes";
-        var firstPlaceholder = plan.type === "Strength" ? "Choose below" : plan.type === "Cardio" ? "Example: +1% at minute 10" : "Optional";
-        var secondPlaceholder = plan.type === "Strength" ? "Example: 12, 12, 11" : plan.type === "Cardio" ? "30" : "Optional";
+        var firstPlaceholder = plan.type === "Strength" ? "Choose below" : plan.type === "Cardio" ? "Example: incline 5 felt right" : "Optional";
+        var secondPlaceholder = plan.type === "Strength" ? "Example: 12, 12, 11" : plan.type === "Cardio" ? String(cardioDuration(plan)) : "Optional";
         html += '<div class="exercise"><div class="exercise-main"><input type="checkbox" data-exercise-done="' + id + '" ' + (log.done ? "checked" : "") + ' aria-label="Complete ' + esc(exercise.name) + '"><div><div class="exercise-name">' + esc(exercise.name) + '</div><div class="exercise-prescription">' + esc(exercise.prescription) + '</div><p class="exercise-tip">' + esc(exercise.tip) + '</p></div></div>' +
           renderExerciseLog(plan, exercise, id, log, firstLabel, secondLabel, firstPlaceholder, secondPlaceholder) + '</div>';
       });
@@ -413,13 +420,14 @@
   }
 
   function renderCardioGuide(day, plan) {
+    var duration = cardioDuration(plan);
     var active = day.cardio && day.cardio.status === "active";
-    if (active && day.cardio.startedAt && Date.now() - new Date(day.cardio.startedAt).getTime() > 31 * 60 * 1000) active = false;
+    if (active && day.cardio.startedAt && Date.now() - new Date(day.cardio.startedAt).getTime() > (duration + 1) * 60 * 1000) active = false;
     var html = '<div class="cardio-timeline">';
     plan.cardioSegments.forEach(function (segment) {
-      html += '<div class="cardio-step"><time>' + segment.start + '–' + segment.end + ' min</time><div><strong>' + segment.speed.toFixed(1) + ' mph · incline ' + segment.incline + '%</strong><span>' + esc(segment.cue) + '</span></div></div>';
+      html += '<div class="cardio-step"><time>' + segment.start + '–' + segment.end + ' min</time><div><strong>' + segment.speed.toFixed(1) + ' mph · incline ' + segment.incline + '</strong><span>' + esc(segment.cue) + '</span></div></div>';
     });
-    html += '</div><div class="cardio-controls"><button class="primary" id="start-cardio" ' + (active ? "disabled" : "") + '>' + (active ? "Session alerts active" : "Start 30-minute session") + '</button>';
+    html += '</div><div class="cardio-controls"><button class="primary" id="start-cardio" ' + (active ? "disabled" : "") + '>' + (active ? "Session alerts active" : "Start ' + duration + '-minute session") + '</button>';
     if (active) html += '<button class="secondary" id="cancel-cardio">Cancel alerts</button>';
     html += '</div><p class="notification-status">' + (state.notificationEnabled ? "You can switch to YouTube—push alerts will tell you every speed and incline change." : "Enable notifications first so alerts can reach you while YouTube is open.") + '</p>';
     return html;
@@ -494,7 +502,7 @@
           html += '</div>';
         });
       });
-      if (plan.cardioSegments) html += '<div class="cardio-timeline">' + plan.cardioSegments.map(function (segment) { return '<div class="cardio-step"><time>' + segment.start + '–' + segment.end + ' min</time><div><strong>' + segment.speed.toFixed(1) + ' mph · incline ' + segment.incline + '%</strong><span>' + esc(segment.cue) + '</span></div></div>'; }).join("") + '</div>';
+      if (plan.cardioSegments) html += '<div class="cardio-timeline">' + plan.cardioSegments.map(function (segment) { return '<div class="cardio-step"><time>' + segment.start + '–' + segment.end + ' min</time><div><strong>' + segment.speed.toFixed(1) + ' mph · incline ' + segment.incline + '</strong><span>' + esc(segment.cue) + '</span></div></div>'; }).join("") + '</div>';
       html += '</section>';
     });
     return html;
@@ -850,10 +858,11 @@
         if (!state.notificationEnabled) return;
       }
       var plan = planForDate(state.selectedDate);
+      var duration = cardioDuration(plan);
       var alerts = plan.cardioSegments.slice(1).map(function (segment) {
-        return { atMinutes: segment.start, title: "Treadmill change · minute " + segment.start, body: segment.speed.toFixed(1) + " mph · incline " + segment.incline + "%. " + segment.cue };
+        return { atMinutes: segment.start, title: "Minute " + segment.start + " · " + segment.speed.toFixed(1) + " mph · incline " + segment.incline, body: segment.cue };
       });
-      alerts.push({ atMinutes: 30, title: "Cardio complete", body: "Nice work, Vinny. Cooldown finished—log how the session felt." });
+      alerts.push({ atMinutes: duration, title: duration + " minutes complete", body: "Nice work, Vinny. Cooldown finished—log your adjustments and how the session felt." });
       var response = await apiFetch("/notifications/cardio/start", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date: state.selectedDate, title: plan.title, alerts: alerts }) });
       var result = await response.json();
       var day = getDay(state.selectedDate);

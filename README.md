@@ -22,7 +22,7 @@ This is the protected replacement for the original tracker. The original live da
 - Blurred progress photos by default with temporary tap-to-reveal privacy.
 - Added exact FEIERDUN plate instructions using the confirmed four 2.5, 3.5, 4.5, and 6.5 lb plates and an approximately 1 lb handle-and-collars assumption.
 - Added prior-load guidance and Too light / Just right / Too heavy progression feedback.
-- Added exact 30-minute treadmill stages and server-scheduled push alerts that continue while another app is open.
+- Added exact guided treadmill stages and server-scheduled push alerts that continue while another app is open. Wednesday's Day 1 session is a 60-minute calibration workout; Saturday remains 30 minutes until feedback guides progression.
 - Added private AI-assisted meal estimation from notes, a photo, or both, with editable confirmation and manual fallback.
 
 ## Data safety
