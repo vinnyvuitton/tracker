@@ -14,6 +14,7 @@
   var LOAD_OPTIONS = buildLoadOptions();
   var MEAL_CATEGORIES = ["breakfast", "lunch", "dinner", "snack"];
   var lockedScrollY = 0;
+  var dialogTouchY = 0;
 
   var PLAN = {
     Sun: {
@@ -249,6 +250,37 @@
       document.body.style.top = "";
       window.scrollTo(0, lockedScrollY);
     });
+  }
+
+  function activeDialog() { return document.querySelector("dialog[open]"); }
+
+  function handleDialogTouchStart(event) {
+    if (!activeDialog() || !event.touches.length) return;
+    dialogTouchY = event.touches[0].clientY;
+  }
+
+  function handleDialogTouchMove(event) {
+    var dialog = activeDialog();
+    if (!dialog || !event.touches.length) return;
+    var nextY = event.touches[0].clientY;
+    var movement = nextY - dialogTouchY;
+    dialogTouchY = nextY;
+    if (!dialog.contains(event.target)) { event.preventDefault(); return; }
+
+    var element = event.target.nodeType === 1 ? event.target : event.target.parentElement;
+    var canMoveInsidePopup = false;
+    while (element && dialog.contains(element)) {
+      var style = getComputedStyle(element);
+      var scrollable = /(auto|scroll)/.test(style.overflowY) && element.scrollHeight > element.clientHeight + 1;
+      if (scrollable) {
+        var canMoveDown = movement < 0 && element.scrollTop + element.clientHeight < element.scrollHeight - 1;
+        var canMoveUp = movement > 0 && element.scrollTop > 1;
+        if (canMoveDown || canMoveUp) { canMoveInsidePopup = true; break; }
+      }
+      if (element === dialog) break;
+      element = element.parentElement;
+    }
+    if (!canMoveInsidePopup) event.preventDefault();
   }
 
   function chicagoToday() {
@@ -1503,6 +1535,8 @@
   document.getElementById("clear-meal-advice").addEventListener("click", clearMealAdvice);
   document.getElementById("log-advice-meal").addEventListener("click", reviewAdviceMeal);
   document.querySelectorAll("dialog").forEach(function (dialog) { dialog.addEventListener("close", releaseDialogScrollLock); });
+  document.addEventListener("touchstart", handleDialogTouchStart, { passive: true, capture: true });
+  document.addEventListener("touchmove", handleDialogTouchMove, { passive: false, capture: true });
   document.addEventListener("visibilitychange", function () { if (document.hidden && state.revealedPhoto) { state.revealedPhoto = null; render(); } });
   window.addEventListener("pagehide", function () { state.revealedPhoto = null; });
   if ("serviceWorker" in navigator && !localMode) navigator.serviceWorker.register("./sw.js").then(async function (registration) { state.serviceWorker = registration; await refreshNotificationState(); render(); }).catch(function () {});

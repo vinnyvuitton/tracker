@@ -19,6 +19,7 @@
 body { margin: 0; background: var(--bg); color: var(--text); min-height: 100vh; }
 html.dialog-open, body.dialog-open { overflow: hidden; overscroll-behavior: none; }
 body.dialog-open { position: fixed; left: 0; right: 0; width: 100%; }
+body.dialog-open #app, body.dialog-open .bottom-nav { touch-action: none; }
 button, input, textarea, select { font: inherit; }
 button { cursor: pointer; }
 
@@ -168,7 +169,7 @@ textarea { resize: vertical; min-height: 74px; }
 .bottom-nav button.active { color: var(--text); }
 
 dialog { width: min(92vw, 440px); max-height: calc(100dvh - 24px - var(--safe-top) - var(--safe-bottom)); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); color: var(--text); padding: 20px; }
-dialog::backdrop { background: rgba(0,0,0,.75); backdrop-filter: blur(3px); }
+dialog::backdrop { background: rgba(0,0,0,.75); backdrop-filter: blur(3px); overscroll-behavior: none; touch-action: none; }
 dialog form { position: relative; display: grid; gap: 12px; }
 dialog label { display: grid; gap: 6px; color: var(--muted); font-size: 12px; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
