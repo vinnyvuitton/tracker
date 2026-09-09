@@ -10,7 +10,7 @@
   <meta name="apple-mobile-web-app-title" content="Workout 2.0">
   <title>Workout 2.0</title>
   <link rel="manifest" href="manifest.webmanifest?v=2.1.0">
-  <link rel="stylesheet" href="styles.css?v=2.1.0">
+  <link rel="stylesheet" href="styles.css?v=2.1.2">
 </head>
 <body>
   <div id="app" aria-live="polite"></div>
@@ -51,6 +51,7 @@
 
   <dialog id="meal-dialog">
     <form method="dialog" id="meal-form">
+      <button value="cancel" class="dialog-x" id="meal-close" autofocus aria-label="Close meal entry">×</button>
       <div>
         <p class="eyebrow">Easy meal entry</p>
         <h2>Log a meal</h2>
@@ -83,11 +84,11 @@
           <button type="button" id="save-meal" class="primary">Confirm and save</button>
         </div>
       </div>
-      <button type="button" class="secondary" id="meal-close">Close</button>
+      <button value="cancel" class="secondary">Close</button>
     </form>
   </dialog>
 
   <script src="migration.js?v=2.1.0"></script>
-  <script src="app.js?v=2.1.1"></script>
+  <script src="app.js?v=2.1.2"></script>
 </body>
 </html>

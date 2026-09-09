@@ -656,15 +656,14 @@
     document.getElementById("keep-meal-photo").checked = false;
     document.getElementById("meal-error").textContent = "";
     document.getElementById("meal-result").hidden = !manual;
-    document.getElementById("meal-close").hidden = manual;
     if (manual) showMealResult({ name: "Meal", calories: "", protein: "", carbs: "", fat: "", confidence: "Manual entry", assumptions: "Enter the package, restaurant, or measured values you trust." });
     document.getElementById("meal-dialog").showModal();
+    document.getElementById("meal-close").focus({ preventScroll: true });
   }
 
   function showMealResult(result) {
     state.mealEstimate = result;
     document.getElementById("meal-result").hidden = false;
-    document.getElementById("meal-close").hidden = true;
     document.getElementById("meal-result-name").value = result.name || "Meal";
     document.getElementById("meal-result-calories").value = result.calories == null ? "" : result.calories;
     document.getElementById("meal-result-protein").value = result.protein == null ? "" : result.protein;
@@ -1018,11 +1017,9 @@
   document.querySelectorAll(".bottom-nav button").forEach(function (button) { button.addEventListener("click", function () { state.revealedPhoto = null; state.view = button.dataset.view; render(); }); });
   document.getElementById("access-form").addEventListener("submit", submitAccess);
   document.getElementById("photo-form").addEventListener("submit", function (event) { event.preventDefault(); savePhoto(); });
-  document.getElementById("meal-form").addEventListener("submit", function (event) { event.preventDefault(); });
   document.getElementById("analyze-meal").addEventListener("click", analyzeMeal);
   document.getElementById("manual-meal").addEventListener("click", function () { showMealResult({ name: "Meal", calories: "", protein: "", carbs: "", fat: "", confidence: "Manual entry", assumptions: "Enter the package, restaurant, or measured values you trust." }); });
   document.getElementById("meal-cancel").addEventListener("click", function () { document.getElementById("meal-dialog").close(); });
-  document.getElementById("meal-close").addEventListener("click", function () { document.getElementById("meal-dialog").close(); });
   document.getElementById("save-meal").addEventListener("click", saveMeal);
   document.addEventListener("visibilitychange", function () { if (document.hidden && state.revealedPhoto) { state.revealedPhoto = null; render(); } });
   window.addEventListener("pagehide", function () { state.revealedPhoto = null; });
