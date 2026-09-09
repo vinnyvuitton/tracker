@@ -10,7 +10,7 @@
   <meta name="apple-mobile-web-app-title" content="Workout 2.0">
   <title>Workout 2.0</title>
   <link rel="manifest" href="manifest.webmanifest?v=2.1.0">
-  <link rel="stylesheet" href="styles.css?v=2.2.0">
+  <link rel="stylesheet" href="styles.css?v=2.3.0">
 </head>
 <body>
   <div id="app" aria-live="polite"></div>
@@ -78,7 +78,30 @@
           <label>Carbs, g<input id="meal-result-carbs" type="number" inputmode="numeric" min="0" step="1"></label>
           <label>Fat, g<input id="meal-result-fat" type="number" inputmode="numeric" min="0" step="1"></label>
         </div>
+        <details class="nutrition-entry-details">
+          <summary>More nutrition details</summary>
+          <div class="macro-grid">
+            <label>Fiber, g<input id="meal-result-fiber" type="number" inputmode="decimal" min="0" step="0.1"></label>
+            <label>Saturated fat, g<input id="meal-result-saturated-fat" type="number" inputmode="decimal" min="0" step="0.1"></label>
+            <label>Added sugar, g<input id="meal-result-added-sugar" type="number" inputmode="decimal" min="0" step="0.1"></label>
+            <label>Sodium, mg<input id="meal-result-sodium" type="number" inputmode="numeric" min="0" step="1"></label>
+          </div>
+          <p class="meal-detail-note">Leave a detail blank when it cannot be estimated responsibly.</p>
+        </details>
+        <p id="meal-included-items" class="meal-included-items"></p>
+        <p id="meal-nutrition-basis" class="meal-detail-note"></p>
         <p id="meal-assumptions" class="meal-assumptions"></p>
+        <label class="keep-photo"><input id="save-meal-favorite" type="checkbox"> Save this as a favorite</label>
+        <fieldset id="favorite-category-wrap" class="favorite-category" hidden>
+          <legend>Choose one favorite category</legend>
+          <div class="category-options">
+            <label><input type="radio" name="favorite-category" value="breakfast"> Breakfast</label>
+            <label><input type="radio" name="favorite-category" value="lunch"> Lunch</label>
+            <label><input type="radio" name="favorite-category" value="dinner"> Dinner</label>
+            <label><input type="radio" name="favorite-category" value="snack"> Snack</label>
+          </div>
+          <p id="favorite-category-note" class="meal-detail-note"></p>
+        </fieldset>
         <div class="dialog-actions">
           <button type="button" id="meal-cancel" class="secondary">Cancel</button>
           <button type="button" id="save-meal" class="primary">Confirm and save</button>
@@ -88,7 +111,32 @@
     </form>
   </dialog>
 
+  <dialog id="advice-dialog">
+    <form method="dialog" id="advice-form">
+      <button value="cancel" class="dialog-x" id="advice-close" autofocus aria-label="Close meal advice">×</button>
+      <div>
+        <p class="eyebrow">Before you eat</p>
+        <h2>Help me decide</h2>
+        <p>Ask what fits today, how much to have, or which option would work better.</p>
+      </div>
+      <div id="advice-conversation" class="advice-conversation" aria-live="polite"></div>
+      <label>Your question
+        <textarea id="advice-question" placeholder="Example: I’m thinking about this burrito. Should I eat the whole thing, and what would fit best for dinner afterward?"></textarea>
+      </label>
+      <label>Food or menu photo (optional)
+        <input id="advice-photo" type="file" accept="image/*" capture="environment">
+      </label>
+      <div class="row wrap">
+        <button type="button" id="ask-meal-advice" class="primary">Ask for advice</button>
+        <button type="button" id="clear-meal-advice" class="secondary">Start over</button>
+      </div>
+      <p id="advice-error" class="error" role="alert"></p>
+      <button type="button" id="log-advice-meal" class="secondary" hidden>Review and log this meal</button>
+      <button value="cancel" class="secondary">Close</button>
+    </form>
+  </dialog>
+
   <script src="migration.js?v=2.1.0"></script>
-  <script src="app.js?v=2.2.0"></script>
+  <script src="app.js?v=2.3.0"></script>
 </body>
 </html>

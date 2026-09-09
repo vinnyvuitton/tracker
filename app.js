@@ -12,6 +12,7 @@
   var PLATES = [2.5, 3.5, 4.5, 6.5];
   var DUMBBELL_HANDLE_WEIGHT = 1;
   var LOAD_OPTIONS = buildLoadOptions();
+  var MEAL_CATEGORIES = ["breakfast", "lunch", "dinner", "snack"];
 
   var PLAN = {
     Sun: {
@@ -154,6 +155,10 @@
     revealedPhoto: null,
     mealEstimate: null,
     activePendingMealId: null,
+    adjustingFavoriteId: null,
+    favoriteFilter: "all",
+    mealAdvice: { turns: [], suggestion: null },
+    adviceImage: "",
     pendingRetryStarted: false,
     pendingRetryTimer: null,
     serviceWorker: null,
@@ -202,8 +207,9 @@
       targets: { calories: 1700, protein: 150, water: 10, checkpointWeight: 140, deadline: "2026-12-31" },
       days: {},
       pendingMeals: [],
+      favorites: [],
       preferences: { notifications: true },
-      meta: { planVersion: "workout-2.1-2026-09-08", createdAt: new Date().toISOString() }
+      meta: { planVersion: "workout-2.3-2026-09-09", createdAt: new Date().toISOString() }
     };
   }
 
@@ -242,8 +248,18 @@
   function formatDate(iso, options) { return new Intl.DateTimeFormat("en-US", options || { weekday: "long", month: "long", day: "numeric" }).format(new Date(iso + "T12:00:00Z")); }
   function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
   function number(value) { var n = Number(value); return Number.isFinite(n) ? n : 0; }
+  function optionalNumber(value) { if (value === "" || value == null) return null; var n = Number(value); return Number.isFinite(n) && n >= 0 ? n : null; }
   function esc(value) { return String(value == null ? "" : value).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]; }); }
   function pct(value, target) { return target > 0 ? clamp(Math.round((value / target) * 100), 0, 100) : 0; }
+  function categoryLabel(value) { return value ? value.charAt(0).toUpperCase() + value.slice(1) : ""; }
+  function validCategory(value) { return MEAL_CATEGORIES.includes(value) ? value : "snack"; }
+  function defaultMealCategory() {
+    var hour = new Date().getHours();
+    if (hour < 11) return "breakfast";
+    if (hour < 15) return "lunch";
+    if (hour >= 17) return "dinner";
+    return "snack";
+  }
 
   function buildLoadOptions() {
     var byWeight = {};
@@ -294,8 +310,12 @@
       sum.protein += number(meal.protein);
       sum.carbs += number(meal.carbs);
       sum.fat += number(meal.fat);
+      ["fiber", "saturatedFat", "addedSugar", "sodium"].forEach(function (field) {
+        var value = optionalNumber(meal[field]);
+        if (value != null) { sum[field] += value; sum.known[field]++; }
+      });
       return sum;
-    }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
+    }, { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, saturatedFat: 0, addedSugar: 0, sodium: 0, known: { fiber: 0, saturatedFat: 0, addedSugar: 0, sodium: 0 } });
   }
 
   function allExercises(dayName) {
@@ -455,10 +475,44 @@
     day.meals.forEach(function (meal, index) {
       html += '<div class="meal"><div><strong>' + esc(meal.name || "Meal") + '</strong><small>' + Math.round(number(meal.protein)) + ' g protein · ' + Math.round(number(meal.calories)) + ' cal' + (meal.photo ? ' · private photo saved' : '') + '</small></div><button data-remove-meal="' + index + '" aria-label="Remove meal">×</button></div>';
     });
-    var saved = savedMeals();
-    if (saved.length) html += '<div class="section-label">Quick repeats</div><div class="saved-meals">' + saved.map(function (meal, index) { return '<button data-repeat-meal="' + index + '">' + esc(meal.name) + '</button>'; }).join("") + '</div>';
-    html += '<div class="meal-actions"><button id="open-meal" class="primary">Log with photo or notes</button><button id="open-manual-meal" class="secondary">Enter macros manually</button></div></section>';
+    html += renderNutritionDetails(t, day.meals.length);
+    html += renderFavoritePicker();
+    html += '<div class="meal-actions"><button id="open-meal" class="primary">Log what I ate</button><button id="open-advice" class="secondary">Help me decide</button><button id="open-manual-meal" class="secondary">Enter macros manually</button></div></section>';
     return html;
+  }
+
+  function renderNutritionDetails(t, mealCount) {
+    var known = t.known || {};
+    var optional = function (field, unit) { return known[field] ? (field === "sodium" ? Math.round(t[field]) : Math.round(t[field] * 10) / 10) + " " + unit : "Not available"; };
+    var missing = ["fiber", "saturatedFat", "addedSugar", "sodium"].some(function (field) { return known[field] < mealCount; });
+    return '<details class="nutrition-details"><summary>Nutrition details</summary><div class="nutrition-grid">' +
+      nutritionItem("Carbohydrates", Math.round(t.carbs) + " g") + nutritionItem("Total fat", Math.round(t.fat) + " g") +
+      nutritionItem("Fiber", optional("fiber", "g")) + nutritionItem("Saturated fat", optional("saturatedFat", "g")) +
+      nutritionItem("Added sugar", optional("addedSugar", "g")) + nutritionItem("Sodium", optional("sodium", "mg")) +
+      '</div><p class="meal-detail-note">' + (missing && mealCount ? "Some detailed values are unavailable because photos cannot always reveal them reliably." : "Detailed values come from the information available for each meal.") + '</p></details>';
+  }
+
+  function nutritionItem(label, value) { return '<div class="nutrition-item"><span>' + esc(label) + '</span><strong>' + esc(value) + '</strong></div>'; }
+
+  function sortedFavorites(filter) {
+    return (state.data.favorites || []).filter(function (favorite) { return filter === "all" || favorite.category === filter; }).slice().sort(function (a, b) {
+      return number(b.useCount) - number(a.useCount) || String(b.lastUsedAt || "").localeCompare(String(a.lastUsedAt || "")) || String(a.name || "").localeCompare(String(b.name || ""));
+    });
+  }
+
+  function renderFavoritePicker() {
+    var all = sortedFavorites("all");
+    if (!all.length) return '';
+    var filtered = sortedFavorites(state.favoriteFilter);
+    var categoryOptions = ['<option value="all">All favorites</option>'].concat(MEAL_CATEGORIES.map(function (category) { return '<option value="' + category + '" ' + (state.favoriteFilter === category ? "selected" : "") + '>' + categoryLabel(category) + '</option>'; })).join("");
+    var favoriteOptions = filtered.length ? filtered.map(function (favorite) { return '<option value="' + esc(favorite.id) + '">' + esc(favorite.name) + '</option>'; }).join("") : '<option value="">No favorites in this category</option>';
+    var manager = all.map(function (favorite) {
+      var options = MEAL_CATEGORIES.map(function (category) { return '<option value="' + category + '" ' + (favorite.category === category ? "selected" : "") + '>' + categoryLabel(category) + '</option>'; }).join("");
+      return '<div class="favorite-edit"><input data-favorite-name="' + esc(favorite.id) + '" value="' + esc(favorite.name) + '" aria-label="Favorite name"><select data-favorite-category="' + esc(favorite.id) + '" aria-label="Favorite category">' + options + '</select><button data-remove-favorite="' + esc(favorite.id) + '" aria-label="Remove ' + esc(favorite.name) + '">Remove</button></div>';
+    }).join("");
+    return '<div class="section-label">Favorites</div><div class="favorite-picker"><select id="favorite-category-filter" aria-label="Favorite category">' + categoryOptions + '</select><select id="favorite-meal-select" aria-label="Favorite meal">' + favoriteOptions + '</select></div>' +
+      '<div class="favorite-picker-actions"><button id="add-favorite-meal" class="primary" ' + (filtered.length ? '' : 'disabled') + '>Add usual portion</button><button id="adjust-favorite-meal" class="secondary" ' + (filtered.length ? '' : 'disabled') + '>Adjust portion first</button></div>' +
+      '<details class="favorite-manager"><summary>Manage favorites</summary>' + manager + '</details>';
   }
 
   function renderPendingMeals() {
@@ -477,16 +531,7 @@
     return html + '</section>';
   }
 
-  function savedMeals() {
-    var seen = {}, out = [];
-    Object.keys(state.data.days || {}).sort().reverse().forEach(function (iso) {
-      (state.data.days[iso].meals || []).slice().reverse().forEach(function (meal) {
-        var key = [meal.name, meal.calories, meal.protein, meal.carbs, meal.fat].join("|");
-        if (!seen[key] && out.length < 6) { seen[key] = true; out.push(meal); }
-      });
-    });
-    return out;
-  }
+  function favoriteById(id) { return (state.data.favorites || []).find(function (favorite) { return favorite.id === id; }); }
 
   function renderProgress() {
     var dates = Object.keys(state.data.days).sort();
@@ -654,11 +699,20 @@
     document.querySelectorAll("[data-reveal-photo]").forEach(function (button) { button.addEventListener("click", function () { togglePhotoReveal(button.dataset.revealPhoto); }); });
     document.querySelectorAll("[data-remove-photo]").forEach(function (button) { button.addEventListener("click", function () { removePhoto(button.dataset.removePhoto); }); });
     document.querySelectorAll("[data-remove-meal]").forEach(function (button) { button.addEventListener("click", function () { getDay(state.selectedDate).meals.splice(Number(button.dataset.removeMeal), 1); queueSave(true); }); });
-    document.querySelectorAll("[data-repeat-meal]").forEach(function (button) { button.addEventListener("click", function () { repeatMeal(Number(button.dataset.repeatMeal)); }); });
+    var favoriteFilter = document.getElementById("favorite-category-filter");
+    if (favoriteFilter) favoriteFilter.addEventListener("change", function () { state.favoriteFilter = favoriteFilter.value; render(); });
+    var addFavorite = document.getElementById("add-favorite-meal");
+    if (addFavorite) addFavorite.addEventListener("click", function () { useSelectedFavorite(false); });
+    var adjustFavorite = document.getElementById("adjust-favorite-meal");
+    if (adjustFavorite) adjustFavorite.addEventListener("click", function () { useSelectedFavorite(true); });
+    document.querySelectorAll("[data-favorite-name]").forEach(function (input) { input.addEventListener("change", function () { updateFavorite(input.dataset.favoriteName, "name", input.value.trim() || "Favorite meal"); }); });
+    document.querySelectorAll("[data-favorite-category]").forEach(function (select) { select.addEventListener("change", function () { updateFavorite(select.dataset.favoriteCategory, "category", select.value); }); });
+    document.querySelectorAll("[data-remove-favorite]").forEach(function (button) { button.addEventListener("click", function () { removeFavorite(button.dataset.removeFavorite); }); });
     document.querySelectorAll("[data-review-pending]").forEach(function (button) { button.addEventListener("click", function () { reviewPendingMeal(button.dataset.reviewPending); }); });
     document.querySelectorAll("[data-retry-pending]").forEach(function (button) { button.addEventListener("click", function () { retryPendingMeal(button.dataset.retryPending, true); }); });
     document.querySelectorAll("[data-discard-pending]").forEach(function (button) { button.addEventListener("click", function () { discardPendingMeal(button.dataset.discardPending); }); });
     document.getElementById("open-meal").addEventListener("click", function () { openMealDialog(false); });
+    document.getElementById("open-advice").addEventListener("click", openAdviceDialog);
     document.getElementById("open-manual-meal").addEventListener("click", function () { openMealDialog(true); });
     var startCardioButton = document.getElementById("start-cardio");
     if (startCardioButton) startCardioButton.addEventListener("click", startCardioSession);
@@ -685,22 +739,64 @@
     render();
   }
 
-  function repeatMeal(index) {
-    var meal = savedMeals()[index];
-    if (!meal) return;
-    getDay(state.selectedDate).meals.push({ name: meal.name, protein: number(meal.protein), calories: number(meal.calories), carbs: number(meal.carbs), fat: number(meal.fat), notes: meal.notes || "Repeated meal" });
+  function mealFromNutrition(source, fallbackNotes) {
+    return {
+      name: source.name || "Meal", protein: number(source.protein), calories: number(source.calories), carbs: number(source.carbs), fat: number(source.fat),
+      fiber: optionalNumber(source.fiber), saturatedFat: optionalNumber(source.saturatedFat), addedSugar: optionalNumber(source.addedSugar), sodium: optionalNumber(source.sodium),
+      notes: source.notes || fallbackNotes || "", category: MEAL_CATEGORIES.includes(source.category) ? source.category : "",
+      estimateConfidence: source.estimateConfidence || source.confidence || "saved favorite", estimateAssumptions: source.estimateAssumptions || source.assumptions || "",
+      nutritionBasis: source.nutritionBasis || "Saved favorite", includedItems: source.includedItems || ""
+    };
+  }
+
+  function selectedFavorite() {
+    var select = document.getElementById("favorite-meal-select");
+    return select ? favoriteById(select.value) : null;
+  }
+
+  function useSelectedFavorite(adjustFirst) {
+    var favorite = selectedFavorite();
+    if (!favorite) return;
+    if (adjustFirst) {
+      state.adjustingFavoriteId = favorite.id;
+      openMealDialog(true, favorite);
+      return;
+    }
+    favorite.useCount = number(favorite.useCount) + 1;
+    favorite.lastUsedAt = new Date().toISOString();
+    getDay(state.selectedDate).meals.push(mealFromNutrition(favorite, "Repeated favorite"));
     queueSave(true);
   }
 
-  function openMealDialog(manual) {
+  function updateFavorite(id, field, value) {
+    var favorite = favoriteById(id);
+    if (!favorite) return;
+    favorite[field] = field === "category" ? validCategory(value) : value;
+    favorite.updatedAt = new Date().toISOString();
+    queueSave(true);
+  }
+
+  function removeFavorite(id) {
+    var favorite = favoriteById(id);
+    if (!favorite || !confirm("Remove " + favorite.name + " from favorites?")) return;
+    state.data.favorites = state.data.favorites.filter(function (item) { return item.id !== id; });
+    queueSave(true);
+  }
+
+  function openMealDialog(manual, source) {
     state.mealEstimate = null;
     state.activePendingMealId = null;
-    document.getElementById("meal-notes").value = "";
+    if (!source) state.adjustingFavoriteId = null;
+    state.adviceImage = source && source.adviceImage || "";
+    document.getElementById("meal-notes").value = source && source.notes || "";
     document.getElementById("meal-photo").value = "";
     document.getElementById("keep-meal-photo").checked = false;
+    document.getElementById("save-meal-favorite").checked = false;
+    document.getElementById("favorite-category-wrap").hidden = true;
     document.getElementById("meal-error").textContent = "";
     document.getElementById("meal-result").hidden = !manual;
-    if (manual) showMealResult({ name: "Meal", calories: "", protein: "", carbs: "", fat: "", confidence: "Manual entry", assumptions: "Enter the package, restaurant, or measured values you trust." });
+    if (source) showMealResult(source);
+    else if (manual) showMealResult({ name: "Meal", calories: "", protein: "", carbs: "", fat: "", fiber: null, saturatedFat: null, addedSugar: null, sodium: null, category: defaultMealCategory(), confidence: "Manual entry", nutritionBasis: "Manual", assumptions: "Enter the package, restaurant, or measured values you trust." });
     document.getElementById("meal-dialog").showModal();
     document.getElementById("meal-close").focus({ preventScroll: true });
   }
@@ -713,8 +809,116 @@
     document.getElementById("meal-result-protein").value = result.protein == null ? "" : result.protein;
     document.getElementById("meal-result-carbs").value = result.carbs == null ? "" : result.carbs;
     document.getElementById("meal-result-fat").value = result.fat == null ? "" : result.fat;
+    document.getElementById("meal-result-fiber").value = result.fiber == null ? "" : result.fiber;
+    document.getElementById("meal-result-saturated-fat").value = result.saturatedFat == null ? "" : result.saturatedFat;
+    document.getElementById("meal-result-added-sugar").value = result.addedSugar == null ? "" : result.addedSugar;
+    document.getElementById("meal-result-sodium").value = result.sodium == null ? "" : result.sodium;
     document.getElementById("meal-confidence").textContent = (result.confidence || "Estimate") + " confidence—review before saving";
+    document.getElementById("meal-included-items").textContent = result.includedItems ? "Included: " + result.includedItems : "";
+    document.getElementById("meal-nutrition-basis").textContent = result.nutritionBasis ? "Nutrition source: " + result.nutritionBasis : "";
     document.getElementById("meal-assumptions").textContent = result.assumptions || "Nutrition values are estimates.";
+    setFavoriteCategory(result.category || defaultMealCategory(), Boolean(result.category));
+  }
+
+  function setFavoriteCategory(category, recommended) {
+    category = validCategory(category);
+    document.querySelectorAll('input[name="favorite-category"]').forEach(function (input) { input.checked = input.value === category; });
+    document.getElementById("favorite-category-note").textContent = recommended ? "Suggested from this meal—you can change it." : "Choose where you want this favorite to live.";
+  }
+
+  function openAdviceDialog() {
+    document.getElementById("advice-error").textContent = "";
+    document.getElementById("advice-question").value = "";
+    document.getElementById("advice-photo").value = "";
+    renderAdviceConversation();
+    document.getElementById("advice-dialog").showModal();
+    document.getElementById("advice-close").focus({ preventScroll: true });
+  }
+
+  function renderAdviceConversation() {
+    var container = document.getElementById("advice-conversation");
+    container.innerHTML = state.mealAdvice.turns.map(function (turn) {
+      return '<div class="advice-turn ' + (turn.role === "user" ? "user" : "assistant") + '"><strong>' + (turn.role === "user" ? "You" : "Meal coach") + '</strong>' + esc(turn.text) + '</div>';
+    }).join("");
+    container.hidden = !state.mealAdvice.turns.length;
+    var logButton = document.getElementById("log-advice-meal");
+    logButton.hidden = !(state.mealAdvice.suggestion && Number.isFinite(Number(state.mealAdvice.suggestion.calories)));
+    if (state.mealAdvice.turns.length) container.scrollTop = container.scrollHeight;
+  }
+
+  function adviceContext() {
+    var day = getDay(state.selectedDate);
+    var consumed = totals(day);
+    var plan = planForDate(state.selectedDate);
+    return {
+      date: state.selectedDate,
+      localTime: new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", hour: "numeric", minute: "2-digit" }).format(new Date()),
+      targets: { calories: number(state.data.targets.calories), protein: number(state.data.targets.protein) },
+      consumed: { calories: Math.round(consumed.calories), protein: Math.round(consumed.protein), carbs: Math.round(consumed.carbs), fat: Math.round(consumed.fat) },
+      remaining: { calories: Math.max(0, Math.round(number(state.data.targets.calories) - consumed.calories)), protein: Math.max(0, Math.round(number(state.data.targets.protein) - consumed.protein)) },
+      workout: { title: plan.title, type: plan.type, completed: Boolean(day.workout.completed) }
+    };
+  }
+
+  async function askMealAdvice() {
+    var question = document.getElementById("advice-question").value.trim();
+    var file = document.getElementById("advice-photo").files[0];
+    if (!question && !file) { document.getElementById("advice-error").textContent = "Ask a question or add a food photo."; return; }
+    if (!question) question = "Would this food fit my goals today, and how much should I have?";
+    var button = document.getElementById("ask-meal-advice");
+    button.disabled = true;
+    button.textContent = "Thinking…";
+    document.getElementById("advice-error").textContent = "";
+    try {
+      var image = "";
+      if (file) {
+        var blob = await compressImage(file, 900, 900, 0.72);
+        image = await blobToDataUrl(blob);
+        state.adviceImage = image;
+      }
+      var priorTurns = state.mealAdvice.turns.slice(-6);
+      var response = await apiFetch("/meals/advise", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: question, image: image, conversation: priorTurns, context: adviceContext() }) });
+      var result = await response.json();
+      state.mealAdvice.turns.push({ role: "user", text: question });
+      state.mealAdvice.turns.push({ role: "assistant", text: formatAdvice(result) });
+      state.mealAdvice.turns = state.mealAdvice.turns.slice(-8);
+      state.mealAdvice.suggestion = result.suggestion || null;
+      document.getElementById("advice-question").value = "";
+      document.getElementById("advice-photo").value = "";
+      renderAdviceConversation();
+    } catch (error) {
+      document.getElementById("advice-error").textContent = error.code === "daily_limit" ? "The free AI limit has been reached for today. Your dashboard and meal logging still work, and advice will be available again after the reset." : "Meal advice is temporarily unavailable. Nothing was logged.";
+    } finally {
+      button.disabled = false;
+      button.textContent = state.mealAdvice.turns.length ? "Ask follow-up" : "Ask for advice";
+    }
+  }
+
+  function formatAdvice(result) {
+    var parts = [result.answer];
+    if (result.portion) parts.push("Portion: " + result.portion);
+    if (result.dayImpact) parts.push("How it fits today: " + result.dayImpact);
+    if (result.alternative) parts.push("Alternative: " + result.alternative);
+    if (result.followUpQuestion) parts.push("One thing I need to know: " + result.followUpQuestion);
+    return parts.filter(Boolean).join("\n\n");
+  }
+
+  function clearMealAdvice() {
+    state.mealAdvice = { turns: [], suggestion: null };
+    state.adviceImage = "";
+    document.getElementById("advice-question").value = "";
+    document.getElementById("advice-photo").value = "";
+    document.getElementById("advice-error").textContent = "";
+    document.getElementById("ask-meal-advice").textContent = "Ask for advice";
+    renderAdviceConversation();
+  }
+
+  function reviewAdviceMeal() {
+    var suggestion = state.mealAdvice.suggestion;
+    if (!suggestion) return;
+    var lastQuestion = state.mealAdvice.turns.slice().reverse().find(function (turn) { return turn.role === "user"; });
+    document.getElementById("advice-dialog").close();
+    openMealDialog(true, Object.assign({}, suggestion, { notes: lastQuestion ? lastQuestion.text : "Meal discussed with the meal coach", confidence: "AI advice", assumptions: suggestion.assumptions || "Review the amount before saving.", adviceImage: state.adviceImage }));
   }
 
   async function analyzeMeal() {
@@ -828,7 +1032,11 @@
     document.getElementById("meal-notes").value = pending.notes || "";
     document.getElementById("meal-photo").value = "";
     document.getElementById("keep-meal-photo").checked = Boolean(pending.keepPhoto);
+    document.getElementById("save-meal-favorite").checked = false;
+    document.getElementById("favorite-category-wrap").hidden = true;
     document.getElementById("meal-error").textContent = "";
+    state.adjustingFavoriteId = null;
+    state.adviceImage = "";
     showMealResult(pending.result);
     document.getElementById("meal-dialog").showModal();
     document.getElementById("meal-close").focus({ preventScroll: true });
@@ -852,9 +1060,16 @@
       protein: number(document.getElementById("meal-result-protein").value),
       carbs: number(document.getElementById("meal-result-carbs").value),
       fat: number(document.getElementById("meal-result-fat").value),
+      fiber: optionalNumber(document.getElementById("meal-result-fiber").value),
+      saturatedFat: optionalNumber(document.getElementById("meal-result-saturated-fat").value),
+      addedSugar: optionalNumber(document.getElementById("meal-result-added-sugar").value),
+      sodium: optionalNumber(document.getElementById("meal-result-sodium").value),
       notes: document.getElementById("meal-notes").value.trim(),
+      category: state.mealEstimate && MEAL_CATEGORIES.includes(state.mealEstimate.category) ? state.mealEstimate.category : "",
       estimateConfidence: state.mealEstimate && state.mealEstimate.confidence || "manual",
-      estimateAssumptions: state.mealEstimate && state.mealEstimate.assumptions || ""
+      estimateAssumptions: state.mealEstimate && state.mealEstimate.assumptions || "",
+      includedItems: state.mealEstimate && state.mealEstimate.includedItems || "",
+      nutritionBasis: state.mealEstimate && state.mealEstimate.nutritionBasis || "Manual"
     };
     var file = document.getElementById("meal-photo").files[0];
     if (pending && pending.photoId && document.getElementById("keep-meal-photo").checked) {
@@ -867,9 +1082,24 @@
         if (localMode) meal.photo = await blobToDataUrl(blob);
         else { var id = state.selectedDate + "-meal-" + crypto.randomUUID() + ".jpg"; await uploadPhoto(id, blob); meal.photo = { id: id }; }
       } catch (error) { document.getElementById("meal-error").textContent = "The macros are ready, but the optional photo could not be saved."; return; }
+    } else if (state.adviceImage && document.getElementById("keep-meal-photo").checked) {
+      try {
+        var adviceBlob = await (await fetch(state.adviceImage)).blob();
+        if (localMode) meal.photo = state.adviceImage;
+        else { var advicePhotoId = state.selectedDate + "-meal-" + crypto.randomUUID() + ".jpg"; await uploadPhoto(advicePhotoId, adviceBlob); meal.photo = { id: advicePhotoId }; }
+      } catch (error) { document.getElementById("meal-error").textContent = "The macros are ready, but the optional photo could not be saved."; return; }
     }
     var mealDate = pending ? pending.date : state.selectedDate;
     getDay(mealDate).meals.push(meal);
+    if (document.getElementById("save-meal-favorite").checked) {
+      var selectedCategory = document.querySelector('input[name="favorite-category"]:checked');
+      if (!selectedCategory) { document.getElementById("meal-error").textContent = "Choose a favorite category before saving."; getDay(mealDate).meals.pop(); return; }
+      meal.category = selectedCategory.value;
+      saveFavoriteFromMeal(meal, selectedCategory.value);
+    } else if (state.adjustingFavoriteId) {
+      var adjustedFavorite = favoriteById(state.adjustingFavoriteId);
+      if (adjustedFavorite) { adjustedFavorite.useCount = number(adjustedFavorite.useCount) + 1; adjustedFavorite.lastUsedAt = new Date().toISOString(); }
+    }
     if (pending) {
       state.data.pendingMeals = state.data.pendingMeals.filter(function (item) { return item.id !== pending.id; });
       if (pending.photoId && !meal.photo && !localMode) {
@@ -877,8 +1107,22 @@
       }
     }
     state.activePendingMealId = null;
+    state.adjustingFavoriteId = null;
+    state.adviceImage = "";
     document.getElementById("meal-dialog").close();
     queueSave(true);
+  }
+
+  function saveFavoriteFromMeal(meal, category) {
+    var key = String(meal.name || "").trim().toLowerCase();
+    var existing = (state.data.favorites || []).find(function (favorite) { return String(favorite.name || "").trim().toLowerCase() === key; });
+    var snapshot = mealFromNutrition(meal);
+    delete snapshot.photo;
+    if (existing) {
+      Object.assign(existing, snapshot, { category: validCategory(category), useCount: number(existing.useCount) + 1, lastUsedAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+      return;
+    }
+    state.data.favorites.push(Object.assign(snapshot, { id: crypto.randomUUID(), category: validCategory(category), useCount: 1, lastUsedAt: new Date().toISOString(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }));
   }
 
   function openPhotoDialog(side) {
@@ -1118,13 +1362,20 @@
     data.profile = Object.assign(defaultData().profile, data.profile || {});
     if (data.profile.startDate === "2026-09-09") data.profile.startDate = "2026-09-10";
     data.targets = Object.assign(defaultData().targets, data.targets || {});
+    data.days = data.days || {};
     data.pendingMeals = Array.isArray(data.pendingMeals) ? data.pendingMeals : [];
     data.pendingMeals.forEach(function (meal) {
       if (meal.status === "estimating") { meal.status = "waiting"; meal.retryAt = ""; }
     });
+    data.favorites = Array.isArray(data.favorites) ? data.favorites.filter(function (favorite) { return favorite && favorite.name; }).map(function (favorite) {
+      favorite.id = favorite.id || crypto.randomUUID();
+      favorite.category = validCategory(favorite.category);
+      favorite.useCount = number(favorite.useCount);
+      return favorite;
+    }) : [];
     delete data.targets.steps;
     data.preferences = Object.assign({ notifications: true }, data.preferences || {});
-    data.meta = Object.assign({}, data.meta || {}, { planVersion: "workout-2.2-2026-09-09" });
+    data.meta = Object.assign({}, data.meta || {}, { planVersion: "workout-2.3-2026-09-09" });
     Object.keys(data.days || {}).forEach(function (iso) {
       var day = data.days[iso];
       day.meals = Array.isArray(day.meals) ? day.meals : [];
@@ -1211,13 +1462,24 @@
     showAccessDialog();
   }
 
-  document.querySelectorAll(".bottom-nav button").forEach(function (button) { button.addEventListener("click", function () { state.revealedPhoto = null; state.view = button.dataset.view; render(); }); });
+  document.querySelectorAll(".bottom-nav button").forEach(function (button) { button.addEventListener("click", function () {
+    state.revealedPhoto = null;
+    state.view = button.dataset.view;
+    render();
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }); });
   document.getElementById("access-form").addEventListener("submit", submitAccess);
   document.getElementById("photo-form").addEventListener("submit", function (event) { event.preventDefault(); savePhoto(); });
   document.getElementById("analyze-meal").addEventListener("click", analyzeMeal);
-  document.getElementById("manual-meal").addEventListener("click", function () { showMealResult({ name: "Meal", calories: "", protein: "", carbs: "", fat: "", confidence: "Manual entry", assumptions: "Enter the package, restaurant, or measured values you trust." }); });
+  document.getElementById("manual-meal").addEventListener("click", function () { showMealResult({ name: "Meal", calories: "", protein: "", carbs: "", fat: "", fiber: null, saturatedFat: null, addedSugar: null, sodium: null, category: defaultMealCategory(), confidence: "Manual entry", nutritionBasis: "Manual", assumptions: "Enter the package, restaurant, or measured values you trust." }); });
+  document.getElementById("save-meal-favorite").addEventListener("change", function (event) { document.getElementById("favorite-category-wrap").hidden = !event.target.checked; });
   document.getElementById("meal-cancel").addEventListener("click", function () { document.getElementById("meal-dialog").close(); });
   document.getElementById("save-meal").addEventListener("click", saveMeal);
+  document.getElementById("ask-meal-advice").addEventListener("click", askMealAdvice);
+  document.getElementById("clear-meal-advice").addEventListener("click", clearMealAdvice);
+  document.getElementById("log-advice-meal").addEventListener("click", reviewAdviceMeal);
   document.addEventListener("visibilitychange", function () { if (document.hidden && state.revealedPhoto) { state.revealedPhoto = null; render(); } });
   window.addEventListener("pagehide", function () { state.revealedPhoto = null; });
   if ("serviceWorker" in navigator && !localMode) navigator.serviceWorker.register("./sw.js").then(async function (registration) { state.serviceWorker = registration; await refreshNotificationState(); render(); }).catch(function () {});

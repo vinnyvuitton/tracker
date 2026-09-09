@@ -27,6 +27,15 @@ This is the protected replacement for the original tracker. The original live da
 - Meal estimates now use the free Workers AI allowance. Meal notes and photos are saved before analysis; unavailable estimates remain in a global Daily queue and retry after the allowance resets.
 - Added private AI-assisted meal estimation from notes, a photo, or both, with editable confirmation and manual fallback.
 
+## Workout 2.3 additions
+
+- Replaced automatic quick repeats with intentional favorites organized as Breakfast, Lunch, Dinner, or Snack.
+- Added most-used and most-recent favorite ranking, one-tap usual portions, adjustable portions, and favorite management.
+- Expanded meal estimates and daily totals with fiber, saturated fat, added sugar, and sodium when the available information supports them; unknown details remain blank.
+- Added an authenticated Help me decide meal coach that uses the current day's remaining targets, supports follow-up questions and optional photos, and never logs food without confirmation.
+- Added a review-and-log handoff from meal advice without running a second AI estimate.
+- Made every bottom navigation tap return its view to the top.
+
 ## Data safety
 
 The access code is never committed to source control. It is stored as a Cloudflare Worker secret and entered once on each device. The browser keeps it locally on that device.
