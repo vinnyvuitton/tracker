@@ -15,9 +15,21 @@ This is the protected replacement for the original tracker. The original live da
 - Added bearer-token authentication, strict origin checks, version conflict detection, rolling backups, and private per-photo storage.
 - Preserved automatic import of the original `mytracker` KV data.
 
+## Workout 2.1 additions
+
+- Added iPhone safe-area spacing and 16 px form controls so the installed app no longer overlaps the status bar or zooms when typing.
+- Renamed the date-browsing tab to Daily and removed unreliable step entry.
+- Blurred progress photos by default with temporary tap-to-reveal privacy.
+- Added exact FEIERDUN plate instructions using the confirmed four 2.5, 3.5, 4.5, and 6.5 lb plates and an approximately 1 lb handle-and-collars assumption.
+- Added prior-load guidance and Too light / Just right / Too heavy progression feedback.
+- Added exact 30-minute treadmill stages and server-scheduled push alerts that continue while another app is open.
+- Added private AI-assisted meal estimation from notes, a photo, or both, with editable confirmation and manual fallback.
+
 ## Data safety
 
 The access code is never committed to source control. It is stored as a Cloudflare Worker secret and entered once on each device. The browser keeps it locally on that device.
+
+The OpenAI API key and private Web Push signing key are also encrypted Worker secrets. Meal requests use `store: false`; meal photos are not added to tracker storage unless the user explicitly turns on Keep this meal photo.
 
 New progress photos are compressed in the browser and stored as separate private objects in Cloudflare KV. They are fetched through the authenticated Worker and are never assigned a public URL.
 

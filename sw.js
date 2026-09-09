@@ -1,5 +1,5 @@
-const CACHE = "workout-2-shell-v3";
-const SHELL = ["./", "./index.html", "./styles.css?v=2.0.2", "./migration.js?v=2.0.2", "./app.js?v=2.0.2", "./manifest.webmanifest?v=2.0.2"];
+const CACHE = "workout-2-shell-v4";
+const SHELL = ["./", "./index.html", "./styles.css?v=2.1.0", "./migration.js?v=2.1.0", "./app.js?v=2.1.0", "./manifest.webmanifest?v=2.1.0"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)));
@@ -19,4 +19,24 @@ self.addEventListener("fetch", (event) => {
     caches.open(CACHE).then((cache) => cache.put(event.request, copy));
     return response;
   }).catch(() => caches.match(event.request)));
+});
+
+self.addEventListener("push", (event) => {
+  let data = { title: "Workout 2.0", body: "You have a new reminder.", url: "./" };
+  try { data = Object.assign(data, event.data.json()); } catch (_) {}
+  event.waitUntil(self.registration.showNotification(data.title, {
+    body: data.body,
+    tag: data.tag || "workout-reminder",
+    renotify: true,
+    data: { url: data.url || "./" }
+  }));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = event.notification.data && event.notification.data.url || "./";
+  event.waitUntil(clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
+    for (const client of windows) { if ("focus" in client) { client.navigate(target); return client.focus(); } }
+    return clients.openWindow(target);
+  }));
 });

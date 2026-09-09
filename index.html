@@ -9,13 +9,13 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Workout 2.0">
   <title>Workout 2.0</title>
-  <link rel="manifest" href="manifest.webmanifest?v=2.0.2">
-  <link rel="stylesheet" href="styles.css?v=2.0.2">
+  <link rel="manifest" href="manifest.webmanifest?v=2.1.0">
+  <link rel="stylesheet" href="styles.css?v=2.1.0">
 </head>
 <body>
   <div id="app" aria-live="polite"></div>
   <nav class="bottom-nav" aria-label="Main navigation">
-    <button data-view="today">Today</button>
+    <button data-view="today">Daily</button>
     <button data-view="progress">Progress</button>
     <button data-view="plan">Plan</button>
     <button data-view="checkin">Check-in</button>
@@ -49,7 +49,45 @@
     </form>
   </dialog>
 
-  <script src="migration.js?v=2.0.2"></script>
-  <script src="app.js?v=2.0.2"></script>
+  <dialog id="meal-dialog">
+    <form method="dialog" id="meal-form">
+      <div>
+        <p class="eyebrow">Easy meal entry</p>
+        <h2>Log a meal</h2>
+        <p>Describe it, add a photo, or use both. You will review every estimate before it is saved.</p>
+      </div>
+      <label>Meal notes
+        <textarea id="meal-notes" placeholder="Example: Chipotle bowl, two scoops chicken, white rice, pinto beans, hot salsa, and cheese"></textarea>
+      </label>
+      <label>Meal photo (optional)
+        <input id="meal-photo" type="file" accept="image/*" capture="environment">
+      </label>
+      <label class="keep-photo"><input id="keep-meal-photo" type="checkbox"> Keep this meal photo privately after analysis</label>
+      <div class="row wrap">
+        <button type="button" id="analyze-meal" class="primary">Estimate for me</button>
+        <button type="button" id="manual-meal" class="secondary">Enter manually</button>
+      </div>
+      <p id="meal-error" class="error" role="alert"></p>
+      <div id="meal-result" hidden>
+        <div class="meal-confidence" id="meal-confidence"></div>
+        <label>Meal name<input id="meal-result-name" autocomplete="off"></label>
+        <div class="macro-grid">
+          <label>Calories<input id="meal-result-calories" type="number" inputmode="numeric" min="0" step="1"></label>
+          <label>Protein, g<input id="meal-result-protein" type="number" inputmode="numeric" min="0" step="1"></label>
+          <label>Carbs, g<input id="meal-result-carbs" type="number" inputmode="numeric" min="0" step="1"></label>
+          <label>Fat, g<input id="meal-result-fat" type="number" inputmode="numeric" min="0" step="1"></label>
+        </div>
+        <p id="meal-assumptions" class="meal-assumptions"></p>
+        <div class="dialog-actions">
+          <button type="button" id="meal-cancel" class="secondary">Cancel</button>
+          <button type="button" id="save-meal" class="primary">Confirm and save</button>
+        </div>
+      </div>
+      <button value="cancel" class="secondary" id="meal-close">Close</button>
+    </form>
+  </dialog>
+
+  <script src="migration.js?v=2.1.0"></script>
+  <script src="app.js?v=2.1.0"></script>
 </body>
 </html>
