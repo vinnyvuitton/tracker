@@ -35,6 +35,7 @@ This is the protected replacement for the original tracker. The original live da
 - Added an authenticated Help me decide meal coach that uses the current day's remaining targets, supports follow-up questions and optional photos, and never logs food without confirmation.
 - Added a review-and-log handoff from meal advice without running a second AI estimate.
 - Made every bottom navigation tap return its view to the top.
+- Locked the dashboard background behind every popup while preserving scrolling inside longer popup content on iPhone.
 
 ## Data safety
 

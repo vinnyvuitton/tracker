@@ -13,6 +13,7 @@
   var DUMBBELL_HANDLE_WEIGHT = 1;
   var LOAD_OPTIONS = buildLoadOptions();
   var MEAL_CATEGORIES = ["breakfast", "lunch", "dinner", "snack"];
+  var lockedScrollY = 0;
 
   var PLAN = {
     Sun: {
@@ -227,6 +228,27 @@
       cannabisNote: "",
       extraActivities: []
     };
+  }
+
+  function openDashboardDialog(dialog) {
+    if (!dialog || dialog.open) return;
+    if (!document.documentElement.classList.contains("dialog-open")) {
+      lockedScrollY = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+      document.documentElement.classList.add("dialog-open");
+      document.body.classList.add("dialog-open");
+      document.body.style.top = "-" + lockedScrollY + "px";
+    }
+    dialog.showModal();
+  }
+
+  function releaseDialogScrollLock() {
+    requestAnimationFrame(function () {
+      if (document.querySelector("dialog[open]")) return;
+      document.documentElement.classList.remove("dialog-open");
+      document.body.classList.remove("dialog-open");
+      document.body.style.top = "";
+      window.scrollTo(0, lockedScrollY);
+    });
   }
 
   function chicagoToday() {
@@ -797,7 +819,7 @@
     document.getElementById("meal-result").hidden = !manual;
     if (source) showMealResult(source);
     else if (manual) showMealResult({ name: "Meal", calories: "", protein: "", carbs: "", fat: "", fiber: null, saturatedFat: null, addedSugar: null, sodium: null, category: defaultMealCategory(), confidence: "Manual entry", nutritionBasis: "Manual", assumptions: "Enter the package, restaurant, or measured values you trust." });
-    document.getElementById("meal-dialog").showModal();
+    openDashboardDialog(document.getElementById("meal-dialog"));
     document.getElementById("meal-close").focus({ preventScroll: true });
   }
 
@@ -831,7 +853,7 @@
     document.getElementById("advice-question").value = "";
     document.getElementById("advice-photo").value = "";
     renderAdviceConversation();
-    document.getElementById("advice-dialog").showModal();
+    openDashboardDialog(document.getElementById("advice-dialog"));
     document.getElementById("advice-close").focus({ preventScroll: true });
   }
 
@@ -1038,7 +1060,7 @@
     state.adjustingFavoriteId = null;
     state.adviceImage = "";
     showMealResult(pending.result);
-    document.getElementById("meal-dialog").showModal();
+    openDashboardDialog(document.getElementById("meal-dialog"));
     document.getElementById("meal-close").focus({ preventScroll: true });
   }
 
@@ -1130,7 +1152,7 @@
     document.getElementById("photo-title").textContent = "Add " + side + " photo";
     document.getElementById("photo-error").textContent = "";
     document.getElementById("photo-input").value = "";
-    document.getElementById("photo-dialog").showModal();
+    openDashboardDialog(document.getElementById("photo-dialog"));
   }
 
   async function savePhoto() {
@@ -1409,7 +1431,7 @@
   function showAccessDialog(message) {
     document.getElementById("access-error").textContent = message || "";
     var dialog = document.getElementById("access-dialog");
-    if (!dialog.open) dialog.showModal();
+    if (!dialog.open) openDashboardDialog(dialog);
   }
 
   async function submitAccess(event) {
@@ -1480,6 +1502,7 @@
   document.getElementById("ask-meal-advice").addEventListener("click", askMealAdvice);
   document.getElementById("clear-meal-advice").addEventListener("click", clearMealAdvice);
   document.getElementById("log-advice-meal").addEventListener("click", reviewAdviceMeal);
+  document.querySelectorAll("dialog").forEach(function (dialog) { dialog.addEventListener("close", releaseDialogScrollLock); });
   document.addEventListener("visibilitychange", function () { if (document.hidden && state.revealedPhoto) { state.revealedPhoto = null; render(); } });
   window.addEventListener("pagehide", function () { state.revealedPhoto = null; });
   if ("serviceWorker" in navigator && !localMode) navigator.serviceWorker.register("./sw.js").then(async function (registration) { state.serviceWorker = registration; await refreshNotificationState(); render(); }).catch(function () {});
