@@ -1022,6 +1022,7 @@
   document.getElementById("analyze-meal").addEventListener("click", analyzeMeal);
   document.getElementById("manual-meal").addEventListener("click", function () { showMealResult({ name: "Meal", calories: "", protein: "", carbs: "", fat: "", confidence: "Manual entry", assumptions: "Enter the package, restaurant, or measured values you trust." }); });
   document.getElementById("meal-cancel").addEventListener("click", function () { document.getElementById("meal-dialog").close(); });
+  document.getElementById("meal-close").addEventListener("click", function () { document.getElementById("meal-dialog").close(); });
   document.getElementById("save-meal").addEventListener("click", saveMeal);
   document.addEventListener("visibilitychange", function () { if (document.hidden && state.revealedPhoto) { state.revealedPhoto = null; render(); } });
   window.addEventListener("pagehide", function () { state.revealedPhoto = null; });
