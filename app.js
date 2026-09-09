@@ -146,10 +146,16 @@
     version: 0,
     sync: "Loading",
     saveTimer: null,
+    saveInFlight: false,
+    saveDirty: false,
+    savePromise: null,
     pendingPhotoSide: null,
     photoUrls: [],
     revealedPhoto: null,
     mealEstimate: null,
+    activePendingMealId: null,
+    pendingRetryStarted: false,
+    pendingRetryTimer: null,
     serviceWorker: null,
     notificationEnabled: false
   };
@@ -195,6 +201,7 @@
       profile: { name: "Vinny", age: 35, height: "5 ft 6 in", baselineWeight: 150.6, startDate: "2026-09-10" },
       targets: { calories: 1700, protein: 150, water: 10, checkpointWeight: 140, deadline: "2026-12-31" },
       days: {},
+      pendingMeals: [],
       preferences: { notifications: true },
       meta: { planVersion: "workout-2.1-2026-09-08", createdAt: new Date().toISOString() }
     };
@@ -354,6 +361,7 @@
       '<label class="field">Water, glasses<input id="water" type="number" inputmode="numeric" min="0" max="30" step="1" value="' + esc(day.water) + '"></label></div></section>';
 
     html += renderMeals(day, t);
+    html += renderPendingMeals();
     html += renderPhotos(day, iso);
     html += renderWorkout(day, plan, iso);
     html += '<section class="card"><div class="card-head"><div><h2>Day note</h2><p>Energy, sleep, soreness, schedule, or anything I should know</p></div></div>' +
@@ -451,6 +459,22 @@
     if (saved.length) html += '<div class="section-label">Quick repeats</div><div class="saved-meals">' + saved.map(function (meal, index) { return '<button data-repeat-meal="' + index + '">' + esc(meal.name) + '</button>'; }).join("") + '</div>';
     html += '<div class="meal-actions"><button id="open-meal" class="primary">Log with photo or notes</button><button id="open-manual-meal" class="secondary">Enter macros manually</button></div></section>';
     return html;
+  }
+
+  function renderPendingMeals() {
+    var pending = state.data.pendingMeals || [];
+    if (!pending.length) return "";
+    var html = '<section class="card pending-meals"><div class="card-head"><div><p class="eyebrow">Saved safely</p><h2>Meal estimates</h2><p>These stay here on Daily—you never need to hunt through old dates.</p></div></div>';
+    pending.slice().sort(function (a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)); }).forEach(function (meal) {
+      var ready = meal.status === "ready" && meal.result;
+      var label = ready ? "Ready for your review" : meal.status === "estimating" ? "Estimating now" : meal.lastError === "daily_limit" ? "Daily free limit reached—saved for automatic retry. No charge" : "Saved—will retry automatically";
+      var description = meal.notes || "Meal photo";
+      html += '<div class="pending-meal"><div><strong>' + esc(description) + '</strong><small>' + esc(formatDate(meal.date, { month: "short", day: "numeric" })) + ' · ' + esc(label) + (meal.photoId ? ' · photo saved privately' : '') + '</small></div><div class="pending-actions">';
+      if (ready) html += '<button class="primary" data-review-pending="' + esc(meal.id) + '">Review</button>';
+      else html += '<button class="secondary" data-retry-pending="' + esc(meal.id) + '" ' + (meal.status === "estimating" ? "disabled" : "") + '>' + (meal.status === "estimating" ? "Estimating…" : "Retry now") + '</button>';
+      html += '<button class="ghost" data-discard-pending="' + esc(meal.id) + '">Discard</button></div></div>';
+    });
+    return html + '</section>';
   }
 
   function savedMeals() {
@@ -631,6 +655,9 @@
     document.querySelectorAll("[data-remove-photo]").forEach(function (button) { button.addEventListener("click", function () { removePhoto(button.dataset.removePhoto); }); });
     document.querySelectorAll("[data-remove-meal]").forEach(function (button) { button.addEventListener("click", function () { getDay(state.selectedDate).meals.splice(Number(button.dataset.removeMeal), 1); queueSave(true); }); });
     document.querySelectorAll("[data-repeat-meal]").forEach(function (button) { button.addEventListener("click", function () { repeatMeal(Number(button.dataset.repeatMeal)); }); });
+    document.querySelectorAll("[data-review-pending]").forEach(function (button) { button.addEventListener("click", function () { reviewPendingMeal(button.dataset.reviewPending); }); });
+    document.querySelectorAll("[data-retry-pending]").forEach(function (button) { button.addEventListener("click", function () { retryPendingMeal(button.dataset.retryPending, true); }); });
+    document.querySelectorAll("[data-discard-pending]").forEach(function (button) { button.addEventListener("click", function () { discardPendingMeal(button.dataset.discardPending); }); });
     document.getElementById("open-meal").addEventListener("click", function () { openMealDialog(false); });
     document.getElementById("open-manual-meal").addEventListener("click", function () { openMealDialog(true); });
     var startCardioButton = document.getElementById("start-cardio");
@@ -667,6 +694,7 @@
 
   function openMealDialog(manual) {
     state.mealEstimate = null;
+    state.activePendingMealId = null;
     document.getElementById("meal-notes").value = "";
     document.getElementById("meal-photo").value = "";
     document.getElementById("keep-meal-photo").checked = false;
@@ -698,19 +726,126 @@
     button.textContent = "Estimating…";
     document.getElementById("meal-error").textContent = "";
     try {
-      var imageData = "";
-      if (file) imageData = await blobToDataUrl(await compressImage(file, 900, 900, 0.72));
-      var response = await apiFetch("/meals/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ notes: notes, image: imageData }) });
-      showMealResult(await response.json());
+      var pending = {
+        id: crypto.randomUUID(), date: state.selectedDate, createdAt: new Date().toISOString(), notes: notes,
+        photoId: "", localImage: "", keepPhoto: document.getElementById("keep-meal-photo").checked,
+        status: "pending", result: null, retryAt: "", lastError: ""
+      };
+      if (file) {
+        var blob = await compressImage(file, 900, 900, 0.72);
+        if (localMode) pending.localImage = await blobToDataUrl(blob);
+        else {
+          pending.photoId = state.selectedDate + "-meal-pending-" + pending.id + ".jpg";
+          await uploadPhoto(pending.photoId, blob);
+        }
+      }
+      state.data.pendingMeals.push(pending);
+      state.activePendingMealId = pending.id;
+      queueSave(false);
+      await saveData();
+      await runPendingEstimate(pending, true);
     } catch (error) {
-      document.getElementById("meal-error").textContent = error.message === "Meal analysis is not configured" ? "AI meal estimates need one final private setup step. You can enter this meal manually now." : (error.message || "That meal could not be estimated.");
+      document.getElementById("meal-error").textContent = error.message || "That meal could not be saved.";
     } finally {
       button.disabled = false;
       button.textContent = "Estimate for me";
     }
   }
 
+  function findPendingMeal(id) {
+    return (state.data.pendingMeals || []).find(function (meal) { return meal.id === id; });
+  }
+
+  async function runPendingEstimate(pending, reviewOnSuccess) {
+    if (!pending || pending.status === "estimating") return false;
+    pending.status = "estimating";
+    pending.lastError = "";
+    queueSave(true);
+    try {
+      var response = await apiFetch("/meals/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ notes: pending.notes, photoId: pending.photoId, image: pending.localImage }) });
+      pending.result = await response.json();
+      pending.status = "ready";
+      pending.retryAt = "";
+      queueSave(false);
+      if (reviewOnSuccess) {
+        state.activePendingMealId = pending.id;
+        showMealResult(pending.result);
+      } else {
+        render();
+      }
+      return true;
+    } catch (error) {
+      pending.status = "waiting";
+      pending.lastError = error.code || "temporary";
+      pending.retryAt = error.retryAt || new Date(Date.now() + 30 * 60 * 1000).toISOString();
+      state.activePendingMealId = null;
+      queueSave(false);
+      await saveData();
+      if (document.getElementById("meal-dialog").open) document.getElementById("meal-dialog").close();
+      render();
+      schedulePendingRetry();
+      return false;
+    }
+  }
+
+  async function retryPendingMeal(id, manual) {
+    var pending = findPendingMeal(id);
+    if (!pending || pending.status === "ready") return;
+    if (!manual && pending.retryAt && new Date(pending.retryAt).getTime() > Date.now()) return;
+    await runPendingEstimate(pending, false);
+  }
+
+  async function retryDuePendingMeals() {
+    var due = (state.data.pendingMeals || []).filter(function (meal) {
+      return meal.status !== "ready" && meal.status !== "estimating" && (!meal.retryAt || new Date(meal.retryAt).getTime() <= Date.now());
+    });
+    for (var i = 0; i < due.length; i++) {
+      await retryPendingMeal(due[i].id, false);
+      if (due[i].lastError === "daily_limit") break;
+    }
+    schedulePendingRetry();
+  }
+
+  function schedulePendingRetry() {
+    clearTimeout(state.pendingRetryTimer);
+    var times = (state.data.pendingMeals || []).filter(function (meal) { return meal.status !== "ready" && meal.retryAt; }).map(function (meal) { return new Date(meal.retryAt).getTime(); }).filter(Number.isFinite);
+    if (!times.length) return;
+    var wait = Math.max(1000, Math.min.apply(Math, times) - Date.now());
+    state.pendingRetryTimer = setTimeout(retryDuePendingMeals, Math.min(wait, 2147483647));
+  }
+
+  function startPendingRetry() {
+    if (state.pendingRetryStarted) return;
+    state.pendingRetryStarted = true;
+    setTimeout(retryDuePendingMeals, 750);
+  }
+
+  function reviewPendingMeal(id) {
+    var pending = findPendingMeal(id);
+    if (!pending || !pending.result) return;
+    state.activePendingMealId = id;
+    state.mealEstimate = pending.result;
+    document.getElementById("meal-notes").value = pending.notes || "";
+    document.getElementById("meal-photo").value = "";
+    document.getElementById("keep-meal-photo").checked = Boolean(pending.keepPhoto);
+    document.getElementById("meal-error").textContent = "";
+    showMealResult(pending.result);
+    document.getElementById("meal-dialog").showModal();
+    document.getElementById("meal-close").focus({ preventScroll: true });
+  }
+
+  async function discardPendingMeal(id) {
+    var pending = findPendingMeal(id);
+    if (!pending || !confirm("Discard this saved meal entry?")) return;
+    if (pending.photoId && !localMode) {
+      try { await apiFetch("/photos/" + encodeURIComponent(pending.photoId), { method: "DELETE" }); } catch (ignore) {}
+    }
+    state.data.pendingMeals = state.data.pendingMeals.filter(function (meal) { return meal.id !== id; });
+    queueSave(true);
+  }
+
   async function saveMeal() {
+    var pending = state.activePendingMealId && findPendingMeal(state.activePendingMealId);
     var meal = {
       name: document.getElementById("meal-result-name").value.trim() || "Meal",
       calories: number(document.getElementById("meal-result-calories").value),
@@ -722,14 +857,26 @@
       estimateAssumptions: state.mealEstimate && state.mealEstimate.assumptions || ""
     };
     var file = document.getElementById("meal-photo").files[0];
-    if (file && document.getElementById("keep-meal-photo").checked) {
+    if (pending && pending.photoId && document.getElementById("keep-meal-photo").checked) {
+      meal.photo = { id: pending.photoId };
+    } else if (pending && pending.localImage && document.getElementById("keep-meal-photo").checked) {
+      meal.photo = pending.localImage;
+    } else if (file && document.getElementById("keep-meal-photo").checked) {
       try {
         var blob = await compressImage(file, 720, 960, 0.72);
         if (localMode) meal.photo = await blobToDataUrl(blob);
         else { var id = state.selectedDate + "-meal-" + crypto.randomUUID() + ".jpg"; await uploadPhoto(id, blob); meal.photo = { id: id }; }
       } catch (error) { document.getElementById("meal-error").textContent = "The macros are ready, but the optional photo could not be saved."; return; }
     }
-    getDay(state.selectedDate).meals.push(meal);
+    var mealDate = pending ? pending.date : state.selectedDate;
+    getDay(mealDate).meals.push(meal);
+    if (pending) {
+      state.data.pendingMeals = state.data.pendingMeals.filter(function (item) { return item.id !== pending.id; });
+      if (pending.photoId && !meal.photo && !localMode) {
+        try { await apiFetch("/photos/" + encodeURIComponent(pending.photoId), { method: "DELETE" }); } catch (ignore) {}
+      }
+    }
+    state.activePendingMealId = null;
     document.getElementById("meal-dialog").close();
     queueSave(true);
   }
@@ -888,9 +1035,11 @@
 
   function queueSave(redraw) {
     state.sync = "Saving";
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.data));
+    state.saveDirty = true;
     if (redraw) render(); else updateSyncLabel();
     clearTimeout(state.saveTimer);
-    state.saveTimer = setTimeout(saveData, 500);
+    state.saveTimer = setTimeout(saveData, 1500);
   }
 
   function updateSyncLabel() {
@@ -899,17 +1048,36 @@
   }
 
   async function saveData() {
+    clearTimeout(state.saveTimer);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.data));
-    if (localMode) { state.sync = "Saved locally"; render(); return; }
-    try {
-      var response = await apiFetch("/data", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ payload: state.data, expectedVersion: state.version }) });
-      var result = await response.json();
-      state.version = result.version;
-      state.sync = "Saved";
-    } catch (error) {
-      state.sync = error.message === "conflict" ? "Newer data found. Reload." : "Save failed";
+    if (localMode) { state.saveDirty = false; state.sync = "Saved locally"; render(); return true; }
+    if (state.saveInFlight) {
+      state.saveDirty = true;
+      await state.savePromise;
+      return state.saveDirty ? saveData() : true;
     }
-    render();
+    state.saveInFlight = true;
+    state.saveDirty = false;
+    var snapshot = JSON.parse(JSON.stringify(state.data));
+    state.savePromise = (async function () {
+      try {
+        var response = await apiFetch("/data", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ payload: snapshot, expectedVersion: state.version }) });
+        var result = await response.json();
+        state.version = result.version;
+        state.sync = "Saved";
+        return true;
+      } catch (error) {
+        state.sync = error.message === "conflict" ? "Newer data found. Reload." : "Save failed";
+        if (error.message === "conflict") state.saveDirty = false;
+        return false;
+      }
+    })();
+    var saved = await state.savePromise;
+    state.saveInFlight = false;
+    state.savePromise = null;
+    if (state.saveDirty) state.saveTimer = setTimeout(saveData, 1000);
+    else render();
+    return saved;
   }
 
   async function loadData() {
@@ -933,6 +1101,7 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state.data));
       render();
       if (migrated) queueSave(false);
+      startPendingRetry();
     } catch (error) {
       if (error.message === "unauthorized") { localStorage.removeItem(TOKEN_KEY); showAccessDialog("That access code did not work."); return; }
       var cached = localStorage.getItem(STORAGE_KEY);
@@ -949,9 +1118,13 @@
     data.profile = Object.assign(defaultData().profile, data.profile || {});
     if (data.profile.startDate === "2026-09-09") data.profile.startDate = "2026-09-10";
     data.targets = Object.assign(defaultData().targets, data.targets || {});
+    data.pendingMeals = Array.isArray(data.pendingMeals) ? data.pendingMeals : [];
+    data.pendingMeals.forEach(function (meal) {
+      if (meal.status === "estimating") { meal.status = "waiting"; meal.retryAt = ""; }
+    });
     delete data.targets.steps;
     data.preferences = Object.assign({ notifications: true }, data.preferences || {});
-    data.meta = Object.assign({}, data.meta || {}, { planVersion: "workout-2.1-2026-09-09" });
+    data.meta = Object.assign({}, data.meta || {}, { planVersion: "workout-2.2-2026-09-09" });
     Object.keys(data.days || {}).forEach(function (iso) {
       var day = data.days[iso];
       day.meals = Array.isArray(day.meals) ? day.meals : [];
@@ -972,8 +1145,12 @@
     if (response.status === 409) throw new Error("conflict");
     if (!response.ok) {
       var message = "request failed";
-      try { var body = await response.json(); message = body.error || message; } catch (ignore) {}
-      throw new Error(message);
+      var detail = {};
+      try { detail = await response.json(); message = detail.error || message; } catch (ignore) {}
+      var requestError = new Error(message);
+      requestError.code = detail.code || "";
+      requestError.retryAt = detail.retryAt || "";
+      throw requestError;
     }
     return returnRaw ? response : response;
   }
@@ -999,6 +1176,7 @@
       document.getElementById("access-dialog").close();
       render();
       if (!(result.payload && result.payload.schemaVersion === 2)) queueSave(false);
+      startPendingRetry();
     } catch (error) {
       localStorage.removeItem(TOKEN_KEY);
       document.getElementById("access-error").textContent = error.message === "unauthorized" ? "That access code did not work." : "The secure tracker could not be reached.";

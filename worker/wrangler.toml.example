@@ -7,14 +7,27 @@ ALLOWED_ORIGIN = "https://vinnyvuitton.github.io"
 ALLOW_LOCAL_DEV = "false"
 VAPID_PUBLIC_KEY = "REPLACE_WITH_PUBLIC_VAPID_KEY"
 VAPID_SUBJECT = "https://YOUR_GITHUB_USERNAME.github.io/YOUR_REPOSITORY/"
-OPENAI_MODEL = "gpt-5.6-luna"
 
 [triggers]
-crons = ["* * * * *"]
+crons = ["*/10 * * * *"]
+
+[ai]
+binding = "AI"
+remote = true
+
+[[queues.producers]]
+binding = "ALERT_QUEUE"
+queue = "REPLACE_WITH_ALERT_QUEUE"
+
+[[queues.consumers]]
+queue = "REPLACE_WITH_ALERT_QUEUE"
+max_batch_size = 1
+max_batch_timeout = 1
+max_retries = 3
 
 [[kv_namespaces]]
 binding = "TRACKER_KV"
 id = "REPLACE_WITH_EXISTING_KV_NAMESPACE_ID"
 
-# Set TRACKER_TOKEN, VAPID_PRIVATE_JWK, and OPENAI_API_KEY as encrypted Worker secrets.
+# Set TRACKER_TOKEN and VAPID_PRIVATE_JWK as encrypted Worker secrets.
 # Never put secret values in this file or in GitHub.
