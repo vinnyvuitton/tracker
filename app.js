@@ -834,7 +834,8 @@
       var saved = await response.json();
       localStorage.setItem(NOTIFICATION_DEVICE_KEY, saved.id);
       state.notificationEnabled = true;
-      if (message) message.textContent = "Enabled. Your first regular reminder is the next useful one on the schedule.";
+      await apiFetch("/notifications/test", { method: "POST" });
+      if (message) message.textContent = "Enabled. A test alert is on its way now.";
       else render();
     } catch (error) {
       if (message) message.textContent = error.message;

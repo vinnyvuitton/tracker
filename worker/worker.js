@@ -49,6 +49,10 @@ export default {
       if (url.pathname === "/notifications/subscribe" && request.method === "POST") {
         return await savePushSubscription(request, env, cors);
       }
+      if (url.pathname === "/notifications/test" && request.method === "POST") {
+        await broadcastPush(env, { title: "Workout 2.0 notifications are ready", body: "Perfect, Vinny. Treadmill changes and useful daily reminders can now reach you.", tag: "notification-test", url: "https://vinnyvuitton.github.io/tracker/" });
+        return json({ ok: true }, 200, cors);
+      }
       if (url.pathname === "/notifications/cardio/start" && request.method === "POST") {
         return await startCardioAlerts(request, env, cors);
       }
