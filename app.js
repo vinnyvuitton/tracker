@@ -13,6 +13,14 @@
   var DUMBBELL_HANDLE_WEIGHT = 1;
   var LOAD_OPTIONS = buildLoadOptions();
   var MEAL_CATEGORIES = ["breakfast", "lunch", "dinner", "snack"];
+  var PROGRESS_RANGES = [7, 14, 21, 30, 90, "all"];
+  var EFFORT_OPTIONS = [
+    { value: "much-too-easy", label: "Much too easy" },
+    { value: "slightly-easy", label: "Slightly easy" },
+    { value: "right", label: "Just right" },
+    { value: "slightly-hard", label: "Slightly hard" },
+    { value: "too-hard", label: "Too hard" }
+  ];
   var lockedScrollY = 0;
   var dialogTouchY = 0;
 
@@ -75,7 +83,7 @@
         { label: "Main Work", exercises: [
           ex("Incline Dumbbell Bench Press", "3 sets of 8 to 12", "Set the bench to a modest incline and keep your shoulder blades set.", load(13, 2)),
           ex("Chest Supported Dumbbell Row", "3 sets of 10 to 15", "Keep your chest on the bench and squeeze your shoulder blades.", load(17, 2)),
-          ex("Push Up", "2 sets of 6 to 12 clean reps", "Stop each set when you believe you could still do 2 more good reps. If you cannot reach 6 on the floor, put your hands on the bench. If 12 feels easy, record that so we can progress it.")
+          ex("Push Up", "2 sets of 6 to 12 clean reps", "Stop each set when you believe you could still do 2 more good reps. If you cannot reach 6 on the floor, put your hands on the bench. If 12 feels easy, record that so we can progress it.", bodyweight("Floor push-up"))
         ] },
         { label: "Build", exercises: [
           ex("Incline Rear Delt Raise", "2 sets of 12 to 20", "Use a light load and move from the shoulders.", load(6, 2)),
@@ -162,6 +170,10 @@
     favoriteFilter: "all",
     mealAdvice: { turns: [], suggestion: null },
     adviceImage: "",
+    editingMeal: null,
+    progressRange: 21,
+    progressMetric: "weight",
+    progressExercise: "dumbbell-flat-bench-press",
     pendingRetryStarted: false,
     pendingRetryTimer: null,
     serviceWorker: null,
@@ -173,6 +185,7 @@
   }
 
   function load(start, dumbbells) { return { type: "dumbbell", start: start, dumbbells: dumbbells }; }
+  function bodyweight(start) { return { type: "bodyweight", start: start }; }
 
   function cardioOne() {
     return [
@@ -211,7 +224,15 @@
       days: {},
       pendingMeals: [],
       favorites: [],
-      preferences: { notifications: true },
+      preferences: {
+        notifications: true,
+        reminders: {
+          workout: true, water: true, protein: true, pausedDate: "",
+          workoutTime: "04:10", waterTimes: ["07:00", "16:30"], proteinTimes: ["12:00", "20:30"],
+          quietStart: "23:00", quietEnd: "04:00"
+        }
+      },
+      reward: { name: "LV Trainer Sneakers", saved: 0, targetSavings: 1675 },
       meta: { planVersion: "workout-2.3-2026-09-09", createdAt: new Date().toISOString() }
     };
   }
@@ -304,10 +325,23 @@
   function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
   function number(value) { var n = Number(value); return Number.isFinite(n) ? n : 0; }
   function optionalNumber(value) { if (value === "" || value == null) return null; var n = Number(value); return Number.isFinite(n) && n >= 0 ? n : null; }
+  function selectedPhotoFile(libraryId, cameraId) {
+    var library = document.getElementById(libraryId), camera = document.getElementById(cameraId);
+    return camera && camera.files && camera.files[0] || library && library.files && library.files[0] || null;
+  }
+  function clearPhotoInputs(libraryId, cameraId) {
+    [libraryId, cameraId].forEach(function (id) { var input = document.getElementById(id); if (input) input.value = ""; });
+  }
   function esc(value) { return String(value == null ? "" : value).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]; }); }
   function pct(value, target) { return target > 0 ? clamp(Math.round((value / target) * 100), 0, 100) : 0; }
   function categoryLabel(value) { return value ? value.charAt(0).toUpperCase() + value.slice(1) : ""; }
   function validCategory(value) { return MEAL_CATEGORIES.includes(value) ? value : "snack"; }
+  function normalizedReminderTime(value) {
+    var parts = String(value || "").split(":");
+    var total = (number(parts[0]) * 60 + number(parts[1]));
+    total = Math.round(total / 10) * 10 % 1440;
+    return String(Math.floor(total / 60)).padStart(2, "0") + ":" + String(total % 60).padStart(2, "0");
+  }
   function defaultMealCategory() {
     var hour = new Date().getHours();
     if (hour < 11) return "breakfast";
@@ -349,9 +383,36 @@
     var weight = number(previous.log.load);
     var index = LOAD_OPTIONS.findIndex(function (option) { return option.weight === weight; });
     if (index < 0) return exercise.equipment.start;
-    if (previous.log.loadFeel === "too-light") return LOAD_OPTIONS[Math.min(index + 1, LOAD_OPTIONS.length - 1)].weight;
-    if (previous.log.loadFeel === "too-heavy") return LOAD_OPTIONS[Math.max(index - 1, 1)].weight;
+    if (previous.log.loadFeel === "much-too-easy") return LOAD_OPTIONS[Math.min(index + 2, LOAD_OPTIONS.length - 1)].weight;
+    if (previous.log.loadFeel === "slightly-easy" || previous.log.loadFeel === "too-light") return LOAD_OPTIONS[Math.min(index + 1, LOAD_OPTIONS.length - 1)].weight;
+    if (previous.log.loadFeel === "too-hard" || previous.log.loadFeel === "too-heavy") return LOAD_OPTIONS[Math.max(index - 1, 1)].weight;
     return weight;
+  }
+
+  function prescribedSetCount(exercise) {
+    var match = String(exercise.prescription || "").match(/(\d+)\s+sets?/i);
+    return match ? Math.max(1, Number(match[1])) : 1;
+  }
+
+  function exerciseSets(log, exercise) {
+    if (Array.isArray(log.sets) && log.sets.length) return log.sets.map(function (value) { return String(value == null ? "" : value); });
+    var old = String(log.reps || "").split(/[,/]+/).map(function (value) { return value.trim(); }).filter(Boolean);
+    while (old.length < prescribedSetCount(exercise)) old.push("");
+    return old;
+  }
+
+  function renderSetInputs(exercise, id, log) {
+    var sets = exerciseSets(log, exercise);
+    return '<div class="set-entry"><div class="set-grid">' + sets.map(function (value, index) {
+      return '<label>Set ' + (index + 1) + '<input data-exercise-set="' + id + '" data-set-index="' + index + '" inputmode="numeric" min="0" value="' + esc(value) + '" aria-label="' + esc(exercise.name) + ' set ' + (index + 1) + '"></label>';
+    }).join("") + '</div><button type="button" class="ghost add-set" data-add-set="' + id + '">+ Add set</button></div>';
+  }
+
+  function renderEffortButtons(id, log) {
+    return '<div class="effort-buttons" aria-label="How did this exercise feel?">' + EFFORT_OPTIONS.map(function (option) {
+      var active = log.loadFeel === option.value || (option.value === "slightly-easy" && log.loadFeel === "too-light") || (option.value === "too-hard" && log.loadFeel === "too-heavy");
+      return '<button type="button" data-load-feel="' + id + '" data-feel="' + option.value + '" class="' + (active ? "active" : "") + '">' + option.label + '</button>';
+    }).join("") + '</div>';
   }
 
   function getDay(iso) {
@@ -386,6 +447,10 @@
   function planForDate(iso) { return SPECIAL_DAYS[iso] || PLAN[dayKey(iso)]; }
 
   function exerciseId(name) { return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); }
+  function exerciseGuide(exercise) {
+    var url = "https://www.google.com/search?q=" + encodeURIComponent("site:acefitness.org " + exercise.name + " exercise demonstration");
+    return '<details class="form-guide"><summary>Show form guide</summary><p>' + esc(exercise.tip) + '</p><a href="' + url + '" target="_blank" rel="noopener noreferrer">Find a verified ACE demonstration ↗</a></details>';
+  }
 
   function render() {
     document.querySelectorAll(".bottom-nav button").forEach(function (button) { button.classList.toggle("active", button.dataset.view === state.view); });
@@ -412,7 +477,7 @@
       '</strong><button class="ghost" data-this-week>Today</button><button class="secondary" data-week-shift="7" aria-label="Next week">›</button></div><div class="week-strip">';
     for (var i = 0; i < 7; i++) {
       var iso = addDays(start, i);
-      html += '<button class="day-button ' + (iso === state.selectedDate ? "active " : "") + (i === 3 ? "official" : "") + '" data-date="' + iso + '"><strong>' + DAYS[i] + '</strong><span>' + Number(iso.slice(8)) + '</span></button>';
+      html += '<button class="day-button ' + (iso === state.selectedDate ? "active " : "") + (i === 3 ? "official" : "") + '" data-date="' + iso + '"' + (i === 3 ? ' title="Weekly progress-photo day"' : '') + '><strong>' + DAYS[i] + '</strong><span>' + Number(iso.slice(8)) + '</span></button>';
     }
     return html + '</div>';
   }
@@ -482,7 +547,7 @@
         var secondLabel = plan.type === "Strength" ? "Reps completed" : plan.type === "Cardio" ? "Minutes completed" : "Notes";
         var firstPlaceholder = plan.type === "Strength" ? "Choose below" : plan.type === "Cardio" ? "Example: incline 5 felt right" : "Optional";
         var secondPlaceholder = plan.type === "Strength" ? "Example: 12, 12, 11" : plan.type === "Cardio" ? String(cardioDuration(plan)) : "Optional";
-        html += '<div class="exercise"><div class="exercise-main"><input type="checkbox" data-exercise-done="' + id + '" ' + (log.done ? "checked" : "") + ' aria-label="Complete ' + esc(exercise.name) + '"><div><div class="exercise-name">' + esc(exercise.name) + '</div><div class="exercise-prescription">' + esc(exercise.prescription) + '</div><p class="exercise-tip">' + esc(exercise.tip) + '</p></div></div>' +
+        html += '<div class="exercise"><div class="exercise-main"><input type="checkbox" data-exercise-done="' + id + '" ' + (log.done ? "checked" : "") + ' aria-label="Complete ' + esc(exercise.name) + '"><div><div class="exercise-name">' + esc(exercise.name) + '</div><div class="exercise-prescription">' + esc(exercise.prescription) + '</div>' + exerciseGuide(exercise) + '</div></div>' +
           renderExerciseLog(plan, exercise, id, log, firstLabel, secondLabel, firstPlaceholder, secondPlaceholder) + '</div>';
       });
     });
@@ -502,9 +567,16 @@
       }).join("");
       return '<div class="load-guide"><strong>Recommended: approximately ' + selected + ' lb ' + (exercise.equipment.dumbbells === 2 ? "per dumbbell" : "on one dumbbell") + '</strong><span>' + esc(plateText(selected, exercise.equipment.dumbbells)) + '</span>' +
         (previous ? '<span class="previous-load">Last time: ≈ ' + esc(previous.log.load) + ' lb' + (previous.log.reps ? ' · ' + esc(previous.log.reps) + ' reps' : '') + '</span>' : '') + '</div>' +
-        '<div class="exercise-log"><label class="field">Load used<select data-exercise-load="' + id + '">' + options + '</select></label><label class="field">Reps completed<input data-exercise-reps="' + id + '" value="' + esc(log.reps || "") + '" placeholder="' + secondPlaceholder + '"></label></div>' +
-        '<div class="effort-buttons" aria-label="How did the load feel?"><button data-load-feel="' + id + '" data-feel="too-light" class="' + (log.loadFeel === "too-light" ? "active" : "") + '">Too light</button><button data-load-feel="' + id + '" data-feel="right" class="' + (log.loadFeel === "right" ? "active" : "") + '">Just right</button><button data-load-feel="' + id + '" data-feel="too-heavy" class="' + (log.loadFeel === "too-heavy" ? "active" : "") + '">Too heavy</button></div>';
+        '<div class="exercise-log"><label class="field">Load used<select data-exercise-load="' + id + '">' + options + '</select></label></div>' +
+        renderSetInputs(exercise, id, log) + renderEffortButtons(id, log);
     }
+    if (plan.type === "Strength" && exercise.equipment && exercise.equipment.type === "bodyweight") {
+      var variations = ["Floor push-up", "Incline push-up", "Knee push-up", "Weighted push-up"];
+      var chosen = log.load || exercise.equipment.start;
+      return '<div class="exercise-log"><label class="field">Variation<select data-exercise-load="' + id + '">' + variations.map(function (variation) { return '<option ' + (variation === chosen ? "selected" : "") + '>' + variation + '</option>'; }).join("") + '</select></label></div>' +
+        renderSetInputs(exercise, id, log) + renderEffortButtons(id, log);
+    }
+    if (plan.type === "Strength") return renderSetInputs(exercise, id, log);
     return '<div class="exercise-log"><label class="field">' + firstLabel + '<input data-exercise-load="' + id + '" value="' + esc(log.load || "") + '" placeholder="' + firstPlaceholder + '"></label><label class="field">' + secondLabel + '<input data-exercise-reps="' + id + '" inputmode="numeric" value="' + esc(log.reps || "") + '" placeholder="' + secondPlaceholder + '"></label></div>';
   }
 
@@ -526,7 +598,7 @@
     var html = '<section class="card"><div class="card-head"><div><h2>Meals</h2><p>' + Math.round(t.protein) + ' g protein and ' + Math.round(t.calories) + ' calories logged</p></div></div>';
     if (!day.meals.length) html += '<div class="empty">No meals logged yet</div>';
     day.meals.forEach(function (meal, index) {
-      html += '<div class="meal"><div><strong>' + esc(meal.name || "Meal") + '</strong><small>' + Math.round(number(meal.protein)) + ' g protein · ' + Math.round(number(meal.calories)) + ' cal' + (meal.photo ? ' · private photo saved' : '') + '</small></div><button data-remove-meal="' + index + '" aria-label="Remove meal">×</button></div>';
+      html += '<div class="meal"><button type="button" class="meal-summary" data-edit-meal="' + index + '"><strong>' + esc(meal.name || "Meal") + '</strong><small>' + Math.round(number(meal.protein)) + ' g protein · ' + Math.round(number(meal.calories)) + ' cal' + (meal.photo ? ' · private photo saved' : '') + '</small><span>Edit details</span></button><button type="button" data-duplicate-meal="' + index + '" aria-label="Duplicate meal">＋</button><button type="button" data-remove-meal="' + index + '" aria-label="Remove meal">×</button></div>';
     });
     html += renderNutritionDetails(t, day.meals.length);
     html += renderFavoritePicker();
@@ -588,18 +660,107 @@
 
   function renderProgress() {
     var dates = Object.keys(state.data.days).sort();
-    var weights = dates.filter(function (iso) { return number(state.data.days[iso].weight) > 0; }).slice(-14);
+    var weights = dates.filter(function (iso) { return number(state.data.days[iso].weight) > 0; });
     var latest = weights.length ? number(state.data.days[weights[weights.length - 1]].weight) : 0;
     var first = weights.length ? number(state.data.days[weights[0]].weight) : 0;
     var change = latest && first ? latest - first : 0;
     var html = header("Progress", "Trend over noise");
     html += '<section class="card"><div class="grid two"><div><p class="eyebrow">Latest weight</p><div class="stat">' + (latest ? latest.toFixed(1) : "No data") + (latest ? ' <small>lb</small>' : '') + '</div></div><div><p class="eyebrow">Change shown</p><div class="stat">' + (weights.length > 1 ? (change > 0 ? "+" : "") + change.toFixed(1) : "No trend") + (weights.length > 1 ? ' <small>lb</small>' : '') + '</div></div></div></section>';
     html += '<section class="card"><div class="card-head"><div><h2>Recent morning weights</h2><p>Use the weekly average to judge progress</p></div></div><div class="weight-list">';
-    weights.forEach(function (iso) { html += '<div class="weight-chip"><small>' + esc(formatDate(iso, { month: "short", day: "numeric" })) + '</small><strong>' + number(state.data.days[iso].weight).toFixed(1) + '</strong></div>'; });
+    weights.slice(-8).forEach(function (iso) { html += '<div class="weight-chip"><small>' + esc(formatDate(iso, { month: "short", day: "numeric" })) + '</small><strong>' + number(state.data.days[iso].weight).toFixed(1) + '</strong></div>'; });
     if (!weights.length) html += '<div class="empty">Your weight trend will appear here.</div>';
     html += '</div></section>';
+    html += renderProgressChart();
     html += renderGoalProgress();
+    html += renderRewardProgress();
+    html += '<section class="card"><details class="target-explainer"><summary>Why is my calorie target ' + esc(state.data.targets.calories) + '?</summary><p>This is a selected starting target, not a number automatically calculated from your profile. Review it using your 14–21 day weight trend, hunger, energy, and workout performance.</p><label class="field">Daily calorie target<input id="calorie-target" type="number" inputmode="numeric" min="1200" max="4000" step="25" value="' + esc(state.data.targets.calories) + '"></label></details></section>';
     return html;
+  }
+
+  function progressWindow() {
+    var dates = Object.keys(state.data.days || {}).sort();
+    var days = state.progressRange === "all" ? Math.max(1, Math.round((new Date(TODAY) - new Date(dates[0] || state.data.profile.startDate)) / 86400000) + 1) : Number(state.progressRange);
+    return { start: state.progressRange === "all" ? (dates[0] || state.data.profile.startDate) : addDays(TODAY, 1 - days), end: TODAY, days: days };
+  }
+
+  function progressExercises() {
+    var seen = {}, out = [];
+    DAYS.forEach(function (key) { if (PLAN[key].type !== "Strength") return; exercisesForPlan(PLAN[key]).forEach(function (exercise) {
+      var id = exerciseId(exercise.name);
+      if (!seen[id]) { seen[id] = true; out.push({ id: id, name: exercise.name }); }
+    }); });
+    return out;
+  }
+
+  function progressSeries(metric, exerciseIdValue, start, end) {
+    var points = [];
+    for (var iso = start; iso <= end; iso = addDays(iso, 1)) {
+      var day = state.data.days[iso];
+      if (metric === "weight") { if (day && number(day.weight)) points.push({ iso: iso, value: number(day.weight) }); continue; }
+      if (metric === "exercise") {
+        var log = day && day.exercises && day.exercises[exerciseIdValue];
+        if (log) {
+          var exerciseValue = number(log.load);
+          if (!exerciseValue && Array.isArray(log.sets)) exerciseValue = log.sets.reduce(function (sum, item) { return sum + number(item); }, 0);
+          if (exerciseValue) points.push({ iso: iso, value: exerciseValue });
+        }
+        continue;
+      }
+      if (!day) continue;
+      if (metric === "workouts") {
+        var plan = planForDate(iso);
+        if (plan.type === "Strength" || plan.type === "Cardio") points.push({ iso: iso, value: sessionComplete(day, plan) ? 100 : 0 });
+      } else {
+        var totalsForDay = totals(day);
+        points.push({ iso: iso, value: metric === "water" ? number(day.water) : number(totalsForDay[metric]) });
+      }
+    }
+    return points;
+  }
+
+  function chartTarget(metric) {
+    if (metric === "protein") return number(state.data.targets.protein);
+    if (metric === "calories") return number(state.data.targets.calories);
+    if (metric === "water") return number(state.data.targets.water);
+    if (metric === "workouts") return 100;
+    return 0;
+  }
+
+  function weeklyAverages(points) {
+    var groups = {};
+    points.forEach(function (point) { var week = startOfWeek(point.iso); if (!groups[week]) groups[week] = []; groups[week].push(point.value); });
+    return Object.keys(groups).sort().map(function (week) { return { iso: week, value: groups[week].reduce(function (sum, value) { return sum + value; }, 0) / groups[week].length }; });
+  }
+
+  function renderSvgChart(points, target) {
+    if (!points.length) return '<div class="empty chart-empty">No data in this timeframe yet.</div>';
+    var width = 640, height = 230, padX = 34, padY = 24;
+    var values = points.map(function (point) { return point.value; });
+    var min = Math.min.apply(Math, values.concat(target ? [target] : []));
+    var max = Math.max.apply(Math, values.concat(target ? [target] : []));
+    if (min === max) { min = Math.max(0, min - 1); max += 1; }
+    var x = function (index) { return padX + (points.length === 1 ? (width - padX * 2) / 2 : index * (width - padX * 2) / (points.length - 1)); };
+    var y = function (value) { return padY + (max - value) * (height - padY * 2) / (max - min); };
+    var path = points.map(function (point, index) { return (index ? "L" : "M") + x(index).toFixed(1) + " " + y(point.value).toFixed(1); }).join(" ");
+    var targetLine = target ? '<line class="chart-target" x1="' + padX + '" x2="' + (width - padX) + '" y1="' + y(target).toFixed(1) + '" y2="' + y(target).toFixed(1) + '"></line><text class="chart-label" x="' + (width - padX) + '" y="' + (y(target) - 7).toFixed(1) + '" text-anchor="end">target ' + esc(target) + '</text>' : '';
+    var dots = points.map(function (point, index) { return '<circle cx="' + x(index).toFixed(1) + '" cy="' + y(point.value).toFixed(1) + '" r="4"><title>' + esc(formatDate(point.iso, { month: "short", day: "numeric" })) + ': ' + esc(Math.round(point.value * 10) / 10) + '</title></circle>'; }).join("");
+    return '<div class="chart-wrap"><svg class="progress-chart" viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="Progress chart">' + targetLine + '<path d="' + path + '"></path>' + dots + '<text class="chart-label" x="' + padX + '" y="' + (height - 3) + '">' + esc(formatDate(points[0].iso, { month: "short", day: "numeric" })) + '</text><text class="chart-label" x="' + (width - padX) + '" y="' + (height - 3) + '" text-anchor="end">' + esc(formatDate(points[points.length - 1].iso, { month: "short", day: "numeric" })) + '</text></svg></div>';
+  }
+
+  function renderProgressChart() {
+    var windowRange = progressWindow();
+    var exercises = progressExercises();
+    var options = [{ value: "weight", label: "Weight" }, { value: "exercise", label: "Exercise performance" }, { value: "workouts", label: "Workout completion" }, { value: "protein", label: "Protein" }, { value: "calories", label: "Calories" }, { value: "water", label: "Water" }];
+    var points = progressSeries(state.progressMetric, state.progressExercise, windowRange.start, windowRange.end);
+    var previous = state.progressRange === "all" ? [] : progressSeries(state.progressMetric, state.progressExercise, addDays(windowRange.start, -windowRange.days), addDays(windowRange.start, -1));
+    if (state.progressRange === "all" || Number(state.progressRange) >= 90) { points = weeklyAverages(points); previous = weeklyAverages(previous); }
+    var average = points.length ? points.reduce(function (sum, point) { return sum + point.value; }, 0) / points.length : 0;
+    var previousAverage = previous.length ? previous.reduce(function (sum, point) { return sum + point.value; }, 0) / previous.length : 0;
+    var difference = average - previousAverage;
+    return '<section class="card progress-visual"><div class="card-head"><div><p class="eyebrow">Explore your data</p><h2>Progress graph</h2><p>' + (previousAverage ? (difference >= 0 ? "+" : "") + difference.toFixed(1) + ' versus the preceding period' : 'Choose a metric and timeframe') + '</p></div></div>' +
+      '<div class="range-tabs">' + PROGRESS_RANGES.map(function (range) { var label = range === "all" ? "All" : range === 30 ? "1 mo" : range === 90 ? "3 mo" : range + " d"; return '<button type="button" data-progress-range="' + range + '" class="' + (String(state.progressRange) === String(range) ? "active" : "") + '">' + label + '</button>'; }).join("") + '</div>' +
+      '<div class="progress-filters"><label class="field">Metric<select id="progress-metric">' + options.map(function (option) { return '<option value="' + option.value + '" ' + (state.progressMetric === option.value ? "selected" : "") + '>' + option.label + '</option>'; }).join("") + '</select></label>' +
+      (state.progressMetric === "exercise" ? '<label class="field">Exercise<select id="progress-exercise">' + exercises.map(function (exercise) { return '<option value="' + exercise.id + '" ' + (state.progressExercise === exercise.id ? "selected" : "") + '>' + esc(exercise.name) + '</option>'; }).join("") + '</select></label>' : '') + '</div>' + renderSvgChart(points, chartTarget(state.progressMetric)) + '</section>';
   }
 
   function renderGoalProgress() {
@@ -607,11 +768,22 @@
     var start = state.data.profile.baselineWeight;
     var latest = stats.latestWeight || start;
     var weightProgress = pct(start - latest, start - state.data.targets.checkpointWeight);
-    return '<section class="card"><div class="card-head"><div><p class="eyebrow">December 31 goal</p><h2>Lean and visibly defined</h2><p>140 lb is a checkpoint, not a promise that one scale number creates abs.</p></div></div>' +
+    return '<section class="card"><div class="card-head"><div><p class="eyebrow">December 31 goal</p><h2>Lean and visibly defined</h2><p>Progress from ' + esc(formatDate(state.data.profile.startDate, { month: "short", day: "numeric" })) + ' through today. Planned totals grow as workout days arrive.</p></div></div>' +
       metric("Weight checkpoint", weightProgress, latest.toFixed(1) + " / " + state.data.targets.checkpointWeight + " lb") +
-      metric("Strength sessions", pct(stats.strengthDone, stats.strengthPlanned), stats.strengthDone + " / " + stats.strengthPlanned) +
-      metric("Cardio sessions", pct(stats.cardioDone, stats.cardioPlanned), stats.cardioDone + " / " + stats.cardioPlanned) +
+      metric("Strength sessions through today", pct(stats.strengthDone, stats.strengthPlanned), stats.strengthDone + " of " + stats.strengthPlanned + " planned") +
+      metric("Cardio sessions through today", pct(stats.cardioDone, stats.cardioPlanned), stats.cardioDone + " of " + stats.cardioPlanned + " planned") +
       metric("Protein days", pct(stats.proteinDays, stats.loggedDays || 1), stats.proteinDays + " / " + stats.loggedDays + " logged days") + '</section>';
+  }
+
+  function renderRewardProgress() {
+    var reward = state.data.reward || defaultData().reward;
+    var stats = periodStats(state.data.profile.startDate, TODAY);
+    var start = number(state.data.profile.baselineWeight), latest = stats.latestWeight || start;
+    var scores = [pct(start - latest, start - state.data.targets.checkpointWeight), pct(stats.strengthDone, stats.strengthPlanned), pct(stats.cardioDone, stats.cardioPlanned), pct(stats.proteinDays, stats.loggedDays || 1)];
+    var earned = Math.round(scores.reduce(function (sum, score) { return sum + score; }, 0) / scores.length);
+    return '<section class="card reward-card"><div class="reward-mark">VW</div><div class="card-head"><div><p class="eyebrow">Vinny’s Wellness reward</p><h2>' + esc(reward.name || "My reward") + '</h2><p>Earned through weight progress and consistent strength, cardio, and protein habits.</p></div><div class="reward-percent">' + earned + '%</div></div><div class="progress-bar reward-bar"><span style="width:' + earned + '%"></span></div>' +
+      metric("Reward savings", pct(number(reward.saved), number(reward.targetSavings)), "$" + number(reward.saved).toFixed(0) + " / $" + number(reward.targetSavings).toFixed(0)) +
+      '<details class="reward-settings"><summary>Reward setup</summary><div class="grid two"><label class="field">Reward name<input id="reward-name" value="' + esc(reward.name || "") + '"></label><label class="field">Saved so far<input id="reward-saved" type="number" inputmode="decimal" min="0" step="1" value="' + esc(reward.saved) + '"></label><label class="field">Savings target<input id="reward-target" type="number" inputmode="decimal" min="0" step="1" value="' + esc(reward.targetSavings) + '"></label></div></details></section>';
   }
 
   function metric(label, percentage, copy) {
@@ -644,9 +816,20 @@
       '<section class="card"><div class="card-head"><div><h2>Send this to ChatGPT</h2><p>Each Sunday, copy this summary into our Workout conversation.</p></div></div>' +
       '<textarea id="checkin-output" class="checkin-output" readonly>' + esc(summary) + '</textarea>' +
       '<div class="row wrap"><button id="copy-checkin" class="primary">Copy check-in</button><button id="download-backup" class="secondary">Download private backup</button><button id="lock-tracker" class="secondary">Lock this device</button></div></section>' +
-      '<section class="card notification-card"><div><p class="eyebrow">Phone alerts</p><h2>Workout, water, and protein reminders</h2><p class="notification-status">Specific reminders at useful times, with quiet hours from 11 PM to 4 AM. Cardio alerts continue while YouTube is open.</p></div>' +
-      '<button id="enable-notifications" class="' + (state.notificationEnabled ? "secondary" : "primary") + '">' + (state.notificationEnabled ? "Notifications enabled" : "Enable notifications") + '</button><p id="notification-message" class="notification-status"></p></section>' +
+      renderNotificationCard() +
       '<section class="card"><div class="notice">Your weekly summary is only copied when you tap the button. Meal analysis sends only the meal photo and notes you choose, and does not expose your dashboard access code.</div></section>';
+  }
+
+  function reminderSettings() { return state.data.preferences.reminders; }
+
+  function renderNotificationCard() {
+    var reminders = reminderSettings();
+    var paused = reminders.pausedDate === TODAY;
+    return '<section class="card notification-card"><div><p class="eyebrow">Smart phone alerts</p><h2>Only nudge me when I’m behind</h2><p class="notification-status">Water and protein reminders compare your logged progress with the time of day. Completed targets stay quiet. Cardio alerts continue while another app is open.</p></div>' +
+      '<button id="enable-notifications" class="' + (state.notificationEnabled ? "secondary" : "primary") + '">' + (state.notificationEnabled ? "Notifications enabled" : "Enable notifications") + '</button><p id="notification-message" class="notification-status"></p>' +
+      '<div class="reminder-types"><label><input type="checkbox" data-reminder-toggle="workout" ' + (reminders.workout ? "checked" : "") + '> Workout</label><label><input type="checkbox" data-reminder-toggle="water" ' + (reminders.water ? "checked" : "") + '> Water</label><label><input type="checkbox" data-reminder-toggle="protein" ' + (reminders.protein ? "checked" : "") + '> Protein</label></div>' +
+      '<details class="reminder-settings"><summary>Reminder schedule</summary><div class="grid two"><label class="field">Workout<input type="time" step="600" data-reminder-time="workoutTime" value="' + esc(reminders.workoutTime) + '"></label><label class="field">Morning water<input type="time" step="600" data-reminder-time="waterTimes.0" value="' + esc(reminders.waterTimes[0]) + '"></label><label class="field">Afternoon water<input type="time" step="600" data-reminder-time="waterTimes.1" value="' + esc(reminders.waterTimes[1]) + '"></label><label class="field">Midday protein<input type="time" step="600" data-reminder-time="proteinTimes.0" value="' + esc(reminders.proteinTimes[0]) + '"></label><label class="field">Evening protein<input type="time" step="600" data-reminder-time="proteinTimes.1" value="' + esc(reminders.proteinTimes[1]) + '"></label><label class="field">Quiet hours start<input type="time" step="600" data-reminder-time="quietStart" value="' + esc(reminders.quietStart) + '"></label><label class="field">Quiet hours end<input type="time" step="600" data-reminder-time="quietEnd" value="' + esc(reminders.quietEnd) + '"></label></div></details>' +
+      '<button type="button" id="pause-reminders" class="ghost">' + (paused ? "Resume today’s reminders" : "Pause reminders for today") + '</button></section>';
   }
 
   function periodStats(startIso, endIso) {
@@ -727,6 +910,17 @@
     document.querySelectorAll("[data-date]").forEach(function (button) { button.addEventListener("click", function () { state.revealedPhoto = null; state.selectedDate = button.dataset.date; render(); }); });
     document.querySelectorAll("[data-week-shift]").forEach(function (button) { button.addEventListener("click", function () { state.revealedPhoto = null; state.selectedDate = addDays(state.selectedDate, Number(button.dataset.weekShift)); render(); }); });
     document.querySelectorAll("[data-this-week]").forEach(function (button) { button.addEventListener("click", function () { state.revealedPhoto = null; state.selectedDate = TODAY; render(); }); });
+    document.querySelectorAll("[data-progress-range]").forEach(function (button) { button.addEventListener("click", function () { state.progressRange = button.dataset.progressRange === "all" ? "all" : Number(button.dataset.progressRange); render(); }); });
+    var progressMetric = document.getElementById("progress-metric");
+    if (progressMetric) progressMetric.addEventListener("change", function () { state.progressMetric = progressMetric.value; render(); });
+    var progressExercise = document.getElementById("progress-exercise");
+    if (progressExercise) progressExercise.addEventListener("change", function () { state.progressExercise = progressExercise.value; render(); });
+    [["reward-name", "name"], ["reward-saved", "saved"], ["reward-target", "targetSavings"]].forEach(function (pair) {
+      var input = document.getElementById(pair[0]);
+      if (input) input.addEventListener("change", function () { state.data.reward[pair[1]] = pair[1] === "name" ? input.value.trim() : number(input.value); queueSave(true); });
+    });
+    var calorieTarget = document.getElementById("calorie-target");
+    if (calorieTarget) calorieTarget.addEventListener("change", function () { state.data.targets.calories = clamp(number(calorieTarget.value), 1200, 4000); queueSave(true); });
     if (state.view !== "today") {
       var copy = document.getElementById("copy-checkin");
       if (copy) copy.addEventListener("click", copyCheckin);
@@ -736,6 +930,17 @@
       if (lock) lock.addEventListener("click", lockTracker);
       var enableNotifications = document.getElementById("enable-notifications");
       if (enableNotifications) enableNotifications.addEventListener("click", enablePushNotifications);
+      document.querySelectorAll("[data-reminder-toggle]").forEach(function (input) { input.addEventListener("change", function () { reminderSettings()[input.dataset.reminderToggle] = input.checked; queueSave(false); }); });
+      document.querySelectorAll("[data-reminder-time]").forEach(function (input) { input.addEventListener("change", function () {
+        var parts = input.dataset.reminderTime.split(".");
+        var value = normalizedReminderTime(input.value);
+        input.value = value;
+        if (parts.length === 2) reminderSettings()[parts[0]][Number(parts[1])] = value;
+        else reminderSettings()[parts[0]] = value;
+        queueSave(false);
+      }); });
+      var pauseReminders = document.getElementById("pause-reminders");
+      if (pauseReminders) pauseReminders.addEventListener("click", function () { reminderSettings().pausedDate = reminderSettings().pausedDate === TODAY ? "" : TODAY; queueSave(true); });
       return;
     }
 
@@ -747,11 +952,15 @@
     document.querySelectorAll("[data-exercise-done]").forEach(function (input) { input.addEventListener("change", function () { updateExercise(input.dataset.exerciseDone, "done", input.checked); }); });
     document.querySelectorAll("[data-exercise-load]").forEach(function (input) { input.addEventListener("change", function () { updateExercise(input.dataset.exerciseLoad, "load", input.value); }); });
     document.querySelectorAll("[data-exercise-reps]").forEach(function (input) { input.addEventListener("change", function () { updateExercise(input.dataset.exerciseReps, "reps", input.value); }); });
+    document.querySelectorAll("[data-exercise-set]").forEach(function (input) { input.addEventListener("change", function () { updateExerciseSet(input.dataset.exerciseSet, Number(input.dataset.setIndex), input.value); }); });
+    document.querySelectorAll("[data-add-set]").forEach(function (button) { button.addEventListener("click", function () { addExerciseSet(button.dataset.addSet); }); });
     document.querySelectorAll("[data-load-feel]").forEach(function (button) { button.addEventListener("click", function () { updateExercise(button.dataset.loadFeel, "loadFeel", button.dataset.feel); }); });
     document.querySelectorAll("[data-add-photo]").forEach(function (button) { button.addEventListener("click", function () { openPhotoDialog(button.dataset.addPhoto); }); });
     document.querySelectorAll("[data-reveal-photo]").forEach(function (button) { button.addEventListener("click", function () { togglePhotoReveal(button.dataset.revealPhoto); }); });
     document.querySelectorAll("[data-remove-photo]").forEach(function (button) { button.addEventListener("click", function () { removePhoto(button.dataset.removePhoto); }); });
     document.querySelectorAll("[data-remove-meal]").forEach(function (button) { button.addEventListener("click", function () { getDay(state.selectedDate).meals.splice(Number(button.dataset.removeMeal), 1); queueSave(true); }); });
+    document.querySelectorAll("[data-edit-meal]").forEach(function (button) { button.addEventListener("click", function () { var index = Number(button.dataset.editMeal); openMealDialog(true, getDay(state.selectedDate).meals[index], { date: state.selectedDate, index: index }); }); });
+    document.querySelectorAll("[data-duplicate-meal]").forEach(function (button) { button.addEventListener("click", function () { var meal = getDay(state.selectedDate).meals[Number(button.dataset.duplicateMeal)]; var copy = Object.assign({}, meal, { name: (meal.name || "Meal") + " copy" }); delete copy.photo; getDay(state.selectedDate).meals.push(copy); queueSave(true); }); });
     var favoriteFilter = document.getElementById("favorite-category-filter");
     if (favoriteFilter) favoriteFilter.addEventListener("change", function () { state.favoriteFilter = favoriteFilter.value; render(); });
     var addFavorite = document.getElementById("add-favorite-meal");
@@ -781,9 +990,31 @@
     if (field === "done" && value && !day.exercises[id].load) {
       var exercise = planned.find(function (item) { return exerciseId(item.name) === id; });
       if (exercise && exercise.equipment && exercise.equipment.type === "dumbbell") day.exercises[id].load = recommendedLoad(exercise, id);
+      if (exercise && exercise.equipment && exercise.equipment.type === "bodyweight") day.exercises[id].load = exercise.equipment.start;
     }
     day.workout.completed = planned.every(function (exercise) { return day.exercises[exerciseId(exercise.name)] && day.exercises[exerciseId(exercise.name)].done; });
     queueSave(field === "done" || field === "load" || field === "loadFeel");
+  }
+
+  function updateExerciseSet(id, index, value) {
+    var day = getDay(state.selectedDate);
+    if (!day.exercises[id]) day.exercises[id] = {};
+    var exercise = exercisesForPlan(planForDate(state.selectedDate)).find(function (item) { return exerciseId(item.name) === id; });
+    var sets = exerciseSets(day.exercises[id], exercise || { prescription: "1 set" });
+    sets[index] = value;
+    day.exercises[id].sets = sets;
+    day.exercises[id].reps = sets.filter(function (item) { return item !== ""; }).join(", ");
+    queueSave(false);
+  }
+
+  function addExerciseSet(id) {
+    var day = getDay(state.selectedDate);
+    if (!day.exercises[id]) day.exercises[id] = {};
+    var exercise = exercisesForPlan(planForDate(state.selectedDate)).find(function (item) { return exerciseId(item.name) === id; });
+    var sets = exerciseSets(day.exercises[id], exercise || { prescription: "1 set" });
+    sets.push("");
+    day.exercises[id].sets = sets;
+    render();
   }
 
   function togglePhotoReveal(side) {
@@ -836,14 +1067,16 @@
     queueSave(true);
   }
 
-  function openMealDialog(manual, source) {
+  function openMealDialog(manual, source, editing) {
     state.mealEstimate = null;
     state.activePendingMealId = null;
+    state.editingMeal = editing || null;
     if (!source) state.adjustingFavoriteId = null;
     state.adviceImage = source && source.adviceImage || "";
     document.getElementById("meal-notes").value = source && source.notes || "";
-    document.getElementById("meal-photo").value = "";
-    document.getElementById("keep-meal-photo").checked = false;
+    clearPhotoInputs("meal-photo", "meal-photo-camera");
+    document.getElementById("keep-meal-photo").checked = Boolean(source && source.photo);
+    document.getElementById("meal-date").value = editing && editing.date || state.selectedDate;
     document.getElementById("save-meal-favorite").checked = false;
     document.getElementById("favorite-category-wrap").hidden = true;
     document.getElementById("meal-error").textContent = "";
@@ -882,7 +1115,7 @@
   function openAdviceDialog() {
     document.getElementById("advice-error").textContent = "";
     document.getElementById("advice-question").value = "";
-    document.getElementById("advice-photo").value = "";
+    clearPhotoInputs("advice-photo", "advice-photo-camera");
     renderAdviceConversation();
     openDashboardDialog(document.getElementById("advice-dialog"));
     document.getElementById("advice-close").focus({ preventScroll: true });
@@ -915,7 +1148,7 @@
 
   async function askMealAdvice() {
     var question = document.getElementById("advice-question").value.trim();
-    var file = document.getElementById("advice-photo").files[0];
+    var file = selectedPhotoFile("advice-photo", "advice-photo-camera");
     if (!question && !file) { document.getElementById("advice-error").textContent = "Ask a question or add a food photo."; return; }
     if (!question) question = "Would this food fit my goals today, and how much should I have?";
     var button = document.getElementById("ask-meal-advice");
@@ -937,7 +1170,7 @@
       state.mealAdvice.turns = state.mealAdvice.turns.slice(-8);
       state.mealAdvice.suggestion = result.suggestion || null;
       document.getElementById("advice-question").value = "";
-      document.getElementById("advice-photo").value = "";
+      clearPhotoInputs("advice-photo", "advice-photo-camera");
       renderAdviceConversation();
     } catch (error) {
       document.getElementById("advice-error").textContent = error.code === "daily_limit" ? "The free AI limit has been reached for today. Your dashboard and meal logging still work, and advice will be available again after the reset." : "Meal advice is temporarily unavailable. Nothing was logged.";
@@ -960,7 +1193,7 @@
     state.mealAdvice = { turns: [], suggestion: null };
     state.adviceImage = "";
     document.getElementById("advice-question").value = "";
-    document.getElementById("advice-photo").value = "";
+    clearPhotoInputs("advice-photo", "advice-photo-camera");
     document.getElementById("advice-error").textContent = "";
     document.getElementById("ask-meal-advice").textContent = "Ask for advice";
     renderAdviceConversation();
@@ -976,7 +1209,7 @@
 
   async function analyzeMeal() {
     var notes = document.getElementById("meal-notes").value.trim();
-    var file = document.getElementById("meal-photo").files[0];
+    var file = selectedPhotoFile("meal-photo", "meal-photo-camera");
     if (!notes && !file) { document.getElementById("meal-error").textContent = "Add a photo, notes, or both."; return; }
     var button = document.getElementById("analyze-meal");
     button.disabled = true;
@@ -1081,9 +1314,11 @@
     var pending = findPendingMeal(id);
     if (!pending || !pending.result) return;
     state.activePendingMealId = id;
+    state.editingMeal = null;
     state.mealEstimate = pending.result;
     document.getElementById("meal-notes").value = pending.notes || "";
-    document.getElementById("meal-photo").value = "";
+    clearPhotoInputs("meal-photo", "meal-photo-camera");
+    document.getElementById("meal-date").value = pending.date || state.selectedDate;
     document.getElementById("keep-meal-photo").checked = Boolean(pending.keepPhoto);
     document.getElementById("save-meal-favorite").checked = false;
     document.getElementById("favorite-category-wrap").hidden = true;
@@ -1107,6 +1342,8 @@
 
   async function saveMeal() {
     var pending = state.activePendingMealId && findPendingMeal(state.activePendingMealId);
+    var editing = state.editingMeal;
+    var existingMeal = editing && state.data.days[editing.date] && state.data.days[editing.date].meals[editing.index];
     var meal = {
       name: document.getElementById("meal-result-name").value.trim() || "Meal",
       calories: number(document.getElementById("meal-result-calories").value),
@@ -1124,7 +1361,7 @@
       includedItems: state.mealEstimate && state.mealEstimate.includedItems || "",
       nutritionBasis: state.mealEstimate && state.mealEstimate.nutritionBasis || "Manual"
     };
-    var file = document.getElementById("meal-photo").files[0];
+    var file = selectedPhotoFile("meal-photo", "meal-photo-camera");
     if (pending && pending.photoId && document.getElementById("keep-meal-photo").checked) {
       meal.photo = { id: pending.photoId };
     } else if (pending && pending.localImage && document.getElementById("keep-meal-photo").checked) {
@@ -1141,12 +1378,20 @@
         if (localMode) meal.photo = state.adviceImage;
         else { var advicePhotoId = state.selectedDate + "-meal-" + crypto.randomUUID() + ".jpg"; await uploadPhoto(advicePhotoId, adviceBlob); meal.photo = { id: advicePhotoId }; }
       } catch (error) { document.getElementById("meal-error").textContent = "The macros are ready, but the optional photo could not be saved."; return; }
+    } else if (existingMeal && existingMeal.photo && document.getElementById("keep-meal-photo").checked) {
+      meal.photo = existingMeal.photo;
     }
-    var mealDate = pending ? pending.date : state.selectedDate;
-    getDay(mealDate).meals.push(meal);
-    if (document.getElementById("save-meal-favorite").checked) {
-      var selectedCategory = document.querySelector('input[name="favorite-category"]:checked');
-      if (!selectedCategory) { document.getElementById("meal-error").textContent = "Choose a favorite category before saving."; getDay(mealDate).meals.pop(); return; }
+    var mealDate = pending ? pending.date : (document.getElementById("meal-date").value || state.selectedDate);
+    var wantsFavorite = document.getElementById("save-meal-favorite").checked;
+    var selectedCategory = wantsFavorite && document.querySelector('input[name="favorite-category"]:checked');
+    if (wantsFavorite && !selectedCategory) { document.getElementById("meal-error").textContent = "Choose a favorite category before saving."; return; }
+    if (editing && existingMeal) {
+      if (editing.date === mealDate) state.data.days[editing.date].meals.splice(editing.index, 1, meal);
+      else { state.data.days[editing.date].meals.splice(editing.index, 1); getDay(mealDate).meals.push(meal); }
+    } else {
+      getDay(mealDate).meals.push(meal);
+    }
+    if (wantsFavorite) {
       meal.category = selectedCategory.value;
       saveFavoriteFromMeal(meal, selectedCategory.value);
     } else if (state.adjustingFavoriteId) {
@@ -1159,7 +1404,11 @@
         try { await apiFetch("/photos/" + encodeURIComponent(pending.photoId), { method: "DELETE" }); } catch (ignore) {}
       }
     }
+    if (existingMeal && existingMeal.photo && existingMeal.photo !== meal.photo && typeof existingMeal.photo === "object" && existingMeal.photo.id && !localMode) {
+      try { await apiFetch("/photos/" + encodeURIComponent(existingMeal.photo.id), { method: "DELETE" }); } catch (ignore) {}
+    }
     state.activePendingMealId = null;
+    state.editingMeal = null;
     state.adjustingFavoriteId = null;
     state.adviceImage = "";
     document.getElementById("meal-dialog").close();
@@ -1182,18 +1431,20 @@
     state.pendingPhotoSide = side;
     document.getElementById("photo-title").textContent = "Add " + side + " photo";
     document.getElementById("photo-error").textContent = "";
-    document.getElementById("photo-input").value = "";
+    clearPhotoInputs("photo-input", "photo-camera-input");
+    document.getElementById("photo-camera-input").setAttribute("capture", side === "back" ? "user" : "environment");
+    document.getElementById("photo-selection").textContent = side === "back" ? "Take photo opens the selfie camera" : "Take photo opens the rear camera";
     openDashboardDialog(document.getElementById("photo-dialog"));
   }
 
   async function savePhoto() {
-    var input = document.getElementById("photo-input");
-    if (!input.files || !input.files[0]) return;
+    var file = selectedPhotoFile("photo-input", "photo-camera-input");
+    if (!file) { document.getElementById("photo-error").textContent = "Take a photo or choose one from your library."; return; }
     var button = document.getElementById("photo-submit");
     button.disabled = true;
     button.textContent = "Saving...";
     try {
-      var blob = await compressImage(input.files[0]);
+      var blob = await compressImage(file);
       var ref;
       if (localMode) {
         ref = await blobToDataUrl(blob);
@@ -1443,11 +1694,21 @@
     }) : [];
     delete data.targets.steps;
     data.preferences = Object.assign({ notifications: true }, data.preferences || {});
-    data.meta = Object.assign({}, data.meta || {}, { planVersion: "workout-2.3-2026-09-09" });
+    data.preferences.reminders = Object.assign({}, defaultData().preferences.reminders, data.preferences.reminders || {});
+    data.preferences.reminders.waterTimes = Array.isArray(data.preferences.reminders.waterTimes) ? data.preferences.reminders.waterTimes.slice(0, 2) : defaultData().preferences.reminders.waterTimes.slice();
+    data.preferences.reminders.proteinTimes = Array.isArray(data.preferences.reminders.proteinTimes) ? data.preferences.reminders.proteinTimes.slice(0, 2) : defaultData().preferences.reminders.proteinTimes.slice();
+    while (data.preferences.reminders.waterTimes.length < 2) data.preferences.reminders.waterTimes.push(defaultData().preferences.reminders.waterTimes[data.preferences.reminders.waterTimes.length]);
+    while (data.preferences.reminders.proteinTimes.length < 2) data.preferences.reminders.proteinTimes.push(defaultData().preferences.reminders.proteinTimes[data.preferences.reminders.proteinTimes.length]);
+    data.reward = Object.assign({}, defaultData().reward, data.reward || {});
+    data.meta = Object.assign({}, data.meta || {}, { planVersion: "workout-2.5-2026-09-10" });
     Object.keys(data.days || {}).forEach(function (iso) {
       var day = data.days[iso];
       day.meals = Array.isArray(day.meals) ? day.meals : [];
       day.exercises = day.exercises || {};
+      Object.keys(day.exercises).forEach(function (id) {
+        var log = day.exercises[id];
+        if (!Array.isArray(log.sets) && log.reps) log.sets = String(log.reps).split(/[,/]+/).map(function (value) { return value.trim(); }).filter(Boolean);
+      });
       day.workout = Object.assign({ completed: false, rating: "", notes: "" }, day.workout || {});
       day.cardio = Object.assign({ sessionId: "", startedAt: "", status: "" }, day.cardio || {});
       day.photos = Object.assign({ front: null, side: null, back: null }, day.photos || {});
@@ -1530,6 +1791,16 @@
     render();
     showAccessDialog();
   }
+
+  document.querySelectorAll("[data-pick-file]").forEach(function (button) { button.addEventListener("click", function () { document.getElementById(button.dataset.pickFile).click(); }); });
+  [["photo-input", "photo-camera-input"], ["meal-photo", "meal-photo-camera"], ["advice-photo", "advice-photo-camera"]].forEach(function (pair) {
+    pair.forEach(function (id, index) {
+      document.getElementById(id).addEventListener("change", function (event) {
+        if (event.target.files && event.target.files[0]) document.getElementById(pair[1 - index]).value = "";
+        if (pair[0] === "photo-input" && event.target.files && event.target.files[0]) document.getElementById("photo-selection").textContent = "Selected: " + event.target.files[0].name;
+      });
+    });
+  });
 
   document.querySelectorAll(".bottom-nav button").forEach(function (button) { button.addEventListener("click", function () {
     state.revealedPhoto = null;

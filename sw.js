@@ -1,5 +1,5 @@
-const CACHE = "workout-2-shell-v14";
-const SHELL = ["./", "./index.html", "./styles.css?v=2.3.2", "./migration.js?v=2.1.0", "./app.js?v=2.4.0", "./manifest.webmanifest?v=2.1.0"];
+const CACHE = "workout-2-shell-v15";
+const SHELL = ["./", "./index.html", "./styles.css?v=2.5.0", "./migration.js?v=2.5.0", "./app.js?v=2.5.0", "./manifest.webmanifest?v=2.5.0", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)));
@@ -26,6 +26,8 @@ self.addEventListener("push", (event) => {
   try { data = Object.assign(data, event.data.json()); } catch (_) {}
   event.waitUntil(self.registration.showNotification(data.title, {
     body: data.body,
+    icon: "./icons/icon-192.png",
+    badge: "./icons/icon-192.png",
     tag: data.tag || "workout-reminder",
     renotify: true,
     data: { url: data.url || "./" }

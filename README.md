@@ -21,7 +21,7 @@ This is the protected replacement for the original tracker. The original live da
 - Renamed the date-browsing tab to Daily and removed unreliable step entry.
 - Blurred progress photos by default with temporary tap-to-reveal privacy.
 - Added exact FEIERDUN plate instructions using the confirmed four 2.5, 3.5, 4.5, and 6.5 lb plates and an approximately 1 lb handle-and-collars assumption.
-- Added prior-load guidance and Too light / Just right / Too heavy progression feedback.
+- Added prior-load guidance and five-level progression feedback from Much too easy through Too hard.
 - Added exact guided treadmill stages and server-scheduled push alerts that continue while another app is open. September 9 is a recovery day; the training journey begins with Thursday's Upper B workout. Saturday remains 30 minutes until feedback guides progression.
 - Replaced constant treadmill polling with delayed alert messages created only when a session starts. Ordinary changes are grouped before syncing, and backups rotate through fixed slots without scanning KV after every save.
 - Meal estimates now use the free Workers AI allowance. Meal notes and photos are saved before analysis; unavailable estimates remain in a global Daily queue and retry after the allowance resets.
@@ -43,6 +43,17 @@ This is the protected replacement for the original tracker. The original live da
 - Reduced ordinary data saves from two KV writes to one by taking one rotating snapshot per active UTC day instead of backing up every edit.
 - Cached private photo downloads and coalesced in-flight requests so ordinary redraws do not repeatedly read the same photo from KV.
 - Added a build identifier to the public health response so the deployed Worker revision can be verified directly.
+
+## Workout 2.5 progress and coaching
+
+- Added set-by-set strength logging with optional extra sets, plus bodyweight variations and full effort feedback for push-ups.
+- Added editable and duplicable meal entries with explicit camera and photo-library choices.
+- Added rear-camera defaults for front/side progress photos and a selfie-camera default for back photos.
+- Added selectable 7, 14, 21, 30, 90 day, and all-history charts for weight, exercise performance, workouts, protein, calories, and water.
+- Clarified that planned-session goal counts run from the official start through today.
+- Added the Vinny's Wellness reward card and VW Home Screen icon.
+- Added configurable smart reminder categories, times, quiet hours, daily pause, and behind-pace suppression.
+- Added compact exercise form guides and stable searches of the ACE exercise library.
 
 ## Data safety
 

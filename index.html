@@ -9,8 +9,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Workout 2.0">
   <title>Workout 2.0</title>
-  <link rel="manifest" href="manifest.webmanifest?v=2.1.0">
-  <link rel="stylesheet" href="styles.css?v=2.3.2">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=2.5.0">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png?v=2.5.0">
+  <link rel="manifest" href="manifest.webmanifest?v=2.5.0">
+  <link rel="stylesheet" href="styles.css?v=2.5.0">
 </head>
 <body>
   <div id="app" aria-live="polite"></div>
@@ -40,7 +42,13 @@
     <form method="dialog" id="photo-form">
       <h2 id="photo-title">Add progress photo</h2>
       <p>Use the same lighting, distance, posture, and clothing each time.</p>
-      <input id="photo-input" type="file" accept="image/*" capture="user" required>
+      <div class="photo-source-actions">
+        <button type="button" class="primary" data-pick-file="photo-camera-input">Take photo</button>
+        <button type="button" class="secondary" data-pick-file="photo-input">Choose from library</button>
+      </div>
+      <input id="photo-camera-input" class="visually-hidden" type="file" accept="image/*" capture="environment">
+      <input id="photo-input" class="visually-hidden" type="file" accept="image/*">
+      <p id="photo-selection" class="notification-status">No photo selected</p>
       <p id="photo-error" class="error" role="alert"></p>
       <div class="dialog-actions">
         <button value="cancel" class="secondary">Cancel</button>
@@ -60,8 +68,11 @@
       <label>Meal notes
         <textarea id="meal-notes" placeholder="Example: Chipotle bowl, two scoops chicken, white rice, pinto beans, hot salsa, and cheese"></textarea>
       </label>
+      <label>Meal date<input id="meal-date" type="date"></label>
       <label>Meal photo (optional)
-        <input id="meal-photo" type="file" accept="image/*" capture="environment">
+        <div class="photo-source-actions"><button type="button" class="secondary" data-pick-file="meal-photo-camera">Take photo</button><button type="button" class="secondary" data-pick-file="meal-photo">Choose from library</button></div>
+        <input id="meal-photo-camera" class="visually-hidden" type="file" accept="image/*" capture="environment">
+        <input id="meal-photo" class="visually-hidden" type="file" accept="image/*">
       </label>
       <label class="keep-photo"><input id="keep-meal-photo" type="checkbox"> Keep this meal photo privately after analysis</label>
       <div class="row wrap">
@@ -124,7 +135,9 @@
         <textarea id="advice-question" placeholder="Example: I’m thinking about this burrito. Should I eat the whole thing, and what would fit best for dinner afterward?"></textarea>
       </label>
       <label>Food or menu photo (optional)
-        <input id="advice-photo" type="file" accept="image/*" capture="environment">
+        <div class="photo-source-actions"><button type="button" class="secondary" data-pick-file="advice-photo-camera">Take photo</button><button type="button" class="secondary" data-pick-file="advice-photo">Choose from library</button></div>
+        <input id="advice-photo-camera" class="visually-hidden" type="file" accept="image/*" capture="environment">
+        <input id="advice-photo" class="visually-hidden" type="file" accept="image/*">
       </label>
       <div class="row wrap">
         <button type="button" id="ask-meal-advice" class="primary">Ask for advice</button>
@@ -136,7 +149,7 @@
     </form>
   </dialog>
 
-  <script src="migration.js?v=2.1.0"></script>
-  <script src="app.js?v=2.4.0"></script>
+  <script src="migration.js?v=2.5.0"></script>
+  <script src="app.js?v=2.5.0"></script>
 </body>
 </html>

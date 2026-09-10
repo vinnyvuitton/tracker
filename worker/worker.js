@@ -4,7 +4,7 @@ const MAX_DATA_BYTES = 24 * 1024 * 1024;
 const MAX_PHOTO_BYTES = 1024 * 1024;
 const BACKUP_LIMIT = 30;
 const MEAL_MODEL = "@cf/google/gemma-4-26b-a4b-it";
-const BUILD_ID = "workout-2.4-kv-hardening";
+const BUILD_ID = "workout-2.5-progress-coaching";
 
 export default {
   async fetch(request, env, ctx) {
@@ -470,25 +470,61 @@ async function deliverAlertMessage(body, env) {
 async function sendDailyReminder(now, env) {
   const parts = chicagoParts(new Date(now));
   const hhmm = parts.hour.padStart(2, "0") + parts.minute.padStart(2, "0");
-  const allowed = ["0410", "0700", "1200", "1630", "2030"];
-  if (!allowed.includes(hhmm)) return;
-  const marker = "reminder:" + parts.iso + ":" + hhmm;
-  if (await env.TRACKER_KV.get(marker)) return;
   const saved = await env.TRACKER_KV.get(DATA_KEY, "json");
   const day = saved && saved.payload && saved.payload.days && saved.payload.days[parts.iso] || {};
   const targets = saved && saved.payload && saved.payload.targets || { protein: 150, water: 10 };
+  const reminders = saved && saved.payload && saved.payload.preferences && saved.payload.preferences.reminders || {
+    workout: true, water: true, protein: true, pausedDate: "", workoutTime: "04:10", waterTimes: ["07:00", "16:30"], proteinTimes: ["12:00", "20:30"], quietStart: "23:00", quietEnd: "04:00"
+  };
+  if (reminders.pausedDate === parts.iso || inQuietHours(hhmm, reminders.quietStart, reminders.quietEnd)) return;
+  let type = "";
+  if (hhmm === compactTime(reminders.workoutTime)) type = "workout";
+  if ((reminders.waterTimes || []).some((value) => hhmm === compactTime(value))) type = "water";
+  if ((reminders.proteinTimes || []).some((value) => hhmm === compactTime(value))) type = "protein";
+  if (!type || reminders[type] === false) return;
+  const marker = "reminder:" + parts.iso + ":" + type + ":" + hhmm;
+  if (await env.TRACKER_KV.get(marker)) return;
   const totals = (day.meals || []).reduce((sum, meal) => ({ protein: sum.protein + (Number(meal.protein) || 0), calories: sum.calories + (Number(meal.calories) || 0) }), { protein: 0, calories: 0 });
   const proteinLeft = Math.max(0, Math.round((Number(targets.protein) || 150) - totals.protein));
   const waterLeft = Math.max(0, (Number(targets.water) || 10) - (Number(day.water) || 0));
   const workoutNames = { Sun: "Recovery Day", Mon: "Upper A", Tue: "Lower A + Core", Wed: "Cardio 1", Thu: "Upper B", Fri: "Lower B + Core", Sat: "Cardio 2" };
   let message;
-  if (hhmm === "0410") message = { title: "Good morning, Vinny", body: workoutNames[parts.weekday] + " is ready. Start when you are dressed and hydrated." };
-  if (hhmm === "0700") message = { title: "Morning hydration", body: waterLeft ? "Have a glass of water now—" + waterLeft + " of today’s 10 remain." : "Hydration goal already handled. Nice work." };
-  if (hhmm === "1200") message = { title: "Midday protein check", body: proteinLeft ? "About " + proteinLeft + " g protein remain today. Make lunch do some of the work." : "You already hit today’s protein target." };
-  if (hhmm === "1630") message = { title: "Afternoon reset", body: waterLeft ? "A glass of water now keeps dinner from doing all the catching up." : "Water goal complete—keep cruising." };
-  if (hhmm === "2030") message = { title: "Evening check", body: proteinLeft ? "About " + proteinLeft + " g protein remain. Choose a simple protein-forward option if you’re hungry." : "Protein target complete. Strong finish today." };
+  if (type === "workout") {
+    if (day.workout && day.workout.completed) return;
+    message = { title: "Good morning, Vinny", body: workoutNames[parts.weekday] + " is ready when you are dressed and hydrated." };
+  }
+  if (type === "water") {
+    const expected = pacedTarget(Number(targets.water) || 10, hhmm, reminders.quietEnd, reminders.quietStart);
+    if (!waterLeft || Number(day.water || 0) >= expected) return;
+    message = { title: "Hydration pace check", body: "You’re at " + Number(day.water || 0) + " of " + (Number(targets.water) || 10) + " glasses. Around " + expected + " by now keeps the rest of the day comfortable." };
+  }
+  if (type === "protein") {
+    const expected = pacedTarget(Number(targets.protein) || 150, hhmm, reminders.quietEnd, reminders.quietStart);
+    if (!proteinLeft || totals.protein >= expected) return;
+    message = { title: "Protein pace check", body: "About " + proteinLeft + " g remain today. Aim to be near " + expected + " g by now so dinner doesn’t have to do all the work." };
+  }
+  if (!message) return;
   await broadcastPush(env, { ...message, tag: marker, url: "https://vinnyvuitton.github.io/tracker/" });
   await env.TRACKER_KV.put(marker, "1", { expirationTtl: 172800 });
+}
+
+function compactTime(value) { return String(value || "").replace(":", ""); }
+
+function minuteOfDay(value) {
+  const compact = compactTime(value).padStart(4, "0");
+  return Number(compact.slice(0, 2)) * 60 + Number(compact.slice(2, 4));
+}
+
+function inQuietHours(now, start, end) {
+  const current = minuteOfDay(now), from = minuteOfDay(start || "23:00"), to = minuteOfDay(end || "04:00");
+  return from > to ? current >= from || current < to : current >= from && current < to;
+}
+
+function pacedTarget(target, now, wake, sleep) {
+  const current = minuteOfDay(now), start = minuteOfDay(wake || "04:00"), end = minuteOfDay(sleep || "23:00");
+  const span = Math.max(60, end > start ? end - start : end + 1440 - start);
+  const elapsed = Math.max(0, current >= start ? current - start : current + 1440 - start);
+  return Math.min(target, Math.max(1, Math.ceil(target * Math.min(1, elapsed / span))));
 }
 
 function chicagoParts(date) {
@@ -585,4 +621,4 @@ function json(body, status, extraHeaders) {
   return new Response(JSON.stringify(body), { status, headers });
 }
 
-export { chicagoParts, deliverAlertMessage, parseMealEstimate, sendWebPush };
+export { chicagoParts, compactTime, deliverAlertMessage, inQuietHours, pacedTarget, parseMealEstimate, sendWebPush };
