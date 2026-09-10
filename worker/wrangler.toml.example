@@ -9,7 +9,9 @@ VAPID_PUBLIC_KEY = "REPLACE_WITH_PUBLIC_VAPID_KEY"
 VAPID_SUBJECT = "https://YOUR_GITHUB_USERNAME.github.io/YOUR_REPOSITORY/"
 
 [triggers]
-crons = ["*/10 * * * *"]
+# Candidate UTC times for the five America/Chicago reminders in both CST and CDT.
+# The Worker verifies local HH:MM before reading or writing KV.
+crons = ["10 9,10 * * *", "0 12,13,17,18 * * *", "30 1,2,21,22 * * *"]
 
 [ai]
 binding = "AI"

@@ -153,7 +153,8 @@
     saveDirty: false,
     savePromise: null,
     pendingPhotoSide: null,
-    photoUrls: [],
+    photoUrls: new Map(),
+    photoRequests: new Map(),
     revealedPhoto: null,
     mealEstimate: null,
     activePendingMealId: null,
@@ -387,8 +388,6 @@
   function exerciseId(name) { return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); }
 
   function render() {
-    state.photoUrls.forEach(function (url) { URL.revokeObjectURL(url); });
-    state.photoUrls = [];
     document.querySelectorAll(".bottom-nav button").forEach(function (button) { button.classList.toggle("active", button.dataset.view === state.view); });
     var app = document.getElementById("app");
     if (state.view === "today") app.innerHTML = renderToday();
@@ -1253,15 +1252,30 @@
       var ref = img.dataset.photoRef;
       if (ref.indexOf("data:") === 0) { img.src = ref; return; }
       if (ref.indexOf("r2:") === 0) {
+        if (state.photoUrls.has(ref)) { img.src = state.photoUrls.get(ref); return; }
         try {
-          var response = await apiFetch("/photos/" + encodeURIComponent(ref.slice(3)), { method: "GET" }, true);
-          var blob = await response.blob();
-          var url = URL.createObjectURL(blob);
-          state.photoUrls.push(url);
-          img.src = url;
+          var pending = state.photoRequests.get(ref);
+          if (!pending) {
+            pending = (async function () {
+              var response = await apiFetch("/photos/" + encodeURIComponent(ref.slice(3)), { method: "GET" }, true);
+              var blob = await response.blob();
+              var url = URL.createObjectURL(blob);
+              state.photoUrls.set(ref, url);
+              return url;
+            })();
+            state.photoRequests.set(ref, pending);
+            pending.then(function () { state.photoRequests.delete(ref); }, function () { state.photoRequests.delete(ref); });
+          }
+          img.src = await pending;
         } catch (error) { img.alt = "Photo unavailable"; }
       }
     }));
+  }
+
+  function clearPhotoUrls() {
+    state.photoUrls.forEach(function (url) { URL.revokeObjectURL(url); });
+    state.photoUrls.clear();
+    state.photoRequests.clear();
   }
 
   async function uploadPhoto(id, blob) {
@@ -1510,6 +1524,7 @@
 
   function lockTracker() {
     localStorage.removeItem(TOKEN_KEY);
+    clearPhotoUrls();
     state.data = defaultData();
     state.sync = "Locked";
     render();

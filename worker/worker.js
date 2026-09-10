@@ -4,6 +4,7 @@ const MAX_DATA_BYTES = 24 * 1024 * 1024;
 const MAX_PHOTO_BYTES = 1024 * 1024;
 const BACKUP_LIMIT = 30;
 const MEAL_MODEL = "@cf/google/gemma-4-26b-a4b-it";
+const BUILD_ID = "workout-2.4-kv-hardening";
 
 export default {
   async fetch(request, env, ctx) {
@@ -20,7 +21,7 @@ export default {
 
     const url = new URL(request.url);
     if (url.pathname === "/health" && request.method === "GET") {
-      return json({ ok: true, service: "workout-2" }, 200, cors);
+      return json({ ok: true, service: "workout-2", build: BUILD_ID }, 200, cors);
     }
 
     if (origin && origin !== allowedOrigin && !isLocalOrigin(origin, env)) {
@@ -148,13 +149,24 @@ async function saveData(request, env, cors) {
     return json({ error: "Version conflict", currentVersion }, 409, cors);
   }
 
-  const next = { version: currentVersion + 1, savedAt: new Date().toISOString(), payload: body.payload };
-  if (current) {
-    const backupKey = "backup:" + String(current.version % BACKUP_LIMIT).padStart(2, "0");
+  const savedAt = new Date().toISOString();
+  const next = { version: currentVersion + 1, savedAt, payload: body.payload };
+  if (current && utcDate(current.savedAt) !== utcDate(savedAt)) {
+    const backupKey = "backup:" + String(utcDayNumber(savedAt) % BACKUP_LIMIT).padStart(2, "0");
     await env.TRACKER_KV.put(backupKey, JSON.stringify(current));
   }
   await env.TRACKER_KV.put(DATA_KEY, JSON.stringify(next));
   return json({ ok: true, version: next.version, savedAt: next.savedAt }, 200, cors);
+}
+
+function utcDate(value) {
+  const parsed = new Date(value);
+  return Number.isFinite(parsed.getTime()) ? parsed.toISOString().slice(0, 10) : "";
+}
+
+function utcDayNumber(value) {
+  const parsed = new Date(value);
+  return Number.isFinite(parsed.getTime()) ? Math.floor(parsed.getTime() / 86400000) : 0;
 }
 
 async function handlePhoto(request, env, rawId, cors) {

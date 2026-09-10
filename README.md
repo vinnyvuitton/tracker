@@ -37,6 +37,13 @@ This is the protected replacement for the original tracker. The original live da
 - Made every bottom navigation tap return its view to the top.
 - Locked the dashboard background behind every popup while preserving scrolling inside longer popup content on iPhone.
 
+## Workout 2.4 KV hardening
+
+- Reduced reminder scheduling from 144 Worker wakeups per day to 10 daylight-saving-safe candidate times, with only the five matching Chicago reminders touching KV.
+- Reduced ordinary data saves from two KV writes to one by taking one rotating snapshot per active UTC day instead of backing up every edit.
+- Cached private photo downloads and coalesced in-flight requests so ordinary redraws do not repeatedly read the same photo from KV.
+- Added a build identifier to the public health response so the deployed Worker revision can be verified directly.
+
 ## Data safety
 
 The access code is never committed to source control. It is stored as a Cloudflare Worker secret and entered once on each device. The browser keeps it locally on that device.
@@ -45,7 +52,7 @@ The private Web Push signing key is stored as an encrypted Worker secret. Meal e
 
 Progress and meal photos are compressed in the browser and stored as separate private objects. They are fetched through the authenticated Worker and are never assigned a public URL. A meal photo is kept temporarily while an estimate is pending, then deleted after confirmation unless Keep this meal photo is selected.
 
-The Worker retains 30 rotating prior tracker versions in KV. The Check-in screen also provides a private JSON backup download.
+The Worker retains 30 rotating daily tracker snapshots in KV. The Check-in screen also provides a private JSON backup download.
 
 ## Deployment order
 
