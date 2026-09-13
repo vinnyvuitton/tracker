@@ -4,7 +4,7 @@ const MAX_DATA_BYTES = 24 * 1024 * 1024;
 const MAX_PHOTO_BYTES = 1024 * 1024;
 const BACKUP_LIMIT = 30;
 const MEAL_MODEL = "@cf/google/gemma-4-26b-a4b-it";
-const BUILD_ID = "workout-2.5-progress-coaching";
+const BUILD_ID = "workout-2.6-weekly-coaching";
 
 export default {
   async fetch(request, env, ctx) {
@@ -47,6 +47,9 @@ export default {
       }
       if (url.pathname === "/meals/advise" && request.method === "POST") {
         return await adviseMeal(request, env, cors);
+      }
+      if (url.pathname === "/treadmill/analyze" && request.method === "POST") {
+        return await analyzeTreadmill(request, env, cors);
       }
       if (url.pathname === "/notifications/status" && request.method === "GET") {
         return json({ configured: Boolean(env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_JWK), publicKey: env.VAPID_PUBLIC_KEY || "" }, 200, cors);
@@ -310,6 +313,36 @@ function nullableNutrition(value) {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 }
 
+async function analyzeTreadmill(request, env, cors) {
+  if (!env.AI) return json({ error: "Treadmill screen analysis is not configured" }, 503, cors);
+  const body = await request.json();
+  const photoId = String(body && body.photoId || "");
+  let image = String(body && body.image || "");
+  if (photoId) {
+    if (!/^[a-zA-Z0-9._-]{1,180}$/.test(photoId)) return json({ error: "Invalid treadmill photo" }, 400, cors);
+    let photoBytes;
+    if (env.TRACKER_PHOTOS) { const object = await env.TRACKER_PHOTOS.get(photoId); if (object) photoBytes = await new Response(object.body).arrayBuffer(); }
+    else photoBytes = await env.TRACKER_KV.get("photo:" + photoId, "arrayBuffer");
+    if (!photoBytes) return json({ error: "Treadmill photo could not be found" }, 404, cors);
+    image = "data:image/jpeg;base64," + bytesToBase64(new Uint8Array(photoBytes));
+  }
+  if (!image || !image.startsWith("data:image/jpeg;base64,") || image.length > 2_000_000) return json({ error: "Add a valid treadmill photo" }, 400, cors);
+  const schema = { type: "object", additionalProperties: false, properties: {
+    durationMinutes: { type: ["number", "null"], minimum: 0 }, distanceMiles: { type: ["number", "null"], minimum: 0 },
+    calories: { type: ["number", "null"], minimum: 0 }, averageSpeedMph: { type: ["number", "null"], minimum: 0 },
+    incline: { type: ["number", "null"], minimum: 0 }, notes: { type: "string" }
+  }, required: ["durationMinutes", "distanceMiles", "calories", "averageSpeedMph", "incline", "notes"] };
+  const result = await env.AI.run(MEAL_MODEL, { messages: [
+    { role: "system", content: "Read only values visibly displayed on this treadmill results screen. Never infer a value that is not visible. Use null for anything absent or unclear. Return only the requested JSON." },
+    { role: "user", content: [{ type: "text", text: "Extract the treadmill workout results for user review." }, { type: "image_url", image_url: { url: image } }] }
+  ], response_format: { type: "json_schema", json_schema: schema }, max_completion_tokens: 240, temperature: 0, chat_template_kwargs: { enable_thinking: false } });
+  const output = result && (result.response || result.choices && result.choices[0] && result.choices[0].message && result.choices[0].message.content);
+  try {
+    const parsed = typeof output === "object" ? output : JSON.parse(String(output || "").replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, ""));
+    return json({ durationMinutes: nullableNutrition(parsed.durationMinutes), distanceMiles: nullableNutrition(parsed.distanceMiles), calories: nullableNutrition(parsed.calories), averageSpeedMph: nullableNutrition(parsed.averageSpeedMph), incline: nullableNutrition(parsed.incline), notes: String(parsed.notes || "").slice(0, 300) }, 200, cors);
+  } catch (_) { return json({ error: "Treadmill results could not be read" }, 502, cors); }
+}
+
 async function adviseMeal(request, env, cors) {
   if (!env.AI) return json({ error: "Meal advice is not configured", code: "not_configured" }, 503, cors);
   const body = await request.json();
@@ -429,8 +462,15 @@ async function startCardioAlerts(request, env, cors) {
   if (!alerts.length) return json({ error: "No cardio alerts supplied" }, 400, cors);
   const id = crypto.randomUUID();
   const startedAt = Date.now();
+  const startAlert = body && body.startAlert ? {
+    title: String(body.startAlert.title || "Time to rock 🤘🏻").slice(0, 90),
+    body: String(body.startAlert.body || "Your treadmill session is ready.").slice(0, 240),
+    tag: "cardio-start-" + id,
+    url: "https://vinnyvuitton.github.io/tracker/"
+  } : null;
   await env.TRACKER_KV.put("cardio:" + id, JSON.stringify({ id, date: String(body.date || ""), title: String(body.title || "Cardio"), startedAt, alerts, sent: [], status: "active" }), { expirationTtl: 7200 });
   try {
+    if (startAlert) await broadcastPush(env, startAlert);
     await Promise.all(alerts.map((alert, index) => env.ALERT_QUEUE.send({
       type: "cardio",
       sessionId: id,

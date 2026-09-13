@@ -17,6 +17,7 @@
 
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--text); min-height: 100vh; }
+body::before { content: ""; position: fixed; z-index: 9; inset: 0 0 auto; height: var(--safe-top); background: var(--bg); pointer-events: none; }
 html.dialog-open, body.dialog-open { overflow: hidden; overscroll-behavior: none; }
 body.dialog-open { position: fixed; left: 0; right: 0; width: 100%; }
 body.dialog-open #app, body.dialog-open .bottom-nav { touch-action: none; }
@@ -75,6 +76,12 @@ textarea { resize: vertical; min-height: 74px; }
 .exercise input[type="checkbox"]:checked { background: var(--good); border-color: var(--good); }
 .exercise input[type="checkbox"]:checked::after { content: "✓"; display: grid; place-items: center; height: 100%; color: #07120d; font-weight: 900; }
 .exercise-name { font-weight: 750; }
+.equipment-badge { display: inline-flex; gap: 2px; margin-left: 8px; color: var(--muted); font-size: 11px; font-weight: 700; vertical-align: middle; }
+.equipment-prep { display: grid; gap: 4px; margin-bottom: 12px; padding: 12px; border: 1px solid color-mix(in srgb, var(--accent-2) 45%, var(--line)); border-radius: 12px; background: color-mix(in srgb, var(--accent-2) 7%, var(--panel)); }
+.equipment-prep span, .equipment-prep small { color: var(--muted); }
+.recovery-option { margin: 10px 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 11px; }
+.recovery-option summary { color: var(--blue); font-weight: 750; }
+.recovery-option p { margin-bottom: 0; font-size: 12px; }
 .exercise-prescription { margin-top: 4px; color: var(--accent-2); font-size: 12px; }
 .exercise-tip { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
 .form-guide { margin-top: 8px; font-size: 12px; color: var(--muted); }
@@ -106,7 +113,8 @@ textarea { resize: vertical; min-height: 74px; }
 .photo-slot .reveal-photo { color: white; font-weight: 800; text-shadow: 0 1px 8px #000; }
 .photo-slot .remove-photo { inset: 6px 6px auto auto; width: 28px; height: 28px; border-radius: 50%; background: rgba(0,0,0,.72); color: white; }
 
-.meal { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px; align-items: center; padding: 11px 0; border-top: 1px solid var(--line); }
+.meal { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 11px 0; border-top: 1px solid var(--line); }
+.meal.has-photo { grid-template-columns: 52px minmax(0, 1fr) auto auto; }
 .meal:first-of-type { border-top: 0; }
 .meal strong { display: block; }
 .meal small { color: var(--muted); }
@@ -114,6 +122,17 @@ textarea { resize: vertical; min-height: 74px; }
 .meal .meal-summary { padding: 0; text-align: left; color: var(--text); }
 .meal-summary small, .meal-summary span { display: block; }
 .meal-summary span { margin-top: 3px; color: var(--blue); font-size: 11px; }
+.meal-photo { position: relative; width: 52px; height: 52px; overflow: hidden; border-radius: 10px; background: #0f0f12; }
+.meal-photo img { width: 100%; height: 100%; object-fit: cover; filter: blur(10px); transform: scale(1.12); }
+.meal-photo.revealed img { filter: none; transform: scale(1); }
+.meal-photo button { position: absolute; inset: 0; padding: 2px; color: white; font-size: 9px; font-weight: 800; text-shadow: 0 1px 5px #000; }
+.meal-photo button:last-child { inset: 2px 2px auto auto; width: 22px; height: 22px; border-radius: 50%; background: rgba(0,0,0,.7); }
+.quantity-stepper, .stepper { display: grid; grid-template-columns: 34px 44px 34px; gap: 4px; align-items: center; }
+.quantity-stepper button, .stepper button { min-width: 34px; height: 38px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel-2); color: var(--text); font-size: 20px; }
+.quantity-stepper input, .stepper input { padding: 8px 3px; text-align: center; }
+.stepper { grid-template-columns: 42px minmax(58px, 1fr) 42px; }
+.favorites-panel { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.favorites-panel > summary, .favorite-manager summary { color: var(--blue); cursor: pointer; font-size: 14px; font-weight: 750; }
 .meal-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
 .favorite-picker { display: grid; grid-template-columns: minmax(110px, .8fr) minmax(150px, 1.2fr); gap: 8px; margin: 8px 0; }
 .favorite-picker-actions { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -122,6 +141,8 @@ textarea { resize: vertical; min-height: 74px; }
 .favorite-manager summary, .nutrition-details summary, .nutrition-entry-details summary { color: var(--blue); cursor: pointer; font-size: 14px; font-weight: 750; }
 .favorite-edit { display: grid; grid-template-columns: minmax(0, 1fr) minmax(110px, .6fr) auto; gap: 7px; align-items: center; margin-top: 9px; }
 .favorite-edit button { border: 0; background: transparent; color: #ff7770; padding: 8px; }
+.existing-meal-photo { display: grid; grid-template-columns: 64px 1fr; gap: 10px; align-items: center; color: var(--muted); font-size: 12px; }
+.existing-meal-photo img { width: 64px; height: 64px; border-radius: 10px; object-fit: cover; filter: blur(10px); }
 .macro-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px; }
 .keep-photo { grid-template-columns: 22px 1fr; align-items: center; text-transform: none; letter-spacing: 0; }
 .keep-photo input { width: 20px; height: 20px; }
@@ -157,6 +178,8 @@ textarea { resize: vertical; min-height: 74px; }
 
 .progress-bar { height: 8px; background: #27272d; border-radius: 99px; overflow: hidden; }
 .progress-bar span { display: block; height: 100%; background: var(--good); border-radius: inherit; transition: width .45s ease; }
+.nutrition-stat.over .progress-bar span { background: var(--accent); }
+.target-status { margin: 7px 0 0; font-size: 11px; }
 .metric { margin-top: 14px; }
 .metric-copy { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 7px; font-size: 12px; }
 .metric-copy span:last-child { color: var(--muted); }
@@ -174,13 +197,7 @@ textarea { resize: vertical; min-height: 74px; }
 .progress-chart .chart-target { stroke: var(--good); stroke-width: 2; stroke-dasharray: 7 7; opacity: .75; }
 .progress-chart .chart-label { fill: var(--muted); font-size: 12px; }
 .chart-empty { margin-top: 12px; border: 1px dashed var(--line); border-radius: 12px; }
-.reward-card { position: relative; overflow: hidden; border-color: color-mix(in srgb, var(--accent) 48%, var(--line)); }
-.reward-mark { position: absolute; right: -8px; top: -25px; color: color-mix(in srgb, var(--accent) 10%, transparent); font-size: 130px; font-weight: 950; letter-spacing: -.16em; pointer-events: none; }
-.reward-percent { color: var(--accent-2); font-size: 28px; font-weight: 900; }
-.reward-bar span { background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
-.reward-settings, .target-explainer { margin-top: 14px; }
-.reward-settings summary, .target-explainer summary, .reminder-settings summary { color: var(--blue); cursor: pointer; font-weight: 750; }
-.target-explainer p { color: var(--muted); font-size: 13px; line-height: 1.45; }
+.reminder-settings summary { color: var(--blue); cursor: pointer; font-weight: 750; }
 .checkin-output { min-height: 320px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
 .notice { border-left: 3px solid var(--blue); padding: 10px 12px; background: color-mix(in srgb, var(--blue) 9%, var(--panel)); border-radius: 0 10px 10px 0; color: var(--muted); font-size: 12px; }
 .notification-card { display: grid; gap: 11px; }
@@ -198,6 +215,15 @@ textarea { resize: vertical; min-height: 74px; }
 .cardio-step strong, .cardio-step span { display: block; }
 .cardio-step span { color: var(--muted); font-size: 12px; margin-top: 3px; }
 .cardio-controls { display: flex; gap: 8px; flex-wrap: wrap; }
+.cardio-mode { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin: 10px 0; }
+.cardio-mode button { border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: var(--panel-2); color: var(--muted); }
+.cardio-mode button.active { color: var(--text); border-color: var(--blue); background: color-mix(in srgb, var(--blue) 12%, var(--panel-2)); }
+.treadmill-result { display: grid; gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.treadmill-result .meal-photo { width: 100%; height: 150px; }
+.treadmill-result small { color: var(--muted); }
+.treadmill-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); gap: 7px; }
+.treadmill-fields label { color: var(--muted); font-size: 11px; }
+.treadmill-fields input { margin-top: 4px; }
 .active-session { border-color: var(--good); }
 .error { color: #ff7770; min-height: 18px; }
 
@@ -205,7 +231,7 @@ textarea { resize: vertical; min-height: 74px; }
 .bottom-nav button { border: 0; background: transparent; color: var(--muted); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; padding: 10px 2px; }
 .bottom-nav button.active { color: var(--text); }
 
-dialog { width: min(92vw, 440px); max-height: calc(100dvh - 24px - var(--safe-top) - var(--safe-bottom)); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); color: var(--text); padding: 20px; }
+dialog { position: fixed; width: min(92vw, 440px); max-height: calc(100dvh - 24px - var(--safe-top) - var(--safe-bottom)); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); color: var(--text); padding: 20px; }
 dialog::backdrop { background: rgba(0,0,0,.75); backdrop-filter: blur(3px); overscroll-behavior: none; touch-action: none; }
 dialog form { position: relative; display: grid; gap: 12px; }
 dialog label { display: grid; gap: 6px; color: var(--muted); font-size: 12px; }
@@ -224,6 +250,11 @@ dialog label { display: grid; gap: 6px; color: var(--muted); font-size: 12px; }
   .pending-actions { justify-content: flex-start; }
   .favorite-picker, .favorite-edit { grid-template-columns: 1fr; }
   .favorite-edit button { justify-self: start; }
+  .meal { grid-template-columns: minmax(0, 1fr) auto; }
+  .meal.has-photo { grid-template-columns: 52px minmax(0, 1fr) auto; }
+  .quantity-stepper { grid-column: 1 / -1; justify-self: end; }
+  .meal.has-photo .quantity-stepper { grid-column: 2 / -1; }
+  dialog { inset: auto 0 0; width: 100%; max-width: none; max-height: calc(100dvh - var(--safe-top) - 8px); margin: 0; padding: 20px 18px calc(18px + var(--safe-bottom)); border-radius: 20px 20px 0 0; }
 }
 
 @media (prefers-reduced-motion: no-preference) {

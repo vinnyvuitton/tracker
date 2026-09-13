@@ -55,6 +55,16 @@ This is the protected replacement for the original tracker. The original live da
 - Added configurable smart reminder categories, times, quiet hours, daily pause, and behind-pace suppression.
 - Added compact exercise form guides and stable searches of the ACE exercise library.
 
+## Workout 2.6 weekly coaching and logging
+
+- Replaced the fixed 1,700-calorie and 150 g protein goals with an 1,850-calorie starting target and flexible daily zones of 1,750–1,950 calories and 135–150 g protein.
+- Made weekly exports use the last fully completed Sunday–Saturday only, with all seven daily nutrition, weight, and water records plus weekly totals, averages, recovery, training, and treadmill results.
+- Removed the Wellness reward card while preserving the VW Home Screen icon.
+- Added meal quantity controls, retained-photo previews, a calmer fixed iPhone meal editor, collapsible favorites, and stable favorite editing.
+- Added water controls, at-a-glance dumbbell and plate preparation, complete core effort logging, explicit side-plank timing, and a fully written recovery mobility routine.
+- Added supported balance options for lower-body training and a lower-day recovery version.
+- Expanded Saturday cardio to a full 60-minute plan with a 30-minute express option, incline-first alerts, an immediate “Time to rock 🤘🏻” confirmation, and optional treadmill-result photo analysis with editable results.
+
 ## Data safety
 
 The access code is never committed to source control. It is stored as a Cloudflare Worker secret and entered once on each device. The browser keeps it locally on that device.

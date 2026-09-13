@@ -13,6 +13,7 @@
   var DUMBBELL_HANDLE_WEIGHT = 1;
   var LOAD_OPTIONS = buildLoadOptions();
   var MEAL_CATEGORIES = ["breakfast", "lunch", "dinner", "snack"];
+  var NUTRITION_FIELDS = ["calories", "protein", "carbs", "fat", "fiber", "saturatedFat", "addedSugar", "sodium"];
   var PROGRESS_RANGES = [7, 14, 21, 30, 90, "all"];
   var EFFORT_OPTIONS = [
     { value: "much-too-easy", label: "Much too easy" },
@@ -31,7 +32,12 @@
       type: "Recovery",
       sections: [{ label: "Restore", exercises: [
         ex("Easy Walk", "20 to 40 minutes", "Comfortable pace. You should finish feeling better than when you started."),
-        ex("Mobility Flow", "8 to 10 minutes", "Move gently through hips, ankles, upper back, and shoulders. Nothing should hurt.")
+        ex("Cat-Cow", "6 slow reps", "Move gently between rounding and extending your upper back."),
+        ex("Thread the Needle", "5 reps each side", "Rotate through your upper back without forcing the shoulder."),
+        ex("Half-Kneeling Hip Flexor Stretch", "30 seconds each side", "Squeeze the back-leg glute and keep your ribs stacked."),
+        ex("90/90 Hip Switch", "8 controlled reps", "Rotate both knees side to side without rushing."),
+        ex("Ankle Rock", "10 reps each side", "Drive the knee forward while keeping the heel down."),
+        ex("Wall Slide", "8 controlled reps", "Keep ribs down and slide your arms only as high as comfortable.")
       ] }]
     },
     Mon: {
@@ -98,10 +104,10 @@
       type: "Strength",
       sections: [
         { label: "Lower Body", exercises: [
-          ex("Bulgarian Split Squat", "3 sets of 8 to 12 each side", "Start with bodyweight if balance is the limiting factor.", load(10, 2)),
+          ex("Bulgarian Split Squat", "3 sets of 8 to 12 each side", "Use one hand on the bench for balance. Keep the current load until every rep feels stable.", load(10, 2)),
           ex("Dumbbell Hip Thrust", "3 sets of 10 to 15", "Pause and squeeze your glutes at the top.", load(21, 1)),
           ex("Dumbbell Sumo Squat", "3 sets of 10 to 15", "Use a wide stance and keep your knees tracking over your toes.", load(21, 1)),
-          ex("Single Leg Romanian Deadlift", "2 sets of 8 to 12 each side", "Use the bench for balance and keep your hips square.", load(13, 1)),
+          ex("Supported Kickstand Romanian Deadlift", "2 sets of 8 to 12 each side", "Use the bench for support, keep the back toes down as a kickstand, and make balance automatic.", load(10, 1)),
           ex("Standing Calf Raise", "3 sets of 12 to 20", "Pause at the top and lower slowly.", load(15, 2))
         ] },
         { label: "Core", exercises: [
@@ -112,10 +118,11 @@
     },
     Sat: {
       title: "Cardio 2",
-      subtitle: "Steady treadmill work",
+      subtitle: "60-minute steady treadmill endurance",
       type: "Cardio",
       cardioSegments: cardioTwo(),
-      sections: [{ label: "Treadmill", exercises: [ex("30-Minute Guided Walk", "Follow the six 5-minute stages", "Start the dashboard timer, then watch YouTube. Your phone will alert you at every change.")] }]
+      expressSegments: cardioTwoExpress(),
+      sections: [{ label: "Treadmill", exercises: [ex("60-Minute Steady Walk", "Full 60 minutes or 30-minute express option", "Target 5–6/10 effort. Start the dashboard timer, then watch YouTube while alerts guide every change.")] }]
     }
   };
 
@@ -168,12 +175,15 @@
     activePendingMealId: null,
     adjustingFavoriteId: null,
     favoriteFilter: "all",
+    favoritesOpen: false,
+    favoriteManagerOpen: false,
     mealAdvice: { turns: [], suggestion: null },
     adviceImage: "",
     editingMeal: null,
     progressRange: 21,
     progressMetric: "weight",
     progressExercise: "dumbbell-flat-bench-press",
+    cardioMode: "full",
     pendingRetryStarted: false,
     pendingRetryTimer: null,
     serviceWorker: null,
@@ -202,25 +212,38 @@
 
   function cardioTwo() {
     return [
-      cardio(0, 5, 2.5, 0, "Easy warmup"), cardio(5, 10, 2.9, 2, "Smooth brisk walk"),
-      cardio(10, 15, 3.0, 3, "Effort check: easy add 1 incline level; right stay; hard subtract 1"),
-      cardio(15, 20, 3.1, 3, "Stay tall and keep your hands off the rails"),
-      cardio(20, 25, 3.0, 2, "Second effort check: easy add 1 incline level; right stay; hard subtract 1"),
-      cardio(25, 30, 2.4, 0, "Cooldown")
+      cardio(0, 5, 2.5, 0, "Easy warmup"),
+      cardio(5, 15, 3.0, 2, "Settle into a smooth brisk walk"),
+      cardio(15, 25, 3.1, 3, "Stay tall and keep your hands off the rails"),
+      cardio(25, 35, 3.2, 4, "Target 5–6/10. If still below 5/10, add one incline level"),
+      cardio(35, 45, 3.1, 3, "Strong but sustainable"),
+      cardio(45, 55, 3.0, 2, "Ease back while keeping a purposeful pace"),
+      cardio(55, 60, 2.5, 0, "Easy cooldown")
+    ];
+  }
+
+  function cardioTwoExpress() {
+    return [
+      cardio(0, 5, 2.5, 0, "Easy warmup"), cardio(5, 10, 3.0, 2, "Smooth brisk walk"),
+      cardio(10, 20, 3.1, 3, "Stay tall and keep your hands off the rails"),
+      cardio(20, 25, 3.2, 4, "Target 5–6/10 effort"), cardio(25, 30, 2.5, 0, "Easy cooldown")
     ];
   }
 
   function cardio(start, end, speed, incline, cue) { return { start: start, end: end, speed: speed, incline: incline, cue: cue }; }
 
   function cardioDuration(plan) {
-    return plan && plan.cardioSegments && plan.cardioSegments.length ? plan.cardioSegments[plan.cardioSegments.length - 1].end : 0;
+    var segments = cardioSegmentsFor(plan);
+    return segments.length ? segments[segments.length - 1].end : 0;
   }
+
+  function cardioSegmentsFor(plan) { return state.cardioMode === "express" && plan && plan.expressSegments ? plan.expressSegments : plan && plan.cardioSegments || []; }
 
   function defaultData() {
     return {
       schemaVersion: 2,
       profile: { name: "Vinny", age: 35, height: "5 ft 6 in", baselineWeight: 150.6, startDate: "2026-09-10" },
-      targets: { calories: 1700, protein: 150, water: 10, checkpointWeight: 140, deadline: "2026-12-31" },
+      targets: { calories: 1850, calorieMin: 1750, calorieMax: 1950, protein: 140, proteinMin: 135, proteinMax: 150, water: 10, checkpointWeight: 140, deadline: "2026-12-31" },
       days: {},
       pendingMeals: [],
       favorites: [],
@@ -232,8 +255,8 @@
           quietStart: "23:00", quietEnd: "04:00"
         }
       },
-      reward: { name: "LV Trainer Sneakers", saved: 0, targetSavings: 1675 },
-      meta: { planVersion: "workout-2.3-2026-09-09", createdAt: new Date().toISOString() }
+      weeklyCheckins: {},
+      meta: { planVersion: "workout-2.6-2026-09-13", createdAt: new Date().toISOString() }
     };
   }
 
@@ -245,8 +268,8 @@
       meals: [],
       exercises: {},
       workout: { completed: false, rating: "", notes: "" },
-      cardio: { sessionId: "", startedAt: "", status: "" },
-      photos: { front: null, side: null, back: null },
+      cardio: { sessionId: "", startedAt: "", status: "", result: null },
+      photos: { front: null, side: null, back: null, treadmill: null },
       cannabis: "",
       cannabisNote: "",
       extraActivities: []
@@ -490,13 +513,13 @@
     var t = totals(day);
     var html = header(plan.title, formatDate(iso)) + weekStrip();
     html += '<div class="grid two">' +
-      statCard("Protein", Math.round(t.protein), "g", state.data.targets.protein) +
-      statCard("Calories", Math.round(t.calories), "cal", state.data.targets.calories) +
+      nutritionStatCard("Protein", Math.round(t.protein), "g", state.data.targets.proteinMin, state.data.targets.proteinMax) +
+      nutritionStatCard("Calories", Math.round(t.calories), "cal", state.data.targets.calorieMin, state.data.targets.calorieMax) +
       '</div>';
 
     html += '<section class="card"><div class="card-head"><div><h2>Morning check</h2><p>Weight after the bathroom, before food or drink</p></div></div>' +
       '<div class="row wrap"><label class="field">Weight, lb<input id="weight" type="number" inputmode="decimal" min="90" max="300" step="0.1" value="' + esc(day.weight) + '"></label>' +
-      '<label class="field">Water, glasses<input id="water" type="number" inputmode="numeric" min="0" max="30" step="1" value="' + esc(day.water) + '"></label></div></section>';
+      '<div class="field">Water, glasses<div class="stepper"><button type="button" data-water-step="-1" aria-label="Subtract one glass">−</button><input id="water" type="number" inputmode="numeric" min="0" max="30" step="1" value="' + esc(day.water) + '" aria-label="Water glasses"><button type="button" data-water-step="1" aria-label="Add one glass">+</button></div></div></div></section>';
 
     html += renderMeals(day, t);
     html += renderPendingMeals();
@@ -510,6 +533,14 @@
   function statCard(label, value, unit, target) {
     return '<section class="card"><p class="eyebrow">' + esc(label) + '</p><div class="stat">' + esc(value) + ' <small>/ ' + esc(target) + ' ' + esc(unit) + '</small></div>' +
       '<div class="progress-bar"><span style="width:' + pct(value, target) + '%"></span></div></section>';
+  }
+
+  function nutritionStatCard(label, value, unit, low, high) {
+    low = number(low); high = number(high) || low;
+    var status = value < low ? (low - value) + " " + unit + " to target zone" : value > high ? (value - high) + " " + unit + " above target zone" : "Inside target zone";
+    var css = value > high ? " over" : value >= low ? " in-zone" : "";
+    return '<section class="card nutrition-stat' + css + '"><p class="eyebrow">' + esc(label) + '</p><div class="stat">' + esc(value) + ' <small>/ ' + esc(low) + '–' + esc(high) + ' ' + esc(unit) + '</small></div>' +
+      '<div class="progress-bar"><span style="width:' + pct(value, high) + '%"></span></div><p class="target-status">' + esc(status) + '</p></section>';
   }
 
   function renderPhotos(day, iso) {
@@ -536,7 +567,11 @@
     var done = todayExercises.filter(function (exercise) { return day.exercises[exerciseId(exercise.name)] && day.exercises[exerciseId(exercise.name)].done; }).length;
     var total = todayExercises.length;
     var html = '<section class="card"><div class="card-head workout-title"><div><p class="eyebrow">' + esc(plan.type) + '</p><h2>' + esc(plan.title) + '</h2><p>' + esc(plan.subtitle) + '</p></div><div class="stat">' + done + '<small> / ' + total + '</small></div></div>';
-    if (plan.type === "Strength") html += '<div class="notice">Choose a load that leaves about 3 good reps in reserve. The plate setup is exact; total dumbbell weight is approximate.</div>';
+    if (plan.type === "Strength") {
+      html += renderEquipmentPrep(day, plan);
+      html += '<div class="notice">Choose a load that leaves about 3 good reps in reserve. The plate setup is exact; total dumbbell weight is approximate.</div>';
+      if (/Lower/.test(plan.title)) html += '<details class="recovery-option"><summary>Still very sore? Use the recovery version</summary><p>Use bench support, keep every load the same or lighter, and complete two controlled sets per lower-body exercise. Stop if soreness changes your normal movement or becomes sharp pain.</p></details>';
+    }
     if (plan.type === "Cardio") html += renderCardioGuide(day, plan);
     plan.sections.forEach(function (section) {
       html += '<div class="section-label">' + esc(section.label) + '</div>';
@@ -547,7 +582,7 @@
         var secondLabel = plan.type === "Strength" ? "Reps completed" : plan.type === "Cardio" ? "Minutes completed" : "Notes";
         var firstPlaceholder = plan.type === "Strength" ? "Choose below" : plan.type === "Cardio" ? "Example: incline 5 felt right" : "Optional";
         var secondPlaceholder = plan.type === "Strength" ? "Example: 12, 12, 11" : plan.type === "Cardio" ? String(cardioDuration(plan)) : "Optional";
-        html += '<div class="exercise"><div class="exercise-main"><input type="checkbox" data-exercise-done="' + id + '" ' + (log.done ? "checked" : "") + ' aria-label="Complete ' + esc(exercise.name) + '"><div><div class="exercise-name">' + esc(exercise.name) + '</div><div class="exercise-prescription">' + esc(exercise.prescription) + '</div>' + exerciseGuide(exercise) + '</div></div>' +
+        html += '<div class="exercise"><div class="exercise-main"><input type="checkbox" data-exercise-done="' + id + '" ' + (log.done ? "checked" : "") + ' aria-label="Complete ' + esc(exercise.name) + '"><div><div class="exercise-name">' + esc(exercise.name) + equipmentBadge(exercise) + '</div><div class="exercise-prescription">' + esc(exercise.prescription) + '</div>' + exerciseGuide(exercise) + '</div></div>' +
           renderExerciseLog(plan, exercise, id, log, firstLabel, secondLabel, firstPlaceholder, secondPlaceholder) + '</div>';
       });
     });
@@ -555,6 +590,25 @@
     ["Easy", "Solid", "Hard", "Brutal"].forEach(function (rating) { html += '<option ' + (day.workout.rating === rating ? "selected" : "") + '>' + rating + '</option>'; });
     html += '</select></label></section>';
     return html;
+  }
+
+  function equipmentBadge(exercise) {
+    if (!exercise.equipment || exercise.equipment.type !== "dumbbell") return "";
+    var count = exercise.equipment.dumbbells;
+    return '<span class="equipment-badge" aria-label="' + count + ' dumbbell' + (count === 1 ? '' : 's') + '">' + (count === 1 ? '🏋️ ×1' : '🏋️ 🏋️') + '</span>';
+  }
+
+  function renderEquipmentPrep(day, plan) {
+    var plates = {}, one = false, two = false;
+    exercisesForPlan(plan).forEach(function (exercise) {
+      if (!exercise.equipment || exercise.equipment.type !== "dumbbell") return;
+      var id = exerciseId(exercise.name), log = day.exercises[id] || {};
+      var option = loadOption(number(log.load) || recommendedLoad(exercise, id));
+      if (option) option.plates.forEach(function (plate) { plates[plate] = true; });
+      if (exercise.equipment.dumbbells === 1) one = true; else two = true;
+    });
+    var plateList = Object.keys(plates).map(Number).sort(function (a, b) { return a - b; }).map(function (plate) { return plate + " lb"; }).join(" · ");
+    return '<div class="equipment-prep"><strong>Get these ready</strong><span>Plates: ' + esc(plateList || "none") + '</span><small>' + (one ? "1-dumbbell exercises" : "") + (one && two ? " · " : "") + (two ? "2-dumbbell exercises" : "") + '</small></div>';
   }
 
   function renderExerciseLog(plan, exercise, id, log, firstLabel, secondLabel, firstPlaceholder, secondPlaceholder) {
@@ -576,21 +630,41 @@
       return '<div class="exercise-log"><label class="field">Variation<select data-exercise-load="' + id + '">' + variations.map(function (variation) { return '<option ' + (variation === chosen ? "selected" : "") + '>' + variation + '</option>'; }).join("") + '</select></label></div>' +
         renderSetInputs(exercise, id, log) + renderEffortButtons(id, log);
     }
-    if (plan.type === "Strength") return renderSetInputs(exercise, id, log);
+    if (plan.type === "Strength") {
+      if (exercise.name === "Side Plank") return renderSidePlankInputs(id, log) + renderEffortButtons(id, log);
+      return renderSetInputs(exercise, id, log) + renderEffortButtons(id, log);
+    }
     return '<div class="exercise-log"><label class="field">' + firstLabel + '<input data-exercise-load="' + id + '" value="' + esc(log.load || "") + '" placeholder="' + firstPlaceholder + '"></label><label class="field">' + secondLabel + '<input data-exercise-reps="' + id + '" inputmode="numeric" value="' + esc(log.reps || "") + '" placeholder="' + secondPlaceholder + '"></label></div>';
+  }
+
+  function renderSidePlankInputs(id, log) {
+    var source = Array.isArray(log.sets) ? log.sets.slice() : String(log.reps || "").split(/[,/]+/).map(function (value) { return value.trim(); }).filter(Boolean);
+    var sets = source.length >= 4 ? source.slice(0, 4) : source.length === 2 ? [source[0], source[0], source[1], source[1]] : ["", "", "", ""];
+    var labels = ["Set 1 left", "Set 1 right", "Set 2 left", "Set 2 right"];
+    return '<div class="set-entry"><div class="set-grid side-plank-grid">' + sets.map(function (value, index) { return '<label>' + labels[index] + ' (sec)<input data-exercise-set="' + id + '" data-set-index="' + index + '" inputmode="numeric" min="0" value="' + esc(value) + '"></label>'; }).join("") + '</div></div>';
   }
 
   function renderCardioGuide(day, plan) {
     var duration = cardioDuration(plan);
     var active = day.cardio && day.cardio.status === "active";
     if (active && day.cardio.startedAt && Date.now() - new Date(day.cardio.startedAt).getTime() > (duration + 1) * 60 * 1000) active = false;
-    var html = '<div class="cardio-timeline">';
-    plan.cardioSegments.forEach(function (segment) {
-      html += '<div class="cardio-step"><time>' + segment.start + '–' + segment.end + ' min</time><div><strong>' + segment.speed.toFixed(1) + ' mph · incline ' + segment.incline + '</strong><span>' + esc(segment.cue) + '</span></div></div>';
+    var html = plan.expressSegments ? '<div class="cardio-mode"><button type="button" data-cardio-mode="full" class="' + (state.cardioMode === "full" ? "active" : "") + '">Full · 60 min</button><button type="button" data-cardio-mode="express" class="' + (state.cardioMode === "express" ? "active" : "") + '">Express · 30 min</button></div>' : '';
+    html += '<div class="cardio-timeline">';
+    cardioSegmentsFor(plan).forEach(function (segment) {
+      html += '<div class="cardio-step"><time>' + segment.start + '–' + segment.end + ' min</time><div><strong>Incline ' + segment.incline + ' · speed ' + segment.speed.toFixed(1) + ' mph</strong><span>' + esc(segment.cue) + '</span></div></div>';
     });
-    html += '</div><div class="cardio-controls"><button class="primary" id="start-cardio" ' + (active ? "disabled" : "") + '>' + (active ? "Session alerts active" : "Start ' + duration + '-minute session") + '</button>';
+    html += '</div><div class="cardio-controls"><button class="primary" id="start-cardio" ' + (active ? "disabled" : "") + '>' + (active ? "Session alerts active" : "Start " + duration + "-minute session") + '</button>';
     if (active) html += '<button class="secondary" id="cancel-cardio">Cancel alerts</button>';
-    html += '</div><p class="notification-status">' + (state.notificationEnabled ? "You can switch to YouTube—push alerts will tell you every speed and incline change." : "Enable notifications first so alerts can reach you while YouTube is open.") + '</p>';
+    html += '</div><p class="notification-status">' + (state.notificationEnabled ? "You can switch to YouTube—push alerts will tell you every incline and speed change." : "Enable notifications first so alerts can reach you while YouTube is open.") + '</p>';
+    var treadmillRef = day.photos && day.photos.treadmill;
+    html += '<div class="treadmill-result"><strong>Workout result</strong>';
+    if (treadmillRef) html += '<div class="meal-photo ' + (state.revealedPhoto === state.selectedDate + ":treadmill" ? "revealed" : "") + '"><img alt="Treadmill results" data-photo-ref="' + esc(photoRefValue(treadmillRef)) + '"><button type="button" data-reveal-photo="treadmill">' + (state.revealedPhoto === state.selectedDate + ":treadmill" ? "Hide result" : "Reveal result") + '</button><button type="button" data-remove-photo="treadmill" aria-label="Remove treadmill result">×</button></div>';
+    else html += '<button type="button" class="secondary" data-add-photo="treadmill">Upload treadmill results photo</button>';
+    if (day.cardio && day.cardio.result) {
+      var result = day.cardio.result;
+      html += '<div class="treadmill-fields"><label>Minutes<input data-cardio-result="durationMinutes" type="number" step="0.1" value="' + esc(result.durationMinutes == null ? "" : result.durationMinutes) + '"></label><label>Distance, mi<input data-cardio-result="distanceMiles" type="number" step="0.01" value="' + esc(result.distanceMiles == null ? "" : result.distanceMiles) + '"></label><label>Screen calories<input data-cardio-result="calories" type="number" step="1" value="' + esc(result.calories == null ? "" : result.calories) + '"></label><label>Avg speed<input data-cardio-result="averageSpeedMph" type="number" step="0.1" value="' + esc(result.averageSpeedMph == null ? "" : result.averageSpeedMph) + '"></label><label>Incline shown<input data-cardio-result="incline" type="number" step="0.1" value="' + esc(result.incline == null ? "" : result.incline) + '"></label></div><small>Proposed from the photo—review and correct every value.</small>';
+    } else html += '<small>Saved privately with this workout. A clear screen photo can propose reviewable results.</small>';
+    html += '</div>';
     return html;
   }
 
@@ -598,7 +672,12 @@
     var html = '<section class="card"><div class="card-head"><div><h2>Meals</h2><p>' + Math.round(t.protein) + ' g protein and ' + Math.round(t.calories) + ' calories logged</p></div></div>';
     if (!day.meals.length) html += '<div class="empty">No meals logged yet</div>';
     day.meals.forEach(function (meal, index) {
-      html += '<div class="meal"><button type="button" class="meal-summary" data-edit-meal="' + index + '"><strong>' + esc(meal.name || "Meal") + '</strong><small>' + Math.round(number(meal.protein)) + ' g protein · ' + Math.round(number(meal.calories)) + ' cal' + (meal.photo ? ' · private photo saved' : '') + '</small><span>Edit details</span></button><button type="button" data-duplicate-meal="' + index + '" aria-label="Duplicate meal">＋</button><button type="button" data-remove-meal="' + index + '" aria-label="Remove meal">×</button></div>';
+      var quantity = number(meal.quantity) || 1;
+      html += '<div class="meal ' + (meal.photo ? "has-photo" : "") + '">';
+      if (meal.photo) html += '<div class="meal-photo ' + (state.revealedPhoto === state.selectedDate + ":meal:" + index ? "revealed" : "") + '"><img alt="Private photo for ' + esc(meal.name || "meal") + '" data-photo-ref="' + esc(photoRefValue(meal.photo)) + '"><button type="button" data-reveal-meal-photo="' + index + '">' + (state.revealedPhoto === state.selectedDate + ":meal:" + index ? "Hide" : "Reveal") + '</button></div>';
+      html += '<button type="button" class="meal-summary" data-edit-meal="' + index + '"><strong>' + esc(meal.name || "Meal") + '</strong><small>' + Math.round(number(meal.protein)) + ' g protein · ' + Math.round(number(meal.calories)) + ' cal</small><span>' + (meal.photo ? 'Private photo saved · ' : '') + 'Edit details</span></button>' +
+        '<div class="quantity-stepper" aria-label="Quantity for ' + esc(meal.name || "meal") + '"><button type="button" data-meal-quantity="-1" data-meal-index="' + index + '" aria-label="Decrease quantity">−</button><input type="number" min="0.25" max="50" step="0.25" value="' + esc(quantity) + '" data-meal-quantity-input="' + index + '" aria-label="Quantity"><button type="button" data-meal-quantity="1" data-meal-index="' + index + '" aria-label="Increase quantity">+</button></div>' +
+        '<button type="button" data-remove-meal="' + index + '" aria-label="Remove meal">×</button></div>';
     });
     html += renderNutritionDetails(t, day.meals.length);
     html += renderFavoritePicker();
@@ -635,9 +714,9 @@
       var options = MEAL_CATEGORIES.map(function (category) { return '<option value="' + category + '" ' + (favorite.category === category ? "selected" : "") + '>' + categoryLabel(category) + '</option>'; }).join("");
       return '<div class="favorite-edit"><input data-favorite-name="' + esc(favorite.id) + '" value="' + esc(favorite.name) + '" aria-label="Favorite name"><select data-favorite-category="' + esc(favorite.id) + '" aria-label="Favorite category">' + options + '</select><button data-remove-favorite="' + esc(favorite.id) + '" aria-label="Remove ' + esc(favorite.name) + '">Remove</button></div>';
     }).join("");
-    return '<div class="section-label">Favorites</div><div class="favorite-picker"><select id="favorite-category-filter" aria-label="Favorite category">' + categoryOptions + '</select><select id="favorite-meal-select" aria-label="Favorite meal">' + favoriteOptions + '</select></div>' +
+    return '<details class="favorites-panel" ' + (state.favoritesOpen ? "open" : "") + '><summary>Add from favorites</summary><div class="favorite-picker"><select id="favorite-category-filter" aria-label="Favorite category">' + categoryOptions + '</select><select id="favorite-meal-select" aria-label="Favorite meal">' + favoriteOptions + '</select></div>' +
       '<div class="favorite-picker-actions"><button id="add-favorite-meal" class="primary" ' + (filtered.length ? '' : 'disabled') + '>Add usual portion</button><button id="adjust-favorite-meal" class="secondary" ' + (filtered.length ? '' : 'disabled') + '>Adjust portion first</button></div>' +
-      '<details class="favorite-manager"><summary>Manage favorites</summary>' + manager + '</details>';
+      '<details class="favorite-manager" ' + (state.favoriteManagerOpen ? "open" : "") + '><summary>Manage favorites</summary>' + manager + '<p class="notification-status">Changes save automatically.</p></details></details>';
   }
 
   function renderPendingMeals() {
@@ -672,8 +751,6 @@
     html += '</div></section>';
     html += renderProgressChart();
     html += renderGoalProgress();
-    html += renderRewardProgress();
-    html += '<section class="card"><details class="target-explainer"><summary>Why is my calorie target ' + esc(state.data.targets.calories) + '?</summary><p>This is a selected starting target, not a number automatically calculated from your profile. Review it using your 14–21 day weight trend, hunger, energy, and workout performance.</p><label class="field">Daily calorie target<input id="calorie-target" type="number" inputmode="numeric" min="1200" max="4000" step="25" value="' + esc(state.data.targets.calories) + '"></label></details></section>';
     return html;
   }
 
@@ -775,17 +852,6 @@
       metric("Protein days", pct(stats.proteinDays, stats.loggedDays || 1), stats.proteinDays + " / " + stats.loggedDays + " logged days") + '</section>';
   }
 
-  function renderRewardProgress() {
-    var reward = state.data.reward || defaultData().reward;
-    var stats = periodStats(state.data.profile.startDate, TODAY);
-    var start = number(state.data.profile.baselineWeight), latest = stats.latestWeight || start;
-    var scores = [pct(start - latest, start - state.data.targets.checkpointWeight), pct(stats.strengthDone, stats.strengthPlanned), pct(stats.cardioDone, stats.cardioPlanned), pct(stats.proteinDays, stats.loggedDays || 1)];
-    var earned = Math.round(scores.reduce(function (sum, score) { return sum + score; }, 0) / scores.length);
-    return '<section class="card reward-card"><div class="reward-mark">VW</div><div class="card-head"><div><p class="eyebrow">Vinny’s Wellness reward</p><h2>' + esc(reward.name || "My reward") + '</h2><p>Earned through weight progress and consistent strength, cardio, and protein habits.</p></div><div class="reward-percent">' + earned + '%</div></div><div class="progress-bar reward-bar"><span style="width:' + earned + '%"></span></div>' +
-      metric("Reward savings", pct(number(reward.saved), number(reward.targetSavings)), "$" + number(reward.saved).toFixed(0) + " / $" + number(reward.targetSavings).toFixed(0)) +
-      '<details class="reward-settings"><summary>Reward setup</summary><div class="grid two"><label class="field">Reward name<input id="reward-name" value="' + esc(reward.name || "") + '"></label><label class="field">Saved so far<input id="reward-saved" type="number" inputmode="decimal" min="0" step="1" value="' + esc(reward.saved) + '"></label><label class="field">Savings target<input id="reward-target" type="number" inputmode="decimal" min="0" step="1" value="' + esc(reward.targetSavings) + '"></label></div></details></section>';
-  }
-
   function metric(label, percentage, copy) {
     return '<div class="metric"><div class="metric-copy"><strong>' + esc(label) + '</strong><span>' + esc(copy) + '</span></div><div class="progress-bar"><span style="width:' + percentage + '%"></span></div></div>';
   }
@@ -799,25 +865,38 @@
       plan.sections.forEach(function (section) {
         html += '<div class="section-label">' + esc(section.label) + '</div>';
         section.exercises.forEach(function (exercise) {
-          html += '<div class="exercise"><div class="exercise-name">' + esc(exercise.name) + '</div><div class="exercise-prescription">' + esc(exercise.prescription) + '</div>';
+          html += '<div class="exercise"><div class="exercise-name">' + esc(exercise.name) + equipmentBadge(exercise) + '</div><div class="exercise-prescription">' + esc(exercise.prescription) + '</div>';
           if (exercise.equipment && exercise.equipment.type === "dumbbell") html += '<p class="exercise-tip">Starting point: ≈ ' + exercise.equipment.start + ' lb ' + (exercise.equipment.dumbbells === 2 ? "per dumbbell. " : "on one dumbbell. ") + esc(plateText(exercise.equipment.start, exercise.equipment.dumbbells)) + '</p>';
           html += '</div>';
         });
       });
-      if (plan.cardioSegments) html += '<div class="cardio-timeline">' + plan.cardioSegments.map(function (segment) { return '<div class="cardio-step"><time>' + segment.start + '–' + segment.end + ' min</time><div><strong>' + segment.speed.toFixed(1) + ' mph · incline ' + segment.incline + '</strong><span>' + esc(segment.cue) + '</span></div></div>'; }).join("") + '</div>';
+      if (plan.cardioSegments) html += '<div class="cardio-timeline">' + plan.cardioSegments.map(function (segment) { return '<div class="cardio-step"><time>' + segment.start + '–' + segment.end + ' min</time><div><strong>Incline ' + segment.incline + ' · speed ' + segment.speed.toFixed(1) + ' mph</strong><span>' + esc(segment.cue) + '</span></div></div>'; }).join("") + '</div>';
       html += '</section>';
     });
     return html;
   }
 
   function renderCheckin() {
-    var summary = buildCheckin(TODAY);
-    return header("Weekly Check-In", "One tap, no retyping") +
-      '<section class="card"><div class="card-head"><div><h2>Send this to ChatGPT</h2><p>Each Sunday, copy this summary into our Workout conversation.</p></div></div>' +
+    var range = lastCompletedWeek(), summary = buildCheckin(range.end), checkin = weeklyCheckin(range.start);
+    return header("Weekly Check-In", "Last completed Sunday–Saturday") +
+      '<section class="card goals-card"><div class="card-head"><div><h2>Nutrition goals</h2><p>Starting targets stay steady until you approve a change.</p></div></div><div class="grid two"><label class="field">Daily calories<input id="calorie-target" type="number" inputmode="numeric" min="1200" max="4000" step="25" value="' + esc(state.data.targets.calories) + '"></label><label class="field">Daily protein, g<input id="protein-target" type="number" inputmode="numeric" min="50" max="300" step="5" value="' + esc(state.data.targets.protein) + '"></label></div><p class="notification-status">Calorie zone: ' + esc(state.data.targets.calorieMin) + '–' + esc(state.data.targets.calorieMax) + ' · Protein zone: ' + esc(state.data.targets.proteinMin) + '–' + esc(state.data.targets.proteinMax) + ' g</p></section>' +
+      '<section class="card"><div class="card-head"><div><h2>Weekly recovery</h2><p>' + esc(formatDate(range.start, { month: "short", day: "numeric" })) + ' to ' + esc(formatDate(range.end, { month: "short", day: "numeric" })) + '</p></div></div><div class="grid two"><label class="field">Hunger, 1–10<input data-weekly-checkin="hunger" type="number" min="1" max="10" value="' + esc(checkin.hunger || "") + '"></label><label class="field">Energy, 1–10<input data-weekly-checkin="energy" type="number" min="1" max="10" value="' + esc(checkin.energy || "") + '"></label><label class="field">Average sleep, hours<input data-weekly-checkin="sleep" type="number" min="0" max="14" step="0.25" value="' + esc(checkin.sleep || "") + '"></label><label class="field">Soreness, 1–10<input data-weekly-checkin="soreness" type="number" min="1" max="10" value="' + esc(checkin.soreness || "") + '"></label></div><label class="field">Recovery notes<textarea data-weekly-checkin="recoveryNotes" placeholder="Anything affecting recovery or performance">' + esc(checkin.recoveryNotes || "") + '</textarea></label></section>' +
+      '<section class="card"><div class="card-head"><div><h2>Export last completed week</h2><p>Includes every day and never counts today while it is still in progress.</p></div></div>' +
       '<textarea id="checkin-output" class="checkin-output" readonly>' + esc(summary) + '</textarea>' +
-      '<div class="row wrap"><button id="copy-checkin" class="primary">Copy check-in</button><button id="download-backup" class="secondary">Download private backup</button><button id="lock-tracker" class="secondary">Lock this device</button></div></section>' +
+      '<div class="row wrap"><button id="copy-checkin" class="primary">Copy completed week</button><button id="download-backup" class="secondary">Download private backup</button><button id="lock-tracker" class="secondary">Lock this device</button></div></section>' +
       renderNotificationCard() +
       '<section class="card"><div class="notice">Your weekly summary is only copied when you tap the button. Meal analysis sends only the meal photo and notes you choose, and does not expose your dashboard access code.</div></section>';
+  }
+
+  function lastCompletedWeek() {
+    var currentStart = startOfWeek(TODAY);
+    return { start: addDays(currentStart, -7), end: addDays(currentStart, -1) };
+  }
+
+  function weeklyCheckin(startIso) {
+    state.data.weeklyCheckins = state.data.weeklyCheckins || {};
+    if (!state.data.weeklyCheckins[startIso]) state.data.weeklyCheckins[startIso] = {};
+    return state.data.weeklyCheckins[startIso];
   }
 
   function reminderSettings() { return state.data.preferences.reminders; }
@@ -843,8 +922,8 @@
       var t = totals(day);
       var hasLog = number(day.weight) || day.meals.length || Object.keys(day.exercises || {}).length || day.workout.notes || day.steps;
       if (hasLog) result.loggedDays++;
-      if (t.protein >= state.data.targets.protein) result.proteinDays++;
-      if (t.calories > 0 && t.calories <= state.data.targets.calories + 100) result.calorieDays++;
+      if (t.protein >= state.data.targets.proteinMin && t.protein <= state.data.targets.proteinMax) result.proteinDays++;
+      if (t.calories >= state.data.targets.calorieMin && t.calories <= state.data.targets.calorieMax) result.calorieDays++;
       if (number(day.weight)) { result.weights.push(number(day.weight)); result.latestWeight = number(day.weight); }
       if (sessionComplete(day, plan)) {
         if (plan.type === "Strength") result.strengthDone++;
@@ -866,11 +945,17 @@
     var startIso = addDays(endIso, -6);
     var stats = periodStats(startIso, endIso);
     var average = stats.weights.length ? stats.weights.reduce(function (a, b) { return a + b; }, 0) / stats.weights.length : 0;
+    var priorStats = periodStats(addDays(startIso, -7), addDays(startIso, -1));
+    var priorAverage = priorStats.weights.length ? priorStats.weights.reduce(function (a, b) { return a + b; }, 0) / priorStats.weights.length : 0;
     var change = stats.weights.length > 1 ? stats.weights[stats.weights.length - 1] - stats.weights[0] : 0;
-    var notes = [];
+    var notes = [], nutrition = [], calorieTotal = 0, proteinTotal = 0, nutritionDays = 0;
     var training = [];
     for (var iso = startIso; iso <= endIso; iso = addDays(iso, 1)) {
       var day = state.data.days[iso];
+      var t = day ? totals(day) : { calories: 0, protein: 0 };
+      var hasNutrition = Boolean(day && day.meals && day.meals.length);
+      if (hasNutrition) { calorieTotal += t.calories; proteinTotal += t.protein; nutritionDays++; }
+      nutrition.push(formatDate(iso, { weekday: "short", month: "short", day: "numeric" }) + ": " + (hasNutrition ? Math.round(t.calories) + " calories · " + Math.round(t.protein) + " g protein" : "No nutrition data logged") + " · weight " + (day && number(day.weight) ? number(day.weight).toFixed(1) + " lb" : "not logged") + " · water " + (day ? number(day.water) : 0) + " glasses");
       if (!day) continue;
       if (day.workout && day.workout.notes) notes.push(formatDate(iso, { weekday: "short" }) + ": " + day.workout.notes);
       var exerciseLines = [];
@@ -881,20 +966,37 @@
         exerciseLines.push("  " + (log.done ? "✓ " : "• ") + exercise.name + (log.load ? " | " + log.load : "") + (log.reps ? " | " + log.reps : ""));
       });
       if (exerciseLines.length || (day.workout && day.workout.rating)) {
-        training.push(formatDate(iso, { weekday: "short", month: "short", day: "numeric" }) + " · " + plan.title + (day.workout.rating ? " · " + day.workout.rating : "") + "\n" + exerciseLines.join("\n"));
+        var cardioResult = day.cardio && day.cardio.result;
+        var resultLine = cardioResult ? "\n  Treadmill result: " + [cardioResult.durationMinutes != null ? cardioResult.durationMinutes + " min" : "", cardioResult.distanceMiles != null ? cardioResult.distanceMiles + " mi" : "", cardioResult.calories != null ? cardioResult.calories + " screen cal" : "", cardioResult.averageSpeedMph != null ? cardioResult.averageSpeedMph + " mph avg" : ""].filter(Boolean).join(" · ") : "";
+        training.push(formatDate(iso, { weekday: "short", month: "short", day: "numeric" }) + " · " + plan.title + (day.workout.rating ? " · " + day.workout.rating : "") + "\n" + exerciseLines.join("\n") + resultLine);
       }
     }
+    var checkin = weeklyCheckin(startIso);
     return [
       "VINNY WORKOUT 2.0 WEEKLY CHECK-IN",
       formatDate(startIso, { month: "short", day: "numeric" }) + " to " + formatDate(endIso, { month: "short", day: "numeric", year: "numeric" }),
       "",
       "Morning weights: " + (stats.weights.length ? stats.weights.map(function (w) { return w.toFixed(1); }).join(", ") + " lb" : "none logged"),
       "Weekly average: " + (average ? average.toFixed(1) + " lb" : "not available"),
+      "Week-over-week average change: " + (average && priorAverage ? ((average - priorAverage) > 0 ? "+" : "") + (average - priorAverage).toFixed(1) + " lb" : "not available"),
       "First to latest change: " + (stats.weights.length > 1 ? (change > 0 ? "+" : "") + change.toFixed(1) + " lb" : "not available"),
       "Strength sessions: " + stats.strengthDone + " completed",
       "Cardio sessions: " + stats.cardioDone + " completed",
       "Protein target days: " + stats.proteinDays,
       "Calorie target days: " + stats.calorieDays,
+      "",
+      "Daily summary:",
+      nutrition.join("\n"),
+      "Weekly nutrition totals: " + (nutritionDays ? Math.round(calorieTotal) + " calories · " + Math.round(proteinTotal) + " g protein" : "not available"),
+      "Logged-day averages: " + (nutritionDays ? Math.round(calorieTotal / nutritionDays) + " calories · " + Math.round(proteinTotal / nutritionDays) + " g protein" : "not available"),
+      "Current target zones: " + state.data.targets.calorieMin + "–" + state.data.targets.calorieMax + " calories · " + state.data.targets.proteinMin + "–" + state.data.targets.proteinMax + " g protein",
+      "",
+      "Recovery check-in:",
+      "Hunger: " + (checkin.hunger || "not entered") + (checkin.hunger ? "/10" : ""),
+      "Energy: " + (checkin.energy || "not entered") + (checkin.energy ? "/10" : ""),
+      "Average sleep: " + (checkin.sleep || "not entered") + (checkin.sleep ? " hours" : ""),
+      "Soreness: " + (checkin.soreness || "not entered") + (checkin.soreness ? "/10" : ""),
+      "Recovery notes: " + (checkin.recoveryNotes || "none entered"),
       "",
       "Training details:",
       training.length ? training.join("\n") : "No exercise details entered.",
@@ -915,12 +1017,10 @@
     if (progressMetric) progressMetric.addEventListener("change", function () { state.progressMetric = progressMetric.value; render(); });
     var progressExercise = document.getElementById("progress-exercise");
     if (progressExercise) progressExercise.addEventListener("change", function () { state.progressExercise = progressExercise.value; render(); });
-    [["reward-name", "name"], ["reward-saved", "saved"], ["reward-target", "targetSavings"]].forEach(function (pair) {
-      var input = document.getElementById(pair[0]);
-      if (input) input.addEventListener("change", function () { state.data.reward[pair[1]] = pair[1] === "name" ? input.value.trim() : number(input.value); queueSave(true); });
-    });
     var calorieTarget = document.getElementById("calorie-target");
-    if (calorieTarget) calorieTarget.addEventListener("change", function () { state.data.targets.calories = clamp(number(calorieTarget.value), 1200, 4000); queueSave(true); });
+    if (calorieTarget) calorieTarget.addEventListener("change", function () { var value = clamp(number(calorieTarget.value), 1200, 4000); state.data.targets.calories = value; state.data.targets.calorieMin = value - 100; state.data.targets.calorieMax = value + 100; queueSave(true); });
+    var proteinTarget = document.getElementById("protein-target");
+    if (proteinTarget) proteinTarget.addEventListener("change", function () { var value = clamp(number(proteinTarget.value), 50, 300); state.data.targets.protein = value; state.data.targets.proteinMin = Math.max(0, value - 5); state.data.targets.proteinMax = value + 10; queueSave(true); });
     if (state.view !== "today") {
       var copy = document.getElementById("copy-checkin");
       if (copy) copy.addEventListener("click", copyCheckin);
@@ -941,12 +1041,14 @@
       }); });
       var pauseReminders = document.getElementById("pause-reminders");
       if (pauseReminders) pauseReminders.addEventListener("click", function () { reminderSettings().pausedDate = reminderSettings().pausedDate === TODAY ? "" : TODAY; queueSave(true); });
+      document.querySelectorAll("[data-weekly-checkin]").forEach(function (input) { input.addEventListener("change", function () { var range = lastCompletedWeek(); weeklyCheckin(range.start)[input.dataset.weeklyCheckin] = input.value.trim(); queueSave(true); }); });
       return;
     }
 
     ["weight", "water"].forEach(function (id) {
       document.getElementById(id).addEventListener("change", function (event) { getDay(state.selectedDate)[id] = event.target.value; queueSave(); });
     });
+    document.querySelectorAll("[data-water-step]").forEach(function (button) { button.addEventListener("click", function () { var day = getDay(state.selectedDate); day.water = clamp(number(day.water) + Number(button.dataset.waterStep), 0, 30); queueSave(true); }); });
     document.getElementById("day-note").addEventListener("change", function (event) { getDay(state.selectedDate).workout.notes = event.target.value; queueSave(); });
     document.getElementById("session-rating").addEventListener("change", function (event) { getDay(state.selectedDate).workout.rating = event.target.value; queueSave(); });
     document.querySelectorAll("[data-exercise-done]").forEach(function (input) { input.addEventListener("change", function () { updateExercise(input.dataset.exerciseDone, "done", input.checked); }); });
@@ -960,9 +1062,12 @@
     document.querySelectorAll("[data-remove-photo]").forEach(function (button) { button.addEventListener("click", function () { removePhoto(button.dataset.removePhoto); }); });
     document.querySelectorAll("[data-remove-meal]").forEach(function (button) { button.addEventListener("click", function () { getDay(state.selectedDate).meals.splice(Number(button.dataset.removeMeal), 1); queueSave(true); }); });
     document.querySelectorAll("[data-edit-meal]").forEach(function (button) { button.addEventListener("click", function () { var index = Number(button.dataset.editMeal); openMealDialog(true, getDay(state.selectedDate).meals[index], { date: state.selectedDate, index: index }); }); });
-    document.querySelectorAll("[data-duplicate-meal]").forEach(function (button) { button.addEventListener("click", function () { var meal = getDay(state.selectedDate).meals[Number(button.dataset.duplicateMeal)]; var copy = Object.assign({}, meal, { name: (meal.name || "Meal") + " copy" }); delete copy.photo; getDay(state.selectedDate).meals.push(copy); queueSave(true); }); });
+    document.querySelectorAll("[data-meal-quantity]").forEach(function (button) { button.addEventListener("click", function () { var index = Number(button.dataset.mealIndex), meal = getDay(state.selectedDate).meals[index]; setMealQuantity(index, (number(meal.quantity) || 1) + Number(button.dataset.mealQuantity)); }); });
+    document.querySelectorAll("[data-meal-quantity-input]").forEach(function (input) { input.addEventListener("change", function () { setMealQuantity(Number(input.dataset.mealQuantityInput), input.value); }); });
+    document.querySelectorAll("[data-reveal-meal-photo]").forEach(function (button) { button.addEventListener("click", function () { var key = state.selectedDate + ":meal:" + button.dataset.revealMealPhoto; state.revealedPhoto = state.revealedPhoto === key ? null : key; render(); }); });
+    document.querySelectorAll(".favorites-panel, .favorite-manager").forEach(function (details) { details.addEventListener("toggle", function () { if (details.classList.contains("favorites-panel")) state.favoritesOpen = details.open; else state.favoriteManagerOpen = details.open; }); });
     var favoriteFilter = document.getElementById("favorite-category-filter");
-    if (favoriteFilter) favoriteFilter.addEventListener("change", function () { state.favoriteFilter = favoriteFilter.value; render(); });
+    if (favoriteFilter) favoriteFilter.addEventListener("change", function () { state.favoriteFilter = favoriteFilter.value; state.favoritesOpen = true; render(); });
     var addFavorite = document.getElementById("add-favorite-meal");
     if (addFavorite) addFavorite.addEventListener("click", function () { useSelectedFavorite(false); });
     var adjustFavorite = document.getElementById("adjust-favorite-meal");
@@ -980,6 +1085,8 @@
     if (startCardioButton) startCardioButton.addEventListener("click", startCardioSession);
     var cancelCardioButton = document.getElementById("cancel-cardio");
     if (cancelCardioButton) cancelCardioButton.addEventListener("click", cancelCardioSession);
+    document.querySelectorAll("[data-cardio-mode]").forEach(function (button) { button.addEventListener("click", function () { state.cardioMode = button.dataset.cardioMode; render(); }); });
+    document.querySelectorAll("[data-cardio-result]").forEach(function (input) { input.addEventListener("change", function () { var day = getDay(state.selectedDate); day.cardio.result = day.cardio.result || {}; day.cardio.result[input.dataset.cardioResult] = optionalNumber(input.value); queueSave(false); }); });
   }
 
   function updateExercise(id, field, value) {
@@ -1024,13 +1131,32 @@
   }
 
   function mealFromNutrition(source, fallbackNotes) {
-    return {
+    var meal = {
       name: source.name || "Meal", protein: number(source.protein), calories: number(source.calories), carbs: number(source.carbs), fat: number(source.fat),
       fiber: optionalNumber(source.fiber), saturatedFat: optionalNumber(source.saturatedFat), addedSugar: optionalNumber(source.addedSugar), sodium: optionalNumber(source.sodium),
       notes: source.notes || fallbackNotes || "", category: MEAL_CATEGORIES.includes(source.category) ? source.category : "",
       estimateConfidence: source.estimateConfidence || source.confidence || "saved favorite", estimateAssumptions: source.estimateAssumptions || source.assumptions || "",
-      nutritionBasis: source.nutritionBasis || "Saved favorite", includedItems: source.includedItems || ""
+      nutritionBasis: source.nutritionBasis || "Saved favorite", includedItems: source.includedItems || "", quantity: 1
     };
+    meal.perServing = nutritionSnapshot(meal, 1);
+    return meal;
+  }
+
+  function nutritionSnapshot(meal, divisor) {
+    var result = {}, amount = Math.max(0.25, number(divisor) || 1);
+    NUTRITION_FIELDS.forEach(function (field) { result[field] = meal[field] == null ? null : number(meal[field]) / amount; });
+    return result;
+  }
+
+  function setMealQuantity(index, quantity) {
+    var day = getDay(state.selectedDate), meal = day.meals[index];
+    if (!meal) return;
+    var oldQuantity = Math.max(0.25, number(meal.quantity) || 1);
+    var next = clamp(Math.round(number(quantity) * 4) / 4, 0.25, 50);
+    meal.perServing = meal.perServing || nutritionSnapshot(meal, oldQuantity);
+    meal.quantity = next;
+    NUTRITION_FIELDS.forEach(function (field) { meal[field] = meal.perServing[field] == null ? null : Math.round(meal.perServing[field] * next * 10) / 10; });
+    queueSave(true);
   }
 
   function selectedFavorite() {
@@ -1057,7 +1183,7 @@
     if (!favorite) return;
     favorite[field] = field === "category" ? validCategory(value) : value;
     favorite.updatedAt = new Date().toISOString();
-    queueSave(true);
+    queueSave(false);
   }
 
   function removeFavorite(id) {
@@ -1076,6 +1202,10 @@
     document.getElementById("meal-notes").value = source && source.notes || "";
     clearPhotoInputs("meal-photo", "meal-photo-camera");
     document.getElementById("keep-meal-photo").checked = Boolean(source && source.photo);
+    var existingPhoto = document.getElementById("meal-existing-photo");
+    existingPhoto.hidden = !(source && source.photo);
+    existingPhoto.innerHTML = source && source.photo ? '<img alt="Saved private meal photo" data-photo-ref="' + esc(photoRefValue(source.photo)) + '"><span>Saved private photo</span>' : '';
+    document.getElementById("duplicate-meal-edit").hidden = !editing;
     document.getElementById("meal-date").value = editing && editing.date || state.selectedDate;
     document.getElementById("save-meal-favorite").checked = false;
     document.getElementById("favorite-category-wrap").hidden = true;
@@ -1085,6 +1215,21 @@
     else if (manual) showMealResult({ name: "Meal", calories: "", protein: "", carbs: "", fat: "", fiber: null, saturatedFat: null, addedSugar: null, sodium: null, category: defaultMealCategory(), confidence: "Manual entry", nutritionBasis: "Manual", assumptions: "Enter the package, restaurant, or measured values you trust." });
     openDashboardDialog(document.getElementById("meal-dialog"));
     document.getElementById("meal-close").focus({ preventScroll: true });
+    hydratePhotos();
+  }
+
+  function duplicateEditingMeal() {
+    var editing = state.editingMeal;
+    if (!editing) return;
+    var source = state.data.days[editing.date] && state.data.days[editing.date].meals[editing.index];
+    if (!source) return;
+    var copy = JSON.parse(JSON.stringify(source));
+    copy.name = (copy.name || "Meal") + " copy";
+    delete copy.photo;
+    getDay(editing.date).meals.push(copy);
+    document.getElementById("meal-dialog").close();
+    state.editingMeal = null;
+    queueSave(true);
   }
 
   function showMealResult(result) {
@@ -1361,6 +1506,8 @@
       includedItems: state.mealEstimate && state.mealEstimate.includedItems || "",
       nutritionBasis: state.mealEstimate && state.mealEstimate.nutritionBasis || "Manual"
     };
+    meal.quantity = Math.max(0.25, number(existingMeal && existingMeal.quantity) || 1);
+    meal.perServing = nutritionSnapshot(meal, meal.quantity);
     var file = selectedPhotoFile("meal-photo", "meal-photo-camera");
     if (pending && pending.photoId && document.getElementById("keep-meal-photo").checked) {
       meal.photo = { id: pending.photoId };
@@ -1429,7 +1576,8 @@
 
   function openPhotoDialog(side) {
     state.pendingPhotoSide = side;
-    document.getElementById("photo-title").textContent = "Add " + side + " photo";
+    document.getElementById("photo-title").textContent = side === "treadmill" ? "Add treadmill results photo" : "Add " + side + " photo";
+    document.getElementById("photo-help").textContent = side === "treadmill" ? "Photograph the full treadmill screen. Keep every extracted value reviewable before adding it to your notes." : "Use the same lighting, distance, posture, and clothing each time.";
     document.getElementById("photo-error").textContent = "";
     clearPhotoInputs("photo-input", "photo-camera-input");
     document.getElementById("photo-camera-input").setAttribute("capture", side === "back" ? "user" : "environment");
@@ -1454,6 +1602,12 @@
         ref = { id: id };
       }
       getDay(state.selectedDate).photos[state.pendingPhotoSide] = ref;
+      if (state.pendingPhotoSide === "treadmill" && !localMode) {
+        try {
+          var response = await apiFetch("/treadmill/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(typeof ref === "object" ? { photoId: ref.id } : { image: ref }) });
+          getDay(state.selectedDate).cardio.result = await response.json();
+        } catch (ignore) { getDay(state.selectedDate).cardio.result = null; }
+      }
       document.getElementById("photo-dialog").close();
       queueSave(true);
     } catch (error) {
@@ -1577,11 +1731,14 @@
       }
       var plan = planForDate(state.selectedDate);
       var duration = cardioDuration(plan);
-      var alerts = plan.cardioSegments.slice(1).map(function (segment) {
-        return { atMinutes: segment.start, title: "Minute " + segment.start + " · " + segment.speed.toFixed(1) + " mph · incline " + segment.incline, body: segment.cue };
+      var segments = cardioSegmentsFor(plan);
+      var alerts = segments.slice(1).map(function (segment) {
+        return { atMinutes: segment.start, title: "Minute " + segment.start + " · Incline " + segment.incline + " · Speed " + segment.speed.toFixed(1) + " mph", body: segment.cue };
       });
       alerts.push({ atMinutes: duration, title: duration + " minutes complete", body: "Nice work, Vinny. Cooldown finished—log your adjustments and how the session felt." });
-      var response = await apiFetch("/notifications/cardio/start", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date: state.selectedDate, title: plan.title, alerts: alerts }) });
+      var first = segments[0];
+      var startAlert = { title: "Time to rock 🤘🏻", body: "Incline " + first.incline + " · Speed " + first.speed.toFixed(1) + " mph" };
+      var response = await apiFetch("/notifications/cardio/start", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date: state.selectedDate, title: plan.title, alerts: alerts, startAlert: startAlert }) });
       var result = await response.json();
       var day = getDay(state.selectedDate);
       day.cardio = { sessionId: result.id, startedAt: result.startedAt, status: "active" };
@@ -1681,6 +1838,12 @@
     data.profile = Object.assign(defaultData().profile, data.profile || {});
     if (data.profile.startDate === "2026-09-09") data.profile.startDate = "2026-09-10";
     data.targets = Object.assign(defaultData().targets, data.targets || {});
+    if (number(data.targets.calories) === 1700) data.targets.calories = 1850;
+    if (number(data.targets.protein) === 150) data.targets.protein = 140;
+    data.targets.calorieMin = number(data.targets.calorieMin) === 1600 ? 1750 : number(data.targets.calorieMin) || data.targets.calories - 100;
+    data.targets.calorieMax = number(data.targets.calorieMax) === 1800 ? 1950 : number(data.targets.calorieMax) || data.targets.calories + 100;
+    data.targets.proteinMin = number(data.targets.proteinMin) === 145 ? 135 : number(data.targets.proteinMin) || data.targets.protein - 5;
+    data.targets.proteinMax = number(data.targets.proteinMax) === 160 ? 150 : number(data.targets.proteinMax) || data.targets.protein + 10;
     data.days = data.days || {};
     data.pendingMeals = Array.isArray(data.pendingMeals) ? data.pendingMeals : [];
     data.pendingMeals.forEach(function (meal) {
@@ -1692,6 +1855,7 @@
       favorite.useCount = number(favorite.useCount);
       return favorite;
     }) : [];
+    data.weeklyCheckins = data.weeklyCheckins || {};
     delete data.targets.steps;
     data.preferences = Object.assign({ notifications: true }, data.preferences || {});
     data.preferences.reminders = Object.assign({}, defaultData().preferences.reminders, data.preferences.reminders || {});
@@ -1699,19 +1863,21 @@
     data.preferences.reminders.proteinTimes = Array.isArray(data.preferences.reminders.proteinTimes) ? data.preferences.reminders.proteinTimes.slice(0, 2) : defaultData().preferences.reminders.proteinTimes.slice();
     while (data.preferences.reminders.waterTimes.length < 2) data.preferences.reminders.waterTimes.push(defaultData().preferences.reminders.waterTimes[data.preferences.reminders.waterTimes.length]);
     while (data.preferences.reminders.proteinTimes.length < 2) data.preferences.reminders.proteinTimes.push(defaultData().preferences.reminders.proteinTimes[data.preferences.reminders.proteinTimes.length]);
-    data.reward = Object.assign({}, defaultData().reward, data.reward || {});
-    data.meta = Object.assign({}, data.meta || {}, { planVersion: "workout-2.5-2026-09-10" });
+    delete data.reward;
+    data.meta = Object.assign({}, data.meta || {}, { planVersion: "workout-2.6-2026-09-13" });
     Object.keys(data.days || {}).forEach(function (iso) {
       var day = data.days[iso];
       day.meals = Array.isArray(day.meals) ? day.meals : [];
+      day.meals.forEach(function (meal) { meal.quantity = Math.max(0.25, number(meal.quantity) || 1); meal.perServing = meal.perServing || nutritionSnapshot(meal, meal.quantity); });
       day.exercises = day.exercises || {};
+      if (day.exercises["single-leg-romanian-deadlift"] && !day.exercises["supported-kickstand-romanian-deadlift"]) day.exercises["supported-kickstand-romanian-deadlift"] = day.exercises["single-leg-romanian-deadlift"];
       Object.keys(day.exercises).forEach(function (id) {
         var log = day.exercises[id];
         if (!Array.isArray(log.sets) && log.reps) log.sets = String(log.reps).split(/[,/]+/).map(function (value) { return value.trim(); }).filter(Boolean);
       });
       day.workout = Object.assign({ completed: false, rating: "", notes: "" }, day.workout || {});
-      day.cardio = Object.assign({ sessionId: "", startedAt: "", status: "" }, day.cardio || {});
-      day.photos = Object.assign({ front: null, side: null, back: null }, day.photos || {});
+      day.cardio = Object.assign({ sessionId: "", startedAt: "", status: "", result: null }, day.cardio || {});
+      day.photos = Object.assign({ front: null, side: null, back: null, treadmill: null }, day.photos || {});
     });
     return data;
   }
@@ -1816,6 +1982,7 @@
   document.getElementById("manual-meal").addEventListener("click", function () { showMealResult({ name: "Meal", calories: "", protein: "", carbs: "", fat: "", fiber: null, saturatedFat: null, addedSugar: null, sodium: null, category: defaultMealCategory(), confidence: "Manual entry", nutritionBasis: "Manual", assumptions: "Enter the package, restaurant, or measured values you trust." }); });
   document.getElementById("save-meal-favorite").addEventListener("change", function (event) { document.getElementById("favorite-category-wrap").hidden = !event.target.checked; });
   document.getElementById("meal-cancel").addEventListener("click", function () { document.getElementById("meal-dialog").close(); });
+  document.getElementById("duplicate-meal-edit").addEventListener("click", duplicateEditingMeal);
   document.getElementById("save-meal").addEventListener("click", saveMeal);
   document.getElementById("ask-meal-advice").addEventListener("click", askMealAdvice);
   document.getElementById("clear-meal-advice").addEventListener("click", clearMealAdvice);
