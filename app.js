@@ -599,16 +599,15 @@
   }
 
   function renderEquipmentPrep(day, plan) {
-    var plates = {}, one = false, two = false;
+    var plates = {};
     exercisesForPlan(plan).forEach(function (exercise) {
       if (!exercise.equipment || exercise.equipment.type !== "dumbbell") return;
       var id = exerciseId(exercise.name), log = day.exercises[id] || {};
       var option = loadOption(number(log.load) || recommendedLoad(exercise, id));
       if (option) option.plates.forEach(function (plate) { plates[plate] = true; });
-      if (exercise.equipment.dumbbells === 1) one = true; else two = true;
     });
     var plateList = Object.keys(plates).map(Number).sort(function (a, b) { return a - b; }).map(function (plate) { return plate + " lb"; }).join(" · ");
-    return '<div class="equipment-prep"><strong>Get these ready</strong><span>Plates: ' + esc(plateList || "none") + '</span><small>' + (one ? "1-dumbbell exercises" : "") + (one && two ? " · " : "") + (two ? "2-dumbbell exercises" : "") + '</small></div>';
+    return '<div class="equipment-prep"><strong>Get these ready</strong><span>Plate sizes needed today: ' + esc(plateList || "none") + '</span></div>';
   }
 
   function renderExerciseLog(plan, exercise, id, log, firstLabel, secondLabel, firstPlaceholder, secondPlaceholder) {
@@ -670,6 +669,7 @@
 
   function renderMeals(day, t) {
     var html = '<section class="card"><div class="card-head"><div><h2>Meals</h2><p>' + Math.round(t.protein) + ' g protein and ' + Math.round(t.calories) + ' calories logged</p></div></div>';
+    html += '<div class="meal-actions"><button id="open-meal" class="primary">Log what I ate</button><button id="open-advice" class="secondary">Help me decide</button><button id="open-manual-meal" class="secondary">Enter macros manually</button></div>';
     if (!day.meals.length) html += '<div class="empty">No meals logged yet</div>';
     day.meals.forEach(function (meal, index) {
       var quantity = number(meal.quantity) || 1;
@@ -677,11 +677,11 @@
       if (meal.photo) html += '<div class="meal-photo ' + (state.revealedPhoto === state.selectedDate + ":meal:" + index ? "revealed" : "") + '"><img alt="Private photo for ' + esc(meal.name || "meal") + '" data-photo-ref="' + esc(photoRefValue(meal.photo)) + '"><button type="button" data-reveal-meal-photo="' + index + '">' + (state.revealedPhoto === state.selectedDate + ":meal:" + index ? "Hide" : "Reveal") + '</button></div>';
       html += '<button type="button" class="meal-summary" data-edit-meal="' + index + '"><strong>' + esc(meal.name || "Meal") + '</strong><small>' + Math.round(number(meal.protein)) + ' g protein · ' + Math.round(number(meal.calories)) + ' cal</small><span>' + (meal.photo ? 'Private photo saved · ' : '') + 'Edit details</span></button>' +
         '<div class="quantity-stepper" aria-label="Quantity for ' + esc(meal.name || "meal") + '"><button type="button" data-meal-quantity="-1" data-meal-index="' + index + '" aria-label="Decrease quantity">−</button><input type="number" min="0.25" max="50" step="0.25" value="' + esc(quantity) + '" data-meal-quantity-input="' + index + '" aria-label="Quantity"><button type="button" data-meal-quantity="1" data-meal-index="' + index + '" aria-label="Increase quantity">+</button></div>' +
-        '<button type="button" data-remove-meal="' + index + '" aria-label="Remove meal">×</button></div>';
+        '<button type="button" class="remove-meal" data-remove-meal="' + index + '" aria-label="Remove ' + esc(meal.name || "meal") + '">×</button></div>';
     });
     html += renderNutritionDetails(t, day.meals.length);
     html += renderFavoritePicker();
-    html += '<div class="meal-actions"><button id="open-meal" class="primary">Log what I ate</button><button id="open-advice" class="secondary">Help me decide</button><button id="open-manual-meal" class="secondary">Enter macros manually</button></div></section>';
+    html += '</section>';
     return html;
   }
 
@@ -1093,6 +1093,7 @@
     var day = getDay(state.selectedDate);
     if (!day.exercises[id]) day.exercises[id] = {};
     day.exercises[id][field] = value;
+    if (field === "done") delete day.exercises[id].autoCompleted;
     var planned = exercisesForPlan(planForDate(state.selectedDate));
     if (field === "done" && value && !day.exercises[id].load) {
       var exercise = planned.find(function (item) { return exerciseId(item.name) === id; });
@@ -1111,7 +1112,23 @@
     sets[index] = value;
     day.exercises[id].sets = sets;
     day.exercises[id].reps = sets.filter(function (item) { return item !== ""; }).join(", ");
-    queueSave(false);
+    var requiredEntries = exercise && exercise.name === "Side Plank" ? 4 : prescribedSetCount(exercise || { prescription: "1 set" });
+    var prescribedSetsComplete = sets.slice(0, requiredEntries).length === requiredEntries && sets.slice(0, requiredEntries).every(function (item) {
+      return String(item == null ? "" : item).trim() !== "" && number(item) > 0;
+    });
+    var completionChanged = false;
+    if (prescribedSetsComplete && !day.exercises[id].done) {
+      day.exercises[id].done = true;
+      day.exercises[id].autoCompleted = true;
+      completionChanged = true;
+    } else if (!prescribedSetsComplete && day.exercises[id].done && day.exercises[id].autoCompleted) {
+      day.exercises[id].done = false;
+      delete day.exercises[id].autoCompleted;
+      completionChanged = true;
+    }
+    var planned = exercisesForPlan(planForDate(state.selectedDate));
+    day.workout.completed = planned.every(function (plannedExercise) { return day.exercises[exerciseId(plannedExercise.name)] && day.exercises[exerciseId(plannedExercise.name)].done; });
+    queueSave(completionChanged);
   }
 
   function addExerciseSet(id) {

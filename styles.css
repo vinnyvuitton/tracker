@@ -113,13 +113,13 @@ textarea { resize: vertical; min-height: 74px; }
 .photo-slot .reveal-photo { color: white; font-weight: 800; text-shadow: 0 1px 8px #000; }
 .photo-slot .remove-photo { inset: 6px 6px auto auto; width: 28px; height: 28px; border-radius: 50%; background: rgba(0,0,0,.72); color: white; }
 
-.meal { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 11px 0; border-top: 1px solid var(--line); }
-.meal.has-photo { grid-template-columns: 52px minmax(0, 1fr) auto auto; }
+.meal { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "summary stepper remove"; gap: 8px; align-items: center; padding: 11px 0; border-top: 1px solid var(--line); }
+.meal.has-photo { grid-template-columns: 52px minmax(0, 1fr) auto auto; grid-template-areas: "photo summary stepper remove"; }
 .meal:first-of-type { border-top: 0; }
 .meal strong { display: block; }
 .meal small { color: var(--muted); }
 .meal button { border: 0; background: transparent; color: var(--muted); }
-.meal .meal-summary { padding: 0; text-align: left; color: var(--text); }
+.meal .meal-summary { grid-area: summary; padding: 0; text-align: left; color: var(--text); }
 .meal-summary small, .meal-summary span { display: block; }
 .meal-summary span { margin-top: 3px; color: var(--blue); font-size: 11px; }
 .meal-photo { position: relative; width: 52px; height: 52px; overflow: hidden; border-radius: 10px; background: #0f0f12; }
@@ -127,13 +127,16 @@ textarea { resize: vertical; min-height: 74px; }
 .meal-photo.revealed img { filter: none; transform: scale(1); }
 .meal-photo button { position: absolute; inset: 0; padding: 2px; color: white; font-size: 9px; font-weight: 800; text-shadow: 0 1px 5px #000; }
 .meal-photo button:last-child { inset: 2px 2px auto auto; width: 22px; height: 22px; border-radius: 50%; background: rgba(0,0,0,.7); }
+.meal > .meal-photo { grid-area: photo; }
 .quantity-stepper, .stepper { display: grid; grid-template-columns: 34px 44px 34px; gap: 4px; align-items: center; }
+.meal .quantity-stepper { grid-area: stepper; }
 .quantity-stepper button, .stepper button { min-width: 34px; height: 38px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel-2); color: var(--text); font-size: 20px; }
 .quantity-stepper input, .stepper input { padding: 8px 3px; text-align: center; }
 .stepper { grid-template-columns: 42px minmax(58px, 1fr) 42px; }
 .favorites-panel { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
 .favorites-panel > summary, .favorite-manager summary { color: var(--blue); cursor: pointer; font-size: 14px; font-weight: 750; }
-.meal-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.meal .remove-meal { grid-area: remove; width: 44px; height: 44px; padding: 0; border-radius: 50%; font-size: 24px; line-height: 1; }
+.meal-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
 .favorite-picker { display: grid; grid-template-columns: minmax(110px, .8fr) minmax(150px, 1.2fr); gap: 8px; margin: 8px 0; }
 .favorite-picker-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .favorite-picker-actions button { flex: 1 1 145px; }
@@ -250,10 +253,9 @@ dialog label { display: grid; gap: 6px; color: var(--muted); font-size: 12px; }
   .pending-actions { justify-content: flex-start; }
   .favorite-picker, .favorite-edit { grid-template-columns: 1fr; }
   .favorite-edit button { justify-self: start; }
-  .meal { grid-template-columns: minmax(0, 1fr) auto; }
-  .meal.has-photo { grid-template-columns: 52px minmax(0, 1fr) auto; }
-  .quantity-stepper { grid-column: 1 / -1; justify-self: end; }
-  .meal.has-photo .quantity-stepper { grid-column: 2 / -1; }
+  .meal { grid-template-columns: minmax(0, 1fr) 44px; grid-template-areas: "summary remove" "stepper stepper"; }
+  .meal.has-photo { grid-template-columns: 52px minmax(0, 1fr) 44px; grid-template-areas: "photo summary remove" ". stepper stepper"; }
+  .quantity-stepper { justify-self: end; }
   dialog { inset: auto 0 0; width: 100%; max-width: none; max-height: calc(100dvh - var(--safe-top) - 8px); margin: 0; padding: 20px 18px calc(18px + var(--safe-bottom)); border-radius: 20px 20px 0 0; }
 }
 
