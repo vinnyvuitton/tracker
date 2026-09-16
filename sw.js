@@ -1,5 +1,5 @@
-const CACHE = "workout-2-shell-v17";
-const SHELL = ["./", "./index.html", "./styles.css?v=2.6.1", "./migration.js?v=2.6.1", "./app.js?v=2.6.1", "./manifest.webmanifest?v=2.6.1", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png"];
+const CACHE = "workout-2-shell-v18";
+const SHELL = ["./", "./index.html", "./styles.css?v=2.7.0", "./migration.js?v=2.7.0", "./app.js?v=2.7.0", "./manifest.webmanifest?v=2.7.0", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)));
@@ -24,14 +24,14 @@ self.addEventListener("fetch", (event) => {
 self.addEventListener("push", (event) => {
   let data = { title: "Workout 2.0", body: "You have a new reminder.", url: "./" };
   try { data = Object.assign(data, event.data.json()); } catch (_) {}
-  event.waitUntil(self.registration.showNotification(data.title, {
+  event.waitUntil(Promise.all([self.registration.showNotification(data.title, {
     body: data.body,
     icon: "./icons/icon-192.png",
     badge: "./icons/icon-192.png",
     tag: data.tag || "workout-reminder",
     renotify: true,
     data: { url: data.url || "./" }
-  }));
+  }), data.cardioComplete ? clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => Promise.all(windows.map((client) => client.postMessage({ type: "cardio-complete", sessionId: data.sessionId, date: data.date, durationMinutes: data.durationMinutes })))) : Promise.resolve()]));
 });
 
 self.addEventListener("notificationclick", (event) => {

@@ -76,6 +76,13 @@ textarea { resize: vertical; min-height: 74px; }
 .exercise input[type="checkbox"]:checked { background: var(--good); border-color: var(--good); }
 .exercise input[type="checkbox"]:checked::after { content: "✓"; display: grid; place-items: center; height: 100%; color: #07120d; font-weight: 900; }
 .exercise-name { font-weight: 750; }
+.exercise-name-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.exercise-count { flex: 0 0 auto; padding: 3px 7px; border: 1px solid var(--line); border-radius: 999px; color: var(--accent-2); background: var(--panel-2); font-size: 11px; font-weight: 850; }
+.exercise-timer { margin: 10px 0 0 38px; display: grid; grid-template-columns: minmax(78px, 1fr) minmax(90px, .8fr) auto auto; gap: 7px; align-items: end; padding: 10px; border: 1px solid color-mix(in srgb, var(--blue) 40%, var(--line)); border-radius: 12px; background: color-mix(in srgb, var(--blue) 7%, var(--panel-2)); }
+.exercise-timer > div { display: grid; }
+.timer-label { color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.exercise-timer strong { font-size: 25px; font-variant-numeric: tabular-nums; }
+.exercise-timer button { padding: 10px 12px; }
 .equipment-badge { display: inline-flex; gap: 2px; margin-left: 8px; color: var(--muted); font-size: 11px; font-weight: 700; vertical-align: middle; }
 .equipment-prep { display: grid; gap: 4px; margin-bottom: 12px; padding: 12px; border: 1px solid color-mix(in srgb, var(--accent-2) 45%, var(--line)); border-radius: 12px; background: color-mix(in srgb, var(--accent-2) 7%, var(--panel)); }
 .equipment-prep span, .equipment-prep small { color: var(--muted); }
@@ -146,6 +153,11 @@ textarea { resize: vertical; min-height: 74px; }
 .favorite-edit button { border: 0; background: transparent; color: #ff7770; padding: 8px; }
 .existing-meal-photo { display: grid; grid-template-columns: 64px 1fr; gap: 10px; align-items: center; color: var(--muted); font-size: 12px; }
 .existing-meal-photo img { width: 64px; height: 64px; border-radius: 10px; object-fit: cover; filter: blur(10px); }
+.meal-photo-preview { display: grid; grid-template-columns: 64px 1fr; gap: 10px; align-items: center; padding: 9px; border: 1px solid var(--line); border-radius: 12px; color: var(--good); font-size: 13px; font-weight: 700; }
+.meal-photo-preview img { width: 64px; height: 64px; object-fit: cover; border-radius: 9px; }
+.meal-photo-preview.status-only { grid-template-columns: 1fr; }
+.meal-photo-preview.status-only img { display: none; }
+.meal-photo-preview[hidden] { display: none; }
 .macro-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px; }
 .keep-photo { grid-template-columns: 22px 1fr; align-items: center; text-transform: none; letter-spacing: 0; }
 .keep-photo input { width: 20px; height: 20px; }
@@ -199,13 +211,20 @@ textarea { resize: vertical; min-height: 74px; }
 .progress-chart circle { fill: var(--accent); stroke: white; stroke-width: 2; }
 .progress-chart .chart-target { stroke: var(--good); stroke-width: 2; stroke-dasharray: 7 7; opacity: .75; }
 .progress-chart .chart-label { fill: var(--muted); font-size: 12px; }
+.progress-chart .chart-y-label { font-variant-numeric: tabular-nums; }
+.progress-chart .chart-grid { stroke: var(--line); stroke-width: 1; }
+.chart-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; margin-top: 12px; }
+.chart-summary > div { padding: 9px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); }
+.chart-summary span, .chart-summary strong { display: block; }
+.chart-summary span { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
+.chart-summary strong { margin-top: 3px; font-size: 14px; }
 .chart-empty { margin-top: 12px; border: 1px dashed var(--line); border-radius: 12px; }
 .reminder-settings summary { color: var(--blue); cursor: pointer; font-weight: 750; }
 .checkin-output { min-height: 320px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
 .notice { border-left: 3px solid var(--blue); padding: 10px 12px; background: color-mix(in srgb, var(--blue) 9%, var(--panel)); border-radius: 0 10px 10px 0; color: var(--muted); font-size: 12px; }
 .notification-card { display: grid; gap: 11px; }
 .notification-status { color: var(--muted); font-size: 13px; margin: 0; }
-.reminder-types { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+.reminder-types { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
 .reminder-types label { display: flex; align-items: center; gap: 7px; padding: 9px; border: 1px solid var(--line); border-radius: 10px; }
 .reminder-types input { width: 18px; height: 18px; }
 .reminder-settings .grid { margin-top: 11px; }
@@ -222,13 +241,27 @@ textarea { resize: vertical; min-height: 74px; }
 .cardio-mode button { border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: var(--panel-2); color: var(--muted); }
 .cardio-mode button.active { color: var(--text); border-color: var(--blue); background: color-mix(in srgb, var(--blue) 12%, var(--panel-2)); }
 .treadmill-result { display: grid; gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
-.treadmill-result .meal-photo { width: 100%; height: 150px; }
+.treadmill-photo { position: relative; width: 100%; height: 190px; overflow: hidden; border-radius: 13px; background: #0f0f12; border: 1px solid var(--line); }
+.treadmill-photo img { width: 100%; height: 100%; object-fit: contain; opacity: 0; filter: blur(18px); transform: scale(1.04); transition: opacity .2s ease, filter .18s ease, transform .18s ease; }
+.treadmill-photo.photo-loaded img { opacity: 1; }
+.treadmill-photo.revealed img { filter: none; transform: scale(1); }
+.photo-load-status { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 13px; pointer-events: none; }
+.treadmill-photo.photo-loaded .photo-load-status { opacity: 0; }
+.treadmill-photo button { position: absolute; border: 0; }
+.treadmill-reveal { inset: 0; width: 100%; background: transparent; color: white; font-weight: 850; text-shadow: 0 1px 8px #000; }
+.treadmill-remove { z-index: 2; top: 7px; right: 7px; width: 32px; height: 32px; padding: 0; border-radius: 50%; background: rgba(0,0,0,.75); color: white; font-size: 22px; }
+.photo-retry { z-index: 2; left: 50%; bottom: 12px; transform: translateX(-50%); background: var(--blue); color: white; }
+.photo-retry[hidden] { display: none; }
 .treadmill-result small { color: var(--muted); }
 .treadmill-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); gap: 7px; }
 .treadmill-fields label { color: var(--muted); font-size: 11px; }
 .treadmill-fields input { margin-top: 4px; }
 .active-session { border-color: var(--good); }
 .error { color: #ff7770; min-height: 18px; }
+.toast { position: fixed; z-index: 30; left: 50%; bottom: calc(82px + var(--safe-bottom)); width: min(calc(100% - 28px), 480px); transform: translateX(-50%); padding: 13px 15px; border: 1px solid var(--line); border-radius: 13px; background: #19191e; color: var(--text); box-shadow: 0 12px 35px rgba(0,0,0,.45); font-size: 14px; font-weight: 700; }
+.toast.success { border-color: color-mix(in srgb, var(--good) 55%, var(--line)); }
+.toast.warning { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+.toast[hidden] { display: none; }
 
 .bottom-nav { position: fixed; z-index: 10; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(4, 1fr); padding: 9px 12px calc(9px + var(--safe-bottom)); border-top: 1px solid var(--line); background: rgba(11,11,13,.93); backdrop-filter: blur(18px); }
 .bottom-nav button { border: 0; background: transparent; color: var(--muted); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; padding: 10px 2px; }
@@ -247,12 +280,15 @@ dialog label { display: grid; gap: 6px; color: var(--muted); font-size: 12px; }
   .grid.two { grid-template-columns: 1fr; }
   .exercise-log { grid-template-columns: 1fr; }
   .load-guide, .effort-buttons, .set-entry { margin-left: 0; }
+  .exercise-timer { margin-left: 0; grid-template-columns: 1fr 1fr; }
   .effort-buttons { grid-template-columns: repeat(2, 1fr); }
   .topbar { align-items: center; }
   .pending-meal { grid-template-columns: 1fr; }
   .pending-actions { justify-content: flex-start; }
   .favorite-picker, .favorite-edit { grid-template-columns: 1fr; }
   .favorite-edit button { justify-self: start; }
+  .chart-summary { grid-template-columns: repeat(2, 1fr); }
+  .reminder-types { grid-template-columns: repeat(2, 1fr); }
   .meal { grid-template-columns: minmax(0, 1fr) 44px; grid-template-areas: "summary remove" "stepper stepper"; }
   .meal.has-photo { grid-template-columns: 52px minmax(0, 1fr) 44px; grid-template-areas: "photo summary remove" ". stepper stepper"; }
   .quantity-stepper { justify-self: end; }

@@ -4,7 +4,7 @@ const MAX_DATA_BYTES = 24 * 1024 * 1024;
 const MAX_PHOTO_BYTES = 1024 * 1024;
 const BACKUP_LIMIT = 30;
 const MEAL_MODEL = "@cf/google/gemma-4-26b-a4b-it";
-const BUILD_ID = "workout-2.6-weekly-coaching";
+const BUILD_ID = "workout-2.7-guided-feedback";
 
 export default {
   async fetch(request, env, ctx) {
@@ -63,6 +63,9 @@ export default {
       }
       if (url.pathname === "/notifications/cardio/start" && request.method === "POST") {
         return await startCardioAlerts(request, env, cors);
+      }
+      if (url.pathname.startsWith("/notifications/cardio/") && request.method === "GET") {
+        return await getCardioAlertsStatus(env, decodeURIComponent(url.pathname.slice(22)), cors);
       }
       if (url.pathname.startsWith("/notifications/cardio/") && request.method === "DELETE") {
         return await cancelCardioAlerts(env, decodeURIComponent(url.pathname.slice(22)), cors);
@@ -462,13 +465,14 @@ async function startCardioAlerts(request, env, cors) {
   if (!alerts.length) return json({ error: "No cardio alerts supplied" }, 400, cors);
   const id = crypto.randomUUID();
   const startedAt = Date.now();
+  const durationMinutes = Math.max(1, Math.min(90, Number(body.durationMinutes) || Math.max(...alerts.map((alert) => alert.atMinutes))));
   const startAlert = body && body.startAlert ? {
     title: String(body.startAlert.title || "Time to rock 🤘🏻").slice(0, 90),
     body: String(body.startAlert.body || "Your treadmill session is ready.").slice(0, 240),
     tag: "cardio-start-" + id,
     url: "https://vinnyvuitton.github.io/tracker/"
   } : null;
-  await env.TRACKER_KV.put("cardio:" + id, JSON.stringify({ id, date: String(body.date || ""), title: String(body.title || "Cardio"), startedAt, alerts, sent: [], status: "active" }), { expirationTtl: 7200 });
+  await env.TRACKER_KV.put("cardio:" + id, JSON.stringify({ id, date: String(body.date || ""), title: String(body.title || "Cardio"), startedAt, durationMinutes, alerts, sent: [], status: "active" }), { expirationTtl: 7200 });
   try {
     if (startAlert) await broadcastPush(env, startAlert);
     await Promise.all(alerts.map((alert, index) => env.ALERT_QUEUE.send({
@@ -476,13 +480,20 @@ async function startCardioAlerts(request, env, cors) {
       sessionId: id,
       index,
       final: index === alerts.length - 1,
-      payload: { title: alert.title, body: alert.body, tag: "cardio-" + id + "-" + index, url: "https://vinnyvuitton.github.io/tracker/" }
+      payload: { title: alert.title, body: alert.body, tag: "cardio-" + id + "-" + index, url: "https://vinnyvuitton.github.io/tracker/", cardioComplete: index === alerts.length - 1, sessionId: id, date: String(body.date || ""), durationMinutes }
     }, { delaySeconds: Math.max(1, Math.round(alert.atMinutes * 60)) })));
   } catch (error) {
     await env.TRACKER_KV.delete("cardio:" + id);
     throw error;
   }
   return json({ ok: true, id, startedAt: new Date(startedAt).toISOString() }, 200, cors);
+}
+
+async function getCardioAlertsStatus(env, id, cors) {
+  if (!/^[a-f0-9-]{20,60}$/i.test(id)) return json({ error: "Invalid cardio session" }, 400, cors);
+  const session = await env.TRACKER_KV.get("cardio:" + id, "json");
+  if (!session) return json({ error: "Cardio session not found" }, 404, cors);
+  return json({ id: session.id, date: session.date, startedAt: new Date(session.startedAt).toISOString(), durationMinutes: session.durationMinutes, status: session.status }, 200, cors);
 }
 
 async function cancelCardioAlerts(env, id, cors) {
@@ -512,15 +523,16 @@ async function sendDailyReminder(now, env) {
   const hhmm = parts.hour.padStart(2, "0") + parts.minute.padStart(2, "0");
   const saved = await env.TRACKER_KV.get(DATA_KEY, "json");
   const day = saved && saved.payload && saved.payload.days && saved.payload.days[parts.iso] || {};
-  const targets = saved && saved.payload && saved.payload.targets || { protein: 150, water: 10 };
+  const targets = saved && saved.payload && saved.payload.targets || { protein: 150, water: 10, calories: 1850, calorieMax: 1950 };
   const reminders = saved && saved.payload && saved.payload.preferences && saved.payload.preferences.reminders || {
-    workout: true, water: true, protein: true, pausedDate: "", workoutTime: "04:10", waterTimes: ["07:00", "16:30"], proteinTimes: ["12:00", "20:30"], quietStart: "23:00", quietEnd: "04:00"
+    workout: true, water: true, protein: true, calories: true, pausedDate: "", workoutTime: "04:10", waterTimes: ["07:00", "16:30"], proteinTimes: ["12:00", "20:30"], calorieTimes: ["13:00", "17:00", "21:00"], dinnerReserve: 600, quietStart: "23:00", quietEnd: "04:00"
   };
   if (reminders.pausedDate === parts.iso || inQuietHours(hhmm, reminders.quietStart, reminders.quietEnd)) return;
   let type = "";
   if (hhmm === compactTime(reminders.workoutTime)) type = "workout";
   if ((reminders.waterTimes || []).some((value) => hhmm === compactTime(value))) type = "water";
   if ((reminders.proteinTimes || []).some((value) => hhmm === compactTime(value))) type = "protein";
+  if ((reminders.calorieTimes || []).some((value) => hhmm === compactTime(value))) type = "calories";
   if (!type || reminders[type] === false) return;
   const marker = "reminder:" + parts.iso + ":" + type + ":" + hhmm;
   if (await env.TRACKER_KV.get(marker)) return;
@@ -542,6 +554,17 @@ async function sendDailyReminder(now, env) {
     const expected = pacedTarget(Number(targets.protein) || 150, hhmm, reminders.quietEnd, reminders.quietStart);
     if (!proteinLeft || totals.protein >= expected) return;
     message = { title: "Protein pace check", body: "About " + proteinLeft + " g remain today. Aim to be near " + expected + " g by now so dinner doesn’t have to do all the work." };
+  }
+  if (type === "calories") {
+    const calorieTarget = Number(targets.calories) || 1850;
+    const calorieMax = Number(targets.calorieMax) || calorieTarget + 100;
+    const remaining = Math.round(calorieTarget - totals.calories);
+    const hour = Number(parts.hour);
+    const reserve = Math.max(300, Number(reminders.dinnerReserve) || 600);
+    if (totals.calories > calorieMax) message = { title: "Calorie pace check", body: "You’re about " + Math.round(totals.calories - calorieMax) + " calories above today’s target zone. Keep the next choice light and protein-forward—one day does not define your progress." };
+    else if (hour < 17 && remaining < reserve) message = { title: "Save some room for dinner", body: "About " + Math.max(0, remaining) + " calories remain today. Holding off or choosing something very light now will leave dinner more comfortable." };
+    else if (hour >= 17 && remaining <= 350) message = { title: "You’re close to today’s calorie target", body: "About " + Math.max(0, remaining) + " calories remain. A lighter, protein-forward choice keeps you in range." };
+    else return;
   }
   if (!message) return;
   await broadcastPush(env, { ...message, tag: marker, url: "https://vinnyvuitton.github.io/tracker/" });

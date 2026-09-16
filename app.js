@@ -187,7 +187,11 @@
     pendingRetryStarted: false,
     pendingRetryTimer: null,
     serviceWorker: null,
-    notificationEnabled: false
+    notificationEnabled: false,
+    exerciseTimer: null,
+    cardioPollTimer: null,
+    mealPhotoPreviewUrl: "",
+    toastTimer: null
   };
 
   function ex(name, prescription, tip, equipment) {
@@ -250,8 +254,9 @@
       preferences: {
         notifications: true,
         reminders: {
-          workout: true, water: true, protein: true, pausedDate: "",
+          workout: true, water: true, protein: true, calories: true, pausedDate: "",
           workoutTime: "04:10", waterTimes: ["07:00", "16:30"], proteinTimes: ["12:00", "20:30"],
+          calorieTimes: ["13:00", "17:00", "21:00"], dinnerReserve: 600,
           quietStart: "23:00", quietEnd: "04:00"
         }
       },
@@ -268,7 +273,7 @@
       meals: [],
       exercises: {},
       workout: { completed: false, rating: "", notes: "" },
-      cardio: { sessionId: "", startedAt: "", status: "", result: null },
+      cardio: { sessionId: "", startedAt: "", status: "", durationMinutes: 0, completedAt: "", result: null },
       photos: { front: null, side: null, back: null, treadmill: null },
       cannabis: "",
       cannabisNote: "",
@@ -354,6 +359,20 @@
   }
   function clearPhotoInputs(libraryId, cameraId) {
     [libraryId, cameraId].forEach(function (id) { var input = document.getElementById(id); if (input) input.value = ""; });
+  }
+  function clearMealPhotoPreview() {
+    if (state.mealPhotoPreviewUrl) URL.revokeObjectURL(state.mealPhotoPreviewUrl);
+    state.mealPhotoPreviewUrl = "";
+    var preview = document.getElementById("meal-photo-preview");
+    if (preview) { preview.hidden = true; preview.classList.remove("status-only"); }
+  }
+  function showMealPhotoPreview(file) {
+    clearMealPhotoPreview();
+    if (!file) return;
+    state.mealPhotoPreviewUrl = URL.createObjectURL(file);
+    document.getElementById("meal-photo-preview-image").src = state.mealPhotoPreviewUrl;
+    document.getElementById("meal-photo-status").textContent = "Photo attached—ready to analyze.";
+    document.getElementById("meal-photo-preview").hidden = false;
   }
   function esc(value) { return String(value == null ? "" : value).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]; }); }
   function pct(value, target) { return target > 0 ? clamp(Math.round((value / target) * 100), 0, 100) : 0; }
@@ -486,6 +505,24 @@
     hydratePhotos();
   }
 
+  function showFeedback(message, tone) {
+    var toast = document.getElementById("toast");
+    if (!toast) return;
+    clearTimeout(state.toastTimer);
+    toast.textContent = message;
+    toast.className = "toast " + (tone || "");
+    toast.hidden = false;
+    state.toastTimer = setTimeout(function () { toast.hidden = true; }, 4800);
+  }
+
+  function showMealFeedback(day, name) {
+    var t = totals(day);
+    var calorieLeft = Math.round(number(state.data.targets.calories) - t.calories);
+    var proteinLeft = Math.max(0, Math.round(number(state.data.targets.protein) - t.protein));
+    var message = calorieLeft >= 0 ? name + " saved. About " + calorieLeft + " calories and " + proteinLeft + " g protein remain." : name + " saved. You’re about " + Math.abs(calorieLeft) + " calories over today’s center target—keep the next choice light.";
+    showFeedback(message, calorieLeft < 0 ? "warning" : "success");
+  }
+
   function header(title, eyebrow) {
     var syncClass = state.sync === "Saved" ? "good" : state.sync.indexOf("failed") >= 0 ? "bad" : "";
     return '<header class="topbar"><div><div class="brand">Workout 2.0</div><p class="eyebrow">' + esc(eyebrow) + '</p><h1>' + esc(title) + '</h1></div>' +
@@ -573,17 +610,19 @@
       if (/Lower/.test(plan.title)) html += '<details class="recovery-option"><summary>Still very sore? Use the recovery version</summary><p>Use bench support, keep every load the same or lighter, and complete two controlled sets per lower-body exercise. Stop if soreness changes your normal movement or becomes sharp pain.</p></details>';
     }
     if (plan.type === "Cardio") html += renderCardioGuide(day, plan);
+    var exercisePosition = 0;
     plan.sections.forEach(function (section) {
       html += '<div class="section-label">' + esc(section.label) + '</div>';
       section.exercises.forEach(function (exercise) {
+        exercisePosition++;
         var id = exerciseId(exercise.name);
         var log = day.exercises[id] || {};
         var firstLabel = plan.type === "Strength" ? "Load used" : plan.type === "Cardio" ? "Adjustments made" : "Setup used";
         var secondLabel = plan.type === "Strength" ? "Reps completed" : plan.type === "Cardio" ? "Minutes completed" : "Notes";
         var firstPlaceholder = plan.type === "Strength" ? "Choose below" : plan.type === "Cardio" ? "Example: incline 5 felt right" : "Optional";
         var secondPlaceholder = plan.type === "Strength" ? "Example: 12, 12, 11" : plan.type === "Cardio" ? String(cardioDuration(plan)) : "Optional";
-        html += '<div class="exercise"><div class="exercise-main"><input type="checkbox" data-exercise-done="' + id + '" ' + (log.done ? "checked" : "") + ' aria-label="Complete ' + esc(exercise.name) + '"><div><div class="exercise-name">' + esc(exercise.name) + equipmentBadge(exercise) + '</div><div class="exercise-prescription">' + esc(exercise.prescription) + '</div>' + exerciseGuide(exercise) + '</div></div>' +
-          renderExerciseLog(plan, exercise, id, log, firstLabel, secondLabel, firstPlaceholder, secondPlaceholder) + '</div>';
+        html += '<div class="exercise"><div class="exercise-main"><input type="checkbox" data-exercise-done="' + id + '" ' + (log.done ? "checked" : "") + ' aria-label="Complete ' + esc(exercise.name) + '"><div><div class="exercise-name-row"><div class="exercise-name">' + esc(exercise.name) + equipmentBadge(exercise) + '</div>' + (plan.type === "Strength" ? '<span class="exercise-count">' + exercisePosition + '/' + total + '</span>' : '') + '</div><div class="exercise-prescription">' + esc(exercise.prescription) + '</div>' + exerciseGuide(exercise) + '</div></div>' +
+          renderTimedExerciseTimer(plan, exercise, id) + renderExerciseLog(plan, exercise, id, log, firstLabel, secondLabel, firstPlaceholder, secondPlaceholder) + '</div>';
       });
     });
     html += '<label class="field">Session effort<select id="session-rating"><option value="">Choose after training</option>';
@@ -643,21 +682,44 @@
     return '<div class="set-entry"><div class="set-grid side-plank-grid">' + sets.map(function (value, index) { return '<label>' + labels[index] + ' (sec)<input data-exercise-set="' + id + '" data-set-index="' + index + '" inputmode="numeric" min="0" value="' + esc(value) + '"></label>'; }).join("") + '</div></div>';
   }
 
+  function timedExerciseOptions(exercise) {
+    if (!exercise || !/sec|second/i.test(exercise.prescription || "")) return [];
+    var values = (exercise.prescription.match(/\d+/g) || []).map(Number).filter(function (value) { return value >= 10 && value <= 180; });
+    if (!values.length) return [30];
+    var low = Math.min.apply(Math, values), high = Math.max.apply(Math, values);
+    return low === high ? [low] : [low, Math.round((low + high) / 2), high].filter(function (value, index, list) { return list.indexOf(value) === index; });
+  }
+
+  function renderTimedExerciseTimer(plan, exercise, id) {
+    if (plan.type !== "Strength") return "";
+    var options = timedExerciseOptions(exercise);
+    if (!options.length) return "";
+    var timer = state.exerciseTimer && state.exerciseTimer.id === id ? state.exerciseTimer : null;
+    var selected = timer ? timer.duration : options[0];
+    var remaining = timer ? timer.remaining : selected;
+    return '<div class="exercise-timer"><div><span class="timer-label">Stopwatch</span><strong data-timer-display="' + id + '">' + formatTimer(remaining) + '</strong></div><select data-timer-duration="' + id + '" aria-label="Timer length for ' + esc(exercise.name) + '">' + options.map(function (seconds) { return '<option value="' + seconds + '" ' + (selected === seconds ? "selected" : "") + '>' + seconds + ' sec</option>'; }).join("") + '</select><button type="button" class="primary" data-timer-start="' + id + '">' + (timer && timer.running ? "Pause" : timer && timer.remaining < timer.duration ? "Resume" : "Start") + '</button><button type="button" class="ghost" data-timer-reset="' + id + '">Reset</button></div>';
+  }
+
+  function formatTimer(seconds) {
+    seconds = Math.max(0, Math.ceil(number(seconds)));
+    return Math.floor(seconds / 60) + ":" + String(seconds % 60).padStart(2, "0");
+  }
+
   function renderCardioGuide(day, plan) {
     var duration = cardioDuration(plan);
     var active = day.cardio && day.cardio.status === "active";
-    if (active && day.cardio.startedAt && Date.now() - new Date(day.cardio.startedAt).getTime() > (duration + 1) * 60 * 1000) active = false;
+    var complete = day.cardio && day.cardio.status === "complete";
     var html = plan.expressSegments ? '<div class="cardio-mode"><button type="button" data-cardio-mode="full" class="' + (state.cardioMode === "full" ? "active" : "") + '">Full · 60 min</button><button type="button" data-cardio-mode="express" class="' + (state.cardioMode === "express" ? "active" : "") + '">Express · 30 min</button></div>' : '';
     html += '<div class="cardio-timeline">';
     cardioSegmentsFor(plan).forEach(function (segment) {
       html += '<div class="cardio-step"><time>' + segment.start + '–' + segment.end + ' min</time><div><strong>Incline ' + segment.incline + ' · speed ' + segment.speed.toFixed(1) + ' mph</strong><span>' + esc(segment.cue) + '</span></div></div>';
     });
-    html += '</div><div class="cardio-controls"><button class="primary" id="start-cardio" ' + (active ? "disabled" : "") + '>' + (active ? "Session alerts active" : "Start " + duration + "-minute session") + '</button>';
+    html += '</div><div class="cardio-controls"><button class="primary" id="start-cardio" ' + (active ? "disabled" : "") + '>' + (active ? "Session alerts active" : complete ? "Start another " + duration + "-minute session" : "Start " + duration + "-minute session") + '</button>';
     if (active) html += '<button class="secondary" id="cancel-cardio">Cancel alerts</button>';
-    html += '</div><p class="notification-status">' + (state.notificationEnabled ? "You can switch to YouTube—push alerts will tell you every incline and speed change." : "Enable notifications first so alerts can reach you while YouTube is open.") + '</p>';
+    html += '</div><p class="notification-status">' + (complete ? "Session complete · " + number(day.cardio.durationMinutes || duration) + " minutes logged automatically." : state.notificationEnabled ? "You can switch to YouTube—push alerts will tell you every incline and speed change." : "Enable notifications first so alerts can reach you while YouTube is open.") + '</p>';
     var treadmillRef = day.photos && day.photos.treadmill;
     html += '<div class="treadmill-result"><strong>Workout result</strong>';
-    if (treadmillRef) html += '<div class="meal-photo ' + (state.revealedPhoto === state.selectedDate + ":treadmill" ? "revealed" : "") + '"><img alt="Treadmill results" data-photo-ref="' + esc(photoRefValue(treadmillRef)) + '"><button type="button" data-reveal-photo="treadmill">' + (state.revealedPhoto === state.selectedDate + ":treadmill" ? "Hide result" : "Reveal result") + '</button><button type="button" data-remove-photo="treadmill" aria-label="Remove treadmill result">×</button></div>';
+    if (treadmillRef) html += '<div class="treadmill-photo ' + (state.revealedPhoto === state.selectedDate + ":treadmill" ? "revealed" : "") + '" data-photo-container="treadmill"><img alt="Treadmill results" data-photo-ref="' + esc(photoRefValue(treadmillRef)) + '"><span class="photo-load-status" data-photo-status>Loading photo…</span><button type="button" class="treadmill-reveal" data-reveal-photo="treadmill">' + (state.revealedPhoto === state.selectedDate + ":treadmill" ? "Hide result" : "Reveal result") + '</button><button type="button" class="photo-retry" data-retry-photo="treadmill" hidden>Retry photo</button><button type="button" class="treadmill-remove" data-remove-photo="treadmill" aria-label="Remove treadmill result">×</button></div>';
     else html += '<button type="button" class="secondary" data-add-photo="treadmill">Upload treadmill results photo</button>';
     if (day.cardio && day.cardio.result) {
       var result = day.cardio.result;
@@ -680,7 +742,6 @@
         '<button type="button" class="remove-meal" data-remove-meal="' + index + '" aria-label="Remove ' + esc(meal.name || "meal") + '">×</button></div>';
     });
     html += renderNutritionDetails(t, day.meals.length);
-    html += renderFavoritePicker();
     html += '</section>';
     return html;
   }
@@ -809,19 +870,31 @@
     return Object.keys(groups).sort().map(function (week) { return { iso: week, value: groups[week].reduce(function (sum, value) { return sum + value; }, 0) / groups[week].length }; });
   }
 
-  function renderSvgChart(points, target) {
+  function metricUnit(metric) { return metric === "weight" || metric === "exercise" ? "lb" : metric === "protein" ? "g" : metric === "calories" ? "cal" : metric === "water" ? "glasses" : "%"; }
+
+  function formatMetricValue(metric, value) {
+    var rounded = metric === "weight" || metric === "exercise" ? Math.round(value * 10) / 10 : Math.round(value);
+    return rounded + " " + metricUnit(metric);
+  }
+
+  function renderSvgChart(points, target, metric) {
     if (!points.length) return '<div class="empty chart-empty">No data in this timeframe yet.</div>';
-    var width = 640, height = 230, padX = 34, padY = 24;
+    var width = 640, height = 250, padLeft = 58, padRight = 34, padY = 24;
     var values = points.map(function (point) { return point.value; });
     var min = Math.min.apply(Math, values.concat(target ? [target] : []));
     var max = Math.max.apply(Math, values.concat(target ? [target] : []));
     if (min === max) { min = Math.max(0, min - 1); max += 1; }
-    var x = function (index) { return padX + (points.length === 1 ? (width - padX * 2) / 2 : index * (width - padX * 2) / (points.length - 1)); };
+    var x = function (index) { return padLeft + (points.length === 1 ? (width - padLeft - padRight) / 2 : index * (width - padLeft - padRight) / (points.length - 1)); };
     var y = function (value) { return padY + (max - value) * (height - padY * 2) / (max - min); };
     var path = points.map(function (point, index) { return (index ? "L" : "M") + x(index).toFixed(1) + " " + y(point.value).toFixed(1); }).join(" ");
-    var targetLine = target ? '<line class="chart-target" x1="' + padX + '" x2="' + (width - padX) + '" y1="' + y(target).toFixed(1) + '" y2="' + y(target).toFixed(1) + '"></line><text class="chart-label" x="' + (width - padX) + '" y="' + (y(target) - 7).toFixed(1) + '" text-anchor="end">target ' + esc(target) + '</text>' : '';
-    var dots = points.map(function (point, index) { return '<circle cx="' + x(index).toFixed(1) + '" cy="' + y(point.value).toFixed(1) + '" r="4"><title>' + esc(formatDate(point.iso, { month: "short", day: "numeric" })) + ': ' + esc(Math.round(point.value * 10) / 10) + '</title></circle>'; }).join("");
-    return '<div class="chart-wrap"><svg class="progress-chart" viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="Progress chart">' + targetLine + '<path d="' + path + '"></path>' + dots + '<text class="chart-label" x="' + padX + '" y="' + (height - 3) + '">' + esc(formatDate(points[0].iso, { month: "short", day: "numeric" })) + '</text><text class="chart-label" x="' + (width - padX) + '" y="' + (height - 3) + '" text-anchor="end">' + esc(formatDate(points[points.length - 1].iso, { month: "short", day: "numeric" })) + '</text></svg></div>';
+    var grid = "";
+    for (var tick = 0; tick <= 4; tick++) {
+      var tickValue = min + (max - min) * tick / 4, tickY = y(tickValue);
+      grid += '<line class="chart-grid" x1="' + padLeft + '" x2="' + (width - padRight) + '" y1="' + tickY.toFixed(1) + '" y2="' + tickY.toFixed(1) + '"></line><text class="chart-label chart-y-label" x="' + (padLeft - 8) + '" y="' + (tickY + 4).toFixed(1) + '" text-anchor="end">' + esc(metric === "weight" || metric === "exercise" ? tickValue.toFixed(1) : Math.round(tickValue)) + '</text>';
+    }
+    var targetLine = target ? '<line class="chart-target" x1="' + padLeft + '" x2="' + (width - padRight) + '" y1="' + y(target).toFixed(1) + '" y2="' + y(target).toFixed(1) + '"></line><text class="chart-label" x="' + (width - padRight) + '" y="' + (y(target) - 7).toFixed(1) + '" text-anchor="end">target ' + esc(target) + '</text>' : '';
+    var dots = points.map(function (point, index) { return '<circle cx="' + x(index).toFixed(1) + '" cy="' + y(point.value).toFixed(1) + '" r="5" tabindex="0"><title>' + esc(formatDate(point.iso, { month: "short", day: "numeric" })) + ': ' + esc(formatMetricValue(metric, point.value)) + '</title></circle>'; }).join("");
+    return '<div class="chart-wrap"><svg class="progress-chart" viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="Progress chart with numeric scale in ' + esc(metricUnit(metric)) + '">' + grid + targetLine + '<path d="' + path + '"></path>' + dots + '<text class="chart-label" x="' + padLeft + '" y="' + (height - 3) + '">' + esc(formatDate(points[0].iso, { month: "short", day: "numeric" })) + '</text><text class="chart-label" x="' + (width - padRight) + '" y="' + (height - 3) + '" text-anchor="end">' + esc(formatDate(points[points.length - 1].iso, { month: "short", day: "numeric" })) + '</text></svg></div>';
   }
 
   function renderProgressChart() {
@@ -834,10 +907,11 @@
     var average = points.length ? points.reduce(function (sum, point) { return sum + point.value; }, 0) / points.length : 0;
     var previousAverage = previous.length ? previous.reduce(function (sum, point) { return sum + point.value; }, 0) / previous.length : 0;
     var difference = average - previousAverage;
+    var summary = points.length ? '<div class="chart-summary"><div><span>Latest</span><strong>' + esc(formatMetricValue(state.progressMetric, points[points.length - 1].value)) + '</strong></div><div><span>Average</span><strong>' + esc(formatMetricValue(state.progressMetric, average)) + '</strong></div><div><span>Low</span><strong>' + esc(formatMetricValue(state.progressMetric, Math.min.apply(Math, points.map(function (point) { return point.value; })))) + '</strong></div><div><span>High</span><strong>' + esc(formatMetricValue(state.progressMetric, Math.max.apply(Math, points.map(function (point) { return point.value; })))) + '</strong></div></div>' : '';
     return '<section class="card progress-visual"><div class="card-head"><div><p class="eyebrow">Explore your data</p><h2>Progress graph</h2><p>' + (previousAverage ? (difference >= 0 ? "+" : "") + difference.toFixed(1) + ' versus the preceding period' : 'Choose a metric and timeframe') + '</p></div></div>' +
       '<div class="range-tabs">' + PROGRESS_RANGES.map(function (range) { var label = range === "all" ? "All" : range === 30 ? "1 mo" : range === 90 ? "3 mo" : range + " d"; return '<button type="button" data-progress-range="' + range + '" class="' + (String(state.progressRange) === String(range) ? "active" : "") + '">' + label + '</button>'; }).join("") + '</div>' +
       '<div class="progress-filters"><label class="field">Metric<select id="progress-metric">' + options.map(function (option) { return '<option value="' + option.value + '" ' + (state.progressMetric === option.value ? "selected" : "") + '>' + option.label + '</option>'; }).join("") + '</select></label>' +
-      (state.progressMetric === "exercise" ? '<label class="field">Exercise<select id="progress-exercise">' + exercises.map(function (exercise) { return '<option value="' + exercise.id + '" ' + (state.progressExercise === exercise.id ? "selected" : "") + '>' + esc(exercise.name) + '</option>'; }).join("") + '</select></label>' : '') + '</div>' + renderSvgChart(points, chartTarget(state.progressMetric)) + '</section>';
+      (state.progressMetric === "exercise" ? '<label class="field">Exercise<select id="progress-exercise">' + exercises.map(function (exercise) { return '<option value="' + exercise.id + '" ' + (state.progressExercise === exercise.id ? "selected" : "") + '>' + esc(exercise.name) + '</option>'; }).join("") + '</select></label>' : '') + '</div>' + summary + renderSvgChart(points, chartTarget(state.progressMetric), state.progressMetric) + '</section>';
   }
 
   function renderGoalProgress() {
@@ -906,8 +980,8 @@
     var paused = reminders.pausedDate === TODAY;
     return '<section class="card notification-card"><div><p class="eyebrow">Smart phone alerts</p><h2>Only nudge me when I’m behind</h2><p class="notification-status">Water and protein reminders compare your logged progress with the time of day. Completed targets stay quiet. Cardio alerts continue while another app is open.</p></div>' +
       '<button id="enable-notifications" class="' + (state.notificationEnabled ? "secondary" : "primary") + '">' + (state.notificationEnabled ? "Notifications enabled" : "Enable notifications") + '</button><p id="notification-message" class="notification-status"></p>' +
-      '<div class="reminder-types"><label><input type="checkbox" data-reminder-toggle="workout" ' + (reminders.workout ? "checked" : "") + '> Workout</label><label><input type="checkbox" data-reminder-toggle="water" ' + (reminders.water ? "checked" : "") + '> Water</label><label><input type="checkbox" data-reminder-toggle="protein" ' + (reminders.protein ? "checked" : "") + '> Protein</label></div>' +
-      '<details class="reminder-settings"><summary>Reminder schedule</summary><div class="grid two"><label class="field">Workout<input type="time" step="600" data-reminder-time="workoutTime" value="' + esc(reminders.workoutTime) + '"></label><label class="field">Morning water<input type="time" step="600" data-reminder-time="waterTimes.0" value="' + esc(reminders.waterTimes[0]) + '"></label><label class="field">Afternoon water<input type="time" step="600" data-reminder-time="waterTimes.1" value="' + esc(reminders.waterTimes[1]) + '"></label><label class="field">Midday protein<input type="time" step="600" data-reminder-time="proteinTimes.0" value="' + esc(reminders.proteinTimes[0]) + '"></label><label class="field">Evening protein<input type="time" step="600" data-reminder-time="proteinTimes.1" value="' + esc(reminders.proteinTimes[1]) + '"></label><label class="field">Quiet hours start<input type="time" step="600" data-reminder-time="quietStart" value="' + esc(reminders.quietStart) + '"></label><label class="field">Quiet hours end<input type="time" step="600" data-reminder-time="quietEnd" value="' + esc(reminders.quietEnd) + '"></label></div></details>' +
+      '<div class="reminder-types"><label><input type="checkbox" data-reminder-toggle="workout" ' + (reminders.workout ? "checked" : "") + '> Workout</label><label><input type="checkbox" data-reminder-toggle="water" ' + (reminders.water ? "checked" : "") + '> Water</label><label><input type="checkbox" data-reminder-toggle="protein" ' + (reminders.protein ? "checked" : "") + '> Protein</label><label><input type="checkbox" data-reminder-toggle="calories" ' + (reminders.calories ? "checked" : "") + '> Calories</label></div>' +
+      '<details class="reminder-settings"><summary>Reminder schedule</summary><div class="grid two"><label class="field">Workout<input type="time" step="600" data-reminder-time="workoutTime" value="' + esc(reminders.workoutTime) + '"></label><label class="field">Morning water<input type="time" step="600" data-reminder-time="waterTimes.0" value="' + esc(reminders.waterTimes[0]) + '"></label><label class="field">Afternoon water<input type="time" step="600" data-reminder-time="waterTimes.1" value="' + esc(reminders.waterTimes[1]) + '"></label><label class="field">Midday protein<input type="time" step="600" data-reminder-time="proteinTimes.0" value="' + esc(reminders.proteinTimes[0]) + '"></label><label class="field">Evening protein<input type="time" step="600" data-reminder-time="proteinTimes.1" value="' + esc(reminders.proteinTimes[1]) + '"></label><label class="field">Calorie pace 1<input type="time" step="600" data-reminder-time="calorieTimes.0" value="' + esc(reminders.calorieTimes[0]) + '"></label><label class="field">Calorie pace 2<input type="time" step="600" data-reminder-time="calorieTimes.1" value="' + esc(reminders.calorieTimes[1]) + '"></label><label class="field">Calorie pace 3<input type="time" step="600" data-reminder-time="calorieTimes.2" value="' + esc(reminders.calorieTimes[2]) + '"></label><label class="field">Calories to reserve for dinner<input type="number" min="300" max="1200" step="50" data-reminder-number="dinnerReserve" value="' + esc(reminders.dinnerReserve) + '"></label><label class="field">Quiet hours start<input type="time" step="600" data-reminder-time="quietStart" value="' + esc(reminders.quietStart) + '"></label><label class="field">Quiet hours end<input type="time" step="600" data-reminder-time="quietEnd" value="' + esc(reminders.quietEnd) + '"></label></div></details>' +
       '<button type="button" id="pause-reminders" class="ghost">' + (paused ? "Resume today’s reminders" : "Pause reminders for today") + '</button></section>';
   }
 
@@ -1039,6 +1113,7 @@
         else reminderSettings()[parts[0]] = value;
         queueSave(false);
       }); });
+      document.querySelectorAll("[data-reminder-number]").forEach(function (input) { input.addEventListener("change", function () { reminderSettings()[input.dataset.reminderNumber] = clamp(number(input.value), 300, 1200); queueSave(false); }); });
       var pauseReminders = document.getElementById("pause-reminders");
       if (pauseReminders) pauseReminders.addEventListener("click", function () { reminderSettings().pausedDate = reminderSettings().pausedDate === TODAY ? "" : TODAY; queueSave(true); });
       document.querySelectorAll("[data-weekly-checkin]").forEach(function (input) { input.addEventListener("change", function () { var range = lastCompletedWeek(); weeklyCheckin(range.start)[input.dataset.weeklyCheckin] = input.value.trim(); queueSave(true); }); });
@@ -1057,24 +1132,18 @@
     document.querySelectorAll("[data-exercise-set]").forEach(function (input) { input.addEventListener("change", function () { updateExerciseSet(input.dataset.exerciseSet, Number(input.dataset.setIndex), input.value); }); });
     document.querySelectorAll("[data-add-set]").forEach(function (button) { button.addEventListener("click", function () { addExerciseSet(button.dataset.addSet); }); });
     document.querySelectorAll("[data-load-feel]").forEach(function (button) { button.addEventListener("click", function () { updateExercise(button.dataset.loadFeel, "loadFeel", button.dataset.feel); }); });
+    document.querySelectorAll("[data-timer-start]").forEach(function (button) { button.addEventListener("click", function () { toggleExerciseTimer(button.dataset.timerStart); }); });
+    document.querySelectorAll("[data-timer-reset]").forEach(function (button) { button.addEventListener("click", function () { resetExerciseTimer(button.dataset.timerReset); }); });
+    document.querySelectorAll("[data-timer-duration]").forEach(function (select) { select.addEventListener("change", function () { setExerciseTimerDuration(select.dataset.timerDuration, Number(select.value)); }); });
     document.querySelectorAll("[data-add-photo]").forEach(function (button) { button.addEventListener("click", function () { openPhotoDialog(button.dataset.addPhoto); }); });
     document.querySelectorAll("[data-reveal-photo]").forEach(function (button) { button.addEventListener("click", function () { togglePhotoReveal(button.dataset.revealPhoto); }); });
     document.querySelectorAll("[data-remove-photo]").forEach(function (button) { button.addEventListener("click", function () { removePhoto(button.dataset.removePhoto); }); });
+    document.querySelectorAll("[data-retry-photo]").forEach(function (button) { button.addEventListener("click", function () { retryPhoto(button); }); });
     document.querySelectorAll("[data-remove-meal]").forEach(function (button) { button.addEventListener("click", function () { getDay(state.selectedDate).meals.splice(Number(button.dataset.removeMeal), 1); queueSave(true); }); });
     document.querySelectorAll("[data-edit-meal]").forEach(function (button) { button.addEventListener("click", function () { var index = Number(button.dataset.editMeal); openMealDialog(true, getDay(state.selectedDate).meals[index], { date: state.selectedDate, index: index }); }); });
     document.querySelectorAll("[data-meal-quantity]").forEach(function (button) { button.addEventListener("click", function () { var index = Number(button.dataset.mealIndex), meal = getDay(state.selectedDate).meals[index]; setMealQuantity(index, (number(meal.quantity) || 1) + Number(button.dataset.mealQuantity)); }); });
     document.querySelectorAll("[data-meal-quantity-input]").forEach(function (input) { input.addEventListener("change", function () { setMealQuantity(Number(input.dataset.mealQuantityInput), input.value); }); });
     document.querySelectorAll("[data-reveal-meal-photo]").forEach(function (button) { button.addEventListener("click", function () { var key = state.selectedDate + ":meal:" + button.dataset.revealMealPhoto; state.revealedPhoto = state.revealedPhoto === key ? null : key; render(); }); });
-    document.querySelectorAll(".favorites-panel, .favorite-manager").forEach(function (details) { details.addEventListener("toggle", function () { if (details.classList.contains("favorites-panel")) state.favoritesOpen = details.open; else state.favoriteManagerOpen = details.open; }); });
-    var favoriteFilter = document.getElementById("favorite-category-filter");
-    if (favoriteFilter) favoriteFilter.addEventListener("change", function () { state.favoriteFilter = favoriteFilter.value; state.favoritesOpen = true; render(); });
-    var addFavorite = document.getElementById("add-favorite-meal");
-    if (addFavorite) addFavorite.addEventListener("click", function () { useSelectedFavorite(false); });
-    var adjustFavorite = document.getElementById("adjust-favorite-meal");
-    if (adjustFavorite) adjustFavorite.addEventListener("click", function () { useSelectedFavorite(true); });
-    document.querySelectorAll("[data-favorite-name]").forEach(function (input) { input.addEventListener("change", function () { updateFavorite(input.dataset.favoriteName, "name", input.value.trim() || "Favorite meal"); }); });
-    document.querySelectorAll("[data-favorite-category]").forEach(function (select) { select.addEventListener("change", function () { updateFavorite(select.dataset.favoriteCategory, "category", select.value); }); });
-    document.querySelectorAll("[data-remove-favorite]").forEach(function (button) { button.addEventListener("click", function () { removeFavorite(button.dataset.removeFavorite); }); });
     document.querySelectorAll("[data-review-pending]").forEach(function (button) { button.addEventListener("click", function () { reviewPendingMeal(button.dataset.reviewPending); }); });
     document.querySelectorAll("[data-retry-pending]").forEach(function (button) { button.addEventListener("click", function () { retryPendingMeal(button.dataset.retryPending, true); }); });
     document.querySelectorAll("[data-discard-pending]").forEach(function (button) { button.addEventListener("click", function () { discardPendingMeal(button.dataset.discardPending); }); });
@@ -1100,7 +1169,9 @@
       if (exercise && exercise.equipment && exercise.equipment.type === "dumbbell") day.exercises[id].load = recommendedLoad(exercise, id);
       if (exercise && exercise.equipment && exercise.equipment.type === "bodyweight") day.exercises[id].load = exercise.equipment.start;
     }
+    var wasComplete = day.workout.completed;
     day.workout.completed = planned.every(function (exercise) { return day.exercises[exerciseId(exercise.name)] && day.exercises[exerciseId(exercise.name)].done; });
+    if (field === "done" && value) showExerciseFeedback(id, planned, day, wasComplete);
     queueSave(field === "done" || field === "load" || field === "loadFeel");
   }
 
@@ -1127,8 +1198,81 @@
       completionChanged = true;
     }
     var planned = exercisesForPlan(planForDate(state.selectedDate));
+    var wasWorkoutComplete = day.workout.completed;
     day.workout.completed = planned.every(function (plannedExercise) { return day.exercises[exerciseId(plannedExercise.name)] && day.exercises[exerciseId(plannedExercise.name)].done; });
+    if (completionChanged && day.exercises[id].done) showExerciseFeedback(id, planned, day, wasWorkoutComplete);
     queueSave(completionChanged);
+  }
+
+  function showExerciseFeedback(id, planned, day, wasWorkoutComplete) {
+    var done = planned.filter(function (exercise) { return day.exercises[exerciseId(exercise.name)] && day.exercises[exerciseId(exercise.name)].done; }).length;
+    if (day.workout.completed && !wasWorkoutComplete) showFeedback("Workout complete—great job. You finished all " + planned.length + " exercises.", "success");
+    else showFeedback("Exercise " + done + " of " + planned.length + " complete—keep going.", "success");
+  }
+
+  function setExerciseTimerDuration(id, seconds) {
+    stopExerciseTimerInterval();
+    state.exerciseTimer = { id: id, duration: seconds, remaining: seconds, endAt: 0, running: false, interval: null };
+    render();
+  }
+
+  function toggleExerciseTimer(id) {
+    var select = document.querySelector('[data-timer-duration="' + id + '"]');
+    var seconds = select ? Number(select.value) : 30;
+    if (!state.exerciseTimer || state.exerciseTimer.id !== id) state.exerciseTimer = { id: id, duration: seconds, remaining: seconds, endAt: 0, running: false, interval: null };
+    var timer = state.exerciseTimer;
+    if (timer.running) {
+      timer.remaining = Math.max(0, Math.ceil((timer.endAt - Date.now()) / 1000));
+      stopExerciseTimerInterval();
+      timer.running = false;
+      render();
+      return;
+    }
+    if (timer.remaining <= 0) timer.remaining = timer.duration;
+    timer.running = true;
+    timer.endAt = Date.now() + timer.remaining * 1000;
+    timer.interval = setInterval(tickExerciseTimer, 250);
+    render();
+  }
+
+  function tickExerciseTimer() {
+    var timer = state.exerciseTimer;
+    if (!timer || !timer.running) return;
+    timer.remaining = Math.max(0, Math.ceil((timer.endAt - Date.now()) / 1000));
+    var display = document.querySelector('[data-timer-display="' + timer.id + '"]');
+    if (display) display.textContent = formatTimer(timer.remaining);
+    if (timer.remaining > 0) return;
+    var id = timer.id, duration = timer.duration;
+    stopExerciseTimerInterval();
+    timer.running = false;
+    if (navigator.vibrate) navigator.vibrate([180, 80, 180]);
+    logCompletedTimedSet(id, duration);
+  }
+
+  function logCompletedTimedSet(id, seconds) {
+    var day = getDay(state.selectedDate);
+    var exercise = exercisesForPlan(planForDate(state.selectedDate)).find(function (item) { return exerciseId(item.name) === id; });
+    var log = day.exercises[id] || {};
+    var sets = exerciseSets(log, exercise || { prescription: "1 set" });
+    var required = exercise && exercise.name === "Side Plank" ? 4 : prescribedSetCount(exercise || { prescription: "1 set" });
+    var index = -1;
+    for (var i = 0; i < required; i++) if (!String(sets[i] == null ? "" : sets[i]).trim()) { index = i; break; }
+    if (index >= 0) updateExerciseSet(id, index, seconds);
+    else showFeedback("Timer complete—this exercise is already fully logged.", "success");
+  }
+
+  function resetExerciseTimer(id) {
+    var timer = state.exerciseTimer;
+    if (!timer || timer.id !== id) return;
+    stopExerciseTimerInterval();
+    timer.running = false;
+    timer.remaining = timer.duration;
+    render();
+  }
+
+  function stopExerciseTimerInterval() {
+    if (state.exerciseTimer && state.exerciseTimer.interval) clearInterval(state.exerciseTimer.interval);
+    if (state.exerciseTimer) state.exerciseTimer.interval = null;
   }
 
   function addExerciseSet(id) {
@@ -1192,7 +1336,22 @@
     favorite.useCount = number(favorite.useCount) + 1;
     favorite.lastUsedAt = new Date().toISOString();
     getDay(state.selectedDate).meals.push(mealFromNutrition(favorite, "Repeated favorite"));
+    document.getElementById("meal-dialog").close();
+    showMealFeedback(getDay(state.selectedDate), favorite.name || "Meal");
     queueSave(true);
+  }
+
+  function bindFavoritePickerEvents() {
+    document.querySelectorAll("#meal-favorites-slot .favorites-panel, #meal-favorites-slot .favorite-manager").forEach(function (details) { details.addEventListener("toggle", function () { if (details.classList.contains("favorites-panel")) state.favoritesOpen = details.open; else state.favoriteManagerOpen = details.open; }); });
+    var favoriteFilter = document.getElementById("favorite-category-filter");
+    if (favoriteFilter) favoriteFilter.addEventListener("change", function () { state.favoriteFilter = favoriteFilter.value; state.favoritesOpen = true; document.getElementById("meal-favorites-slot").innerHTML = renderFavoritePicker(); bindFavoritePickerEvents(); });
+    var addFavorite = document.getElementById("add-favorite-meal");
+    if (addFavorite) addFavorite.addEventListener("click", function () { useSelectedFavorite(false); });
+    var adjustFavorite = document.getElementById("adjust-favorite-meal");
+    if (adjustFavorite) adjustFavorite.addEventListener("click", function () { useSelectedFavorite(true); });
+    document.querySelectorAll("#meal-favorites-slot [data-favorite-name]").forEach(function (input) { input.addEventListener("change", function () { updateFavorite(input.dataset.favoriteName, "name", input.value.trim() || "Favorite meal"); }); });
+    document.querySelectorAll("#meal-favorites-slot [data-favorite-category]").forEach(function (select) { select.addEventListener("change", function () { updateFavorite(select.dataset.favoriteCategory, "category", select.value); }); });
+    document.querySelectorAll("#meal-favorites-slot [data-remove-favorite]").forEach(function (button) { button.addEventListener("click", function () { removeFavorite(button.dataset.removeFavorite); document.getElementById("meal-favorites-slot").innerHTML = renderFavoritePicker(); bindFavoritePickerEvents(); }); });
   }
 
   function updateFavorite(id, field, value) {
@@ -1216,6 +1375,9 @@
     state.editingMeal = editing || null;
     if (!source) state.adjustingFavoriteId = null;
     state.adviceImage = source && source.adviceImage || "";
+    clearMealPhotoPreview();
+    document.getElementById("meal-favorites-slot").innerHTML = editing ? "" : renderFavoritePicker();
+    bindFavoritePickerEvents();
     document.getElementById("meal-notes").value = source && source.notes || "";
     clearPhotoInputs("meal-photo", "meal-photo-camera");
     document.getElementById("keep-meal-photo").checked = Boolean(source && source.photo);
@@ -1376,6 +1538,7 @@
     var button = document.getElementById("analyze-meal");
     button.disabled = true;
     button.textContent = "Estimating…";
+    if (file) document.getElementById("meal-photo-status").textContent = "Photo received—uploading and analyzing…";
     document.getElementById("meal-error").textContent = "";
     try {
       var pending = {
@@ -1422,6 +1585,8 @@
       if (reviewOnSuccess) {
         state.activePendingMealId = pending.id;
         showMealResult(pending.result);
+        var photoStatus = document.getElementById("meal-photo-status");
+        if (photoStatus && (pending.photoId || pending.localImage)) photoStatus.textContent = "Photo uploaded and analyzed successfully.";
       } else {
         render();
       }
@@ -1434,6 +1599,7 @@
       queueSave(false);
       await saveData();
       if (document.getElementById("meal-dialog").open) document.getElementById("meal-dialog").close();
+      showFeedback("Your meal photo was saved safely and will be analyzed automatically.", "warning");
       render();
       schedulePendingRetry();
       return false;
@@ -1478,6 +1644,9 @@
     state.activePendingMealId = id;
     state.editingMeal = null;
     state.mealEstimate = pending.result;
+    clearMealPhotoPreview();
+    document.getElementById("meal-favorites-slot").innerHTML = renderFavoritePicker();
+    bindFavoritePickerEvents();
     document.getElementById("meal-notes").value = pending.notes || "";
     clearPhotoInputs("meal-photo", "meal-photo-camera");
     document.getElementById("meal-date").value = pending.date || state.selectedDate;
@@ -1485,6 +1654,11 @@
     document.getElementById("save-meal-favorite").checked = false;
     document.getElementById("favorite-category-wrap").hidden = true;
     document.getElementById("meal-error").textContent = "";
+    if (pending.photoId || pending.localImage) {
+      document.getElementById("meal-photo-preview").hidden = false;
+      document.getElementById("meal-photo-preview").classList.add("status-only");
+      document.getElementById("meal-photo-status").textContent = "Photo uploaded and analyzed successfully.";
+    }
     state.adjustingFavoriteId = null;
     state.adviceImage = "";
     showMealResult(pending.result);
@@ -1576,6 +1750,8 @@
     state.adjustingFavoriteId = null;
     state.adviceImage = "";
     document.getElementById("meal-dialog").close();
+    clearMealPhotoPreview();
+    showMealFeedback(getDay(mealDate), meal.name);
     queueSave(true);
   }
 
@@ -1672,9 +1848,11 @@
     var images = Array.from(document.querySelectorAll("img[data-photo-ref]"));
     await Promise.all(images.map(async function (img) {
       var ref = img.dataset.photoRef;
-      if (ref.indexOf("data:") === 0) { img.src = ref; return; }
+      var container = img.closest("[data-photo-container]");
+      var markLoaded = function () { if (container) { container.classList.add("photo-loaded"); container.classList.remove("photo-failed"); var status = container.querySelector("[data-photo-status]"); if (status) status.textContent = "Photo ready"; } };
+      if (ref.indexOf("data:") === 0) { img.src = ref; markLoaded(); return; }
       if (ref.indexOf("r2:") === 0) {
-        if (state.photoUrls.has(ref)) { img.src = state.photoUrls.get(ref); return; }
+        if (state.photoUrls.has(ref)) { img.src = state.photoUrls.get(ref); markLoaded(); return; }
         try {
           var pending = state.photoRequests.get(ref);
           if (!pending) {
@@ -1689,9 +1867,27 @@
             pending.then(function () { state.photoRequests.delete(ref); }, function () { state.photoRequests.delete(ref); });
           }
           img.src = await pending;
-        } catch (error) { img.alt = "Photo unavailable"; }
+          markLoaded();
+        } catch (error) {
+          img.alt = "Photo unavailable";
+          if (container) { container.classList.add("photo-failed"); var status = container.querySelector("[data-photo-status]"); if (status) status.textContent = "Photo could not load."; var retry = container.querySelector("[data-retry-photo]"); if (retry) retry.hidden = false; }
+        }
       }
     }));
+  }
+
+  function retryPhoto(button) {
+    var container = button.closest("[data-photo-container]");
+    var img = container && container.querySelector("img[data-photo-ref]");
+    if (!img) return;
+    var ref = img.dataset.photoRef;
+    if (state.photoUrls.has(ref)) URL.revokeObjectURL(state.photoUrls.get(ref));
+    state.photoUrls.delete(ref);
+    state.photoRequests.delete(ref);
+    container.classList.remove("photo-failed", "photo-loaded");
+    button.hidden = true;
+    container.querySelector("[data-photo-status]").textContent = "Loading photo…";
+    hydratePhotos();
   }
 
   function clearPhotoUrls() {
@@ -1755,10 +1951,11 @@
       alerts.push({ atMinutes: duration, title: duration + " minutes complete", body: "Nice work, Vinny. Cooldown finished—log your adjustments and how the session felt." });
       var first = segments[0];
       var startAlert = { title: "Time to rock 🤘🏻", body: "Incline " + first.incline + " · Speed " + first.speed.toFixed(1) + " mph" };
-      var response = await apiFetch("/notifications/cardio/start", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date: state.selectedDate, title: plan.title, alerts: alerts, startAlert: startAlert }) });
+      var response = await apiFetch("/notifications/cardio/start", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date: state.selectedDate, title: plan.title, durationMinutes: duration, alerts: alerts, startAlert: startAlert }) });
       var result = await response.json();
       var day = getDay(state.selectedDate);
-      day.cardio = { sessionId: result.id, startedAt: result.startedAt, status: "active" };
+      day.cardio = { sessionId: result.id, startedAt: result.startedAt, status: "active", durationMinutes: duration, completedAt: "", result: day.cardio && day.cardio.result || null };
+      startCardioStatusPolling();
       queueSave(true);
     } catch (error) { alert(error.message || "Cardio alerts could not be started."); }
   }
@@ -1766,8 +1963,51 @@
   async function cancelCardioSession() {
     var day = getDay(state.selectedDate);
     try { if (day.cardio && day.cardio.sessionId) await apiFetch("/notifications/cardio/" + encodeURIComponent(day.cardio.sessionId), { method: "DELETE" }); } catch (ignore) {}
-    day.cardio = { sessionId: "", startedAt: "", status: "cancelled" };
+    day.cardio = { sessionId: "", startedAt: "", status: "cancelled", durationMinutes: 0, completedAt: "", result: day.cardio && day.cardio.result || null };
     queueSave(true);
+  }
+
+  function completeCardioSession(date, sessionId, durationMinutes) {
+    date = date || state.selectedDate;
+    var day = getDay(date);
+    if (sessionId && day.cardio && day.cardio.sessionId && day.cardio.sessionId !== sessionId) return false;
+    if (day.cardio && day.cardio.status === "complete") return true;
+    var plan = planForDate(date);
+    if (!plan || plan.type !== "Cardio") return false;
+    var duration = number(durationMinutes) || number(day.cardio && day.cardio.durationMinutes) || cardioDuration(plan);
+    exercisesForPlan(plan).forEach(function (exercise) {
+      var id = exerciseId(exercise.name);
+      day.exercises[id] = Object.assign({}, day.exercises[id] || {}, { reps: duration, done: true, autoCompleted: true });
+    });
+    day.workout.completed = true;
+    day.cardio = Object.assign({}, day.cardio || {}, { status: "complete", durationMinutes: duration, completedAt: new Date().toISOString() });
+    clearInterval(state.cardioPollTimer);
+    state.cardioPollTimer = null;
+    showFeedback("Cardio complete—" + duration + " minutes logged automatically. Great work.", "success");
+    queueSave(date === state.selectedDate);
+    return true;
+  }
+
+  async function syncCardioCompletion() {
+    var activeDates = Object.keys(state.data.days || {}).filter(function (date) { var day = state.data.days[date]; return day && day.cardio && day.cardio.status === "active"; });
+    for (var i = 0; i < activeDates.length; i++) {
+      var date = activeDates[i], day = state.data.days[date];
+      var elapsed = Date.now() - new Date(day.cardio.startedAt).getTime();
+      var duration = number(day.cardio.durationMinutes) || cardioDuration(planForDate(date));
+      if (Number.isFinite(elapsed) && elapsed >= duration * 60 * 1000) { completeCardioSession(date, day.cardio.sessionId, duration); continue; }
+      if (!day.cardio.sessionId || localMode) continue;
+      try {
+        var response = await apiFetch("/notifications/cardio/" + encodeURIComponent(day.cardio.sessionId), { method: "GET" });
+        var result = await response.json();
+        if (result.status === "complete") completeCardioSession(date, result.id, result.durationMinutes);
+      } catch (ignore) {}
+    }
+  }
+
+  function startCardioStatusPolling() {
+    clearInterval(state.cardioPollTimer);
+    state.cardioPollTimer = setInterval(function () { if (!document.hidden) syncCardioCompletion(); }, 15000);
+    syncCardioCompletion();
   }
 
   function queueSave(redraw) {
@@ -1839,6 +2079,7 @@
       render();
       if (migrated) queueSave(false);
       startPendingRetry();
+      startCardioStatusPolling();
     } catch (error) {
       if (error.message === "unauthorized") { localStorage.removeItem(TOKEN_KEY); showAccessDialog("That access code did not work."); return; }
       var cached = localStorage.getItem(STORAGE_KEY);
@@ -1878,10 +2119,12 @@
     data.preferences.reminders = Object.assign({}, defaultData().preferences.reminders, data.preferences.reminders || {});
     data.preferences.reminders.waterTimes = Array.isArray(data.preferences.reminders.waterTimes) ? data.preferences.reminders.waterTimes.slice(0, 2) : defaultData().preferences.reminders.waterTimes.slice();
     data.preferences.reminders.proteinTimes = Array.isArray(data.preferences.reminders.proteinTimes) ? data.preferences.reminders.proteinTimes.slice(0, 2) : defaultData().preferences.reminders.proteinTimes.slice();
+    data.preferences.reminders.calorieTimes = Array.isArray(data.preferences.reminders.calorieTimes) ? data.preferences.reminders.calorieTimes.slice(0, 3) : defaultData().preferences.reminders.calorieTimes.slice();
     while (data.preferences.reminders.waterTimes.length < 2) data.preferences.reminders.waterTimes.push(defaultData().preferences.reminders.waterTimes[data.preferences.reminders.waterTimes.length]);
     while (data.preferences.reminders.proteinTimes.length < 2) data.preferences.reminders.proteinTimes.push(defaultData().preferences.reminders.proteinTimes[data.preferences.reminders.proteinTimes.length]);
+    while (data.preferences.reminders.calorieTimes.length < 3) data.preferences.reminders.calorieTimes.push(defaultData().preferences.reminders.calorieTimes[data.preferences.reminders.calorieTimes.length]);
     delete data.reward;
-    data.meta = Object.assign({}, data.meta || {}, { planVersion: "workout-2.6-2026-09-13" });
+    data.meta = Object.assign({}, data.meta || {}, { planVersion: "workout-2.7-2026-09-16" });
     Object.keys(data.days || {}).forEach(function (iso) {
       var day = data.days[iso];
       day.meals = Array.isArray(day.meals) ? day.meals : [];
@@ -1893,7 +2136,7 @@
         if (!Array.isArray(log.sets) && log.reps) log.sets = String(log.reps).split(/[,/]+/).map(function (value) { return value.trim(); }).filter(Boolean);
       });
       day.workout = Object.assign({ completed: false, rating: "", notes: "" }, day.workout || {});
-      day.cardio = Object.assign({ sessionId: "", startedAt: "", status: "", result: null }, day.cardio || {});
+      day.cardio = Object.assign({ sessionId: "", startedAt: "", status: "", durationMinutes: 0, completedAt: "", result: null }, day.cardio || {});
       day.photos = Object.assign({ front: null, side: null, back: null, treadmill: null }, day.photos || {});
     });
     return data;
@@ -1940,6 +2183,7 @@
       render();
       if (!(result.payload && result.payload.schemaVersion === 2)) queueSave(false);
       startPendingRetry();
+      startCardioStatusPolling();
     } catch (error) {
       localStorage.removeItem(TOKEN_KEY);
       document.getElementById("access-error").textContent = error.message === "unauthorized" ? "That access code did not work." : "The secure tracker could not be reached.";
@@ -1981,6 +2225,7 @@
       document.getElementById(id).addEventListener("change", function (event) {
         if (event.target.files && event.target.files[0]) document.getElementById(pair[1 - index]).value = "";
         if (pair[0] === "photo-input" && event.target.files && event.target.files[0]) document.getElementById("photo-selection").textContent = "Selected: " + event.target.files[0].name;
+        if (pair[0] === "meal-photo" && event.target.files && event.target.files[0]) showMealPhotoPreview(event.target.files[0]);
       });
     });
   });
@@ -1995,10 +2240,11 @@
   }); });
   document.getElementById("access-form").addEventListener("submit", submitAccess);
   document.getElementById("photo-form").addEventListener("submit", function (event) { event.preventDefault(); savePhoto(); });
+  document.getElementById("photo-cancel").addEventListener("click", function () { document.getElementById("photo-dialog").close(); clearPhotoInputs("photo-input", "photo-camera-input"); document.getElementById("photo-error").textContent = ""; });
   document.getElementById("analyze-meal").addEventListener("click", analyzeMeal);
   document.getElementById("manual-meal").addEventListener("click", function () { showMealResult({ name: "Meal", calories: "", protein: "", carbs: "", fat: "", fiber: null, saturatedFat: null, addedSugar: null, sodium: null, category: defaultMealCategory(), confidence: "Manual entry", nutritionBasis: "Manual", assumptions: "Enter the package, restaurant, or measured values you trust." }); });
   document.getElementById("save-meal-favorite").addEventListener("change", function (event) { document.getElementById("favorite-category-wrap").hidden = !event.target.checked; });
-  document.getElementById("meal-cancel").addEventListener("click", function () { document.getElementById("meal-dialog").close(); });
+  document.getElementById("meal-cancel").addEventListener("click", function () { document.getElementById("meal-dialog").close(); clearMealPhotoPreview(); });
   document.getElementById("duplicate-meal-edit").addEventListener("click", duplicateEditingMeal);
   document.getElementById("save-meal").addEventListener("click", saveMeal);
   document.getElementById("ask-meal-advice").addEventListener("click", askMealAdvice);
@@ -2007,8 +2253,9 @@
   document.querySelectorAll("dialog").forEach(function (dialog) { dialog.addEventListener("close", releaseDialogScrollLock); });
   document.addEventListener("touchstart", handleDialogTouchStart, { passive: true, capture: true });
   document.addEventListener("touchmove", handleDialogTouchMove, { passive: false, capture: true });
-  document.addEventListener("visibilitychange", function () { if (document.hidden && state.revealedPhoto) { state.revealedPhoto = null; render(); } });
+  document.addEventListener("visibilitychange", function () { if (document.hidden && state.revealedPhoto) { state.revealedPhoto = null; render(); } if (!document.hidden) syncCardioCompletion(); });
   window.addEventListener("pagehide", function () { state.revealedPhoto = null; });
   if ("serviceWorker" in navigator && !localMode) navigator.serviceWorker.register("./sw.js").then(async function (registration) { state.serviceWorker = registration; await refreshNotificationState(); render(); }).catch(function () {});
+  if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", function (event) { var data = event.data || {}; if (data.type === "cardio-complete") completeCardioSession(data.date, data.sessionId, data.durationMinutes); });
   loadData();
 })();
