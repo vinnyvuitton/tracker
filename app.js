@@ -183,6 +183,7 @@
     progressRange: 21,
     progressMetric: "weight",
     progressExercise: "dumbbell-flat-bench-press",
+    checkinWeekStart: null,
     cardioMode: "full",
     pendingRetryStarted: false,
     pendingRetryTimer: null,
@@ -965,26 +966,54 @@
   }
 
   function renderCheckin() {
-    var range = lastCompletedWeek(), summary = buildCheckin(range.end), checkin = weeklyCheckin(range.start);
-    return header("Weekly Check-In", "Last completed Sunday–Saturday") +
+    var range = selectedCheckinRange(), summary = buildCheckin(range.start, range.end, range.inProgress), checkin = readWeeklyCheckin(range.start);
+    return header("Weekly Check-In", "Current and previous weeks") +
       '<section class="card goals-card"><div class="card-head"><div><h2>Nutrition goals</h2><p>Starting targets stay steady until you approve a change.</p></div></div><div class="grid two"><label class="field">Daily calories<input id="calorie-target" type="number" inputmode="numeric" min="1200" max="4000" step="25" value="' + esc(state.data.targets.calories) + '"></label><label class="field">Daily protein, g<input id="protein-target" type="number" inputmode="numeric" min="50" max="300" step="5" value="' + esc(state.data.targets.protein) + '"></label></div><p class="notification-status">Calorie zone: ' + esc(state.data.targets.calorieMin) + '–' + esc(state.data.targets.calorieMax) + ' · Protein zone: ' + esc(state.data.targets.proteinMin) + '–' + esc(state.data.targets.proteinMax) + ' g</p></section>' +
-      '<section class="card"><div class="card-head"><div><h2>Weekly recovery</h2><p>' + esc(formatDate(range.start, { month: "short", day: "numeric" })) + ' to ' + esc(formatDate(range.end, { month: "short", day: "numeric" })) + '</p></div></div><div class="grid two"><label class="field">Hunger, 1–10<input data-weekly-checkin="hunger" type="number" min="1" max="10" value="' + esc(checkin.hunger || "") + '"></label><label class="field">Energy, 1–10<input data-weekly-checkin="energy" type="number" min="1" max="10" value="' + esc(checkin.energy || "") + '"></label><label class="field">Average sleep, hours<input data-weekly-checkin="sleep" type="number" min="0" max="14" step="0.25" value="' + esc(checkin.sleep || "") + '"></label><label class="field">Soreness, 1–10<input data-weekly-checkin="soreness" type="number" min="1" max="10" value="' + esc(checkin.soreness || "") + '"></label></div><label class="field">Recovery notes<textarea data-weekly-checkin="recoveryNotes" placeholder="Anything affecting recovery or performance">' + esc(checkin.recoveryNotes || "") + '</textarea></label></section>' +
-      '<section class="card"><div class="card-head"><div><h2>Export last completed week</h2><p>Includes every day and never counts today while it is still in progress.</p></div></div>' +
+      '<section class="card"><label class="field">Week<select id="checkin-week">' + renderCheckinWeekOptions(range.start) + '</select></label><div class="card-head"><div><h2>Weekly recovery</h2><p>' + esc(formatDate(range.start, { month: "short", day: "numeric" })) + ' to ' + esc(formatDate(range.end, { month: "short", day: "numeric" })) + (range.inProgress ? ' · In progress' : '') + '</p></div></div><div class="grid two"><label class="field">Hunger, 1–10<input data-weekly-checkin="hunger" type="number" min="1" max="10" value="' + esc(checkin.hunger || "") + '"></label><label class="field">Energy, 1–10<input data-weekly-checkin="energy" type="number" min="1" max="10" value="' + esc(checkin.energy || "") + '"></label><label class="field">Average sleep, hours<input data-weekly-checkin="sleep" type="number" min="0" max="14" step="0.25" value="' + esc(checkin.sleep || "") + '"></label><label class="field">Soreness, 1–10<input data-weekly-checkin="soreness" type="number" min="1" max="10" value="' + esc(checkin.soreness || "") + '"></label></div><label class="field">Recovery notes<textarea data-weekly-checkin="recoveryNotes" placeholder="Anything affecting recovery or performance">' + esc(checkin.recoveryNotes || "") + '</textarea></label></section>' +
+      '<section class="card"><div class="card-head"><div><h2>Export selected week</h2><p>' + (range.inProgress ? 'Includes Sunday through today. Future days are left out.' : 'Includes the full Sunday–Saturday week.') + '</p></div></div>' +
       '<textarea id="checkin-output" class="checkin-output" readonly>' + esc(summary) + '</textarea>' +
-      '<div class="row wrap"><button id="copy-checkin" class="primary">Copy completed week</button><button id="download-backup" class="secondary">Download private backup</button><button id="lock-tracker" class="secondary">Lock this device</button></div></section>' +
+      '<div class="row wrap"><button id="copy-checkin" class="primary">Copy selected week</button><button id="download-backup" class="secondary">Download private backup</button><button id="lock-tracker" class="secondary">Lock this device</button></div></section>' +
       renderNotificationCard() +
       '<section class="card"><div class="notice">Your weekly summary is only copied when you tap the button. Meal analysis sends only the meal photo and notes you choose, and does not expose your dashboard access code.</div></section>';
   }
 
-  function lastCompletedWeek() {
+  function selectedCheckinRange() {
     var currentStart = startOfWeek(TODAY);
-    return { start: addDays(currentStart, -7), end: addDays(currentStart, -1) };
+    var selectedStart = state.checkinWeekStart && state.checkinWeekStart <= currentStart ? state.checkinWeekStart : currentStart;
+    var inProgress = selectedStart === currentStart;
+    return { start: selectedStart, end: inProgress ? TODAY : addDays(selectedStart, 6), inProgress: inProgress };
+  }
+
+  function checkinWeekStarts() {
+    var currentStart = startOfWeek(TODAY);
+    var dates = Object.keys(state.data.days || {}).concat(Object.keys(state.data.weeklyCheckins || {}), [state.data.profile.startDate || TODAY]);
+    var earliest = dates.filter(Boolean).sort()[0] || TODAY;
+    var firstStart = startOfWeek(earliest > TODAY ? TODAY : earliest);
+    var starts = [];
+    for (var iso = currentStart; iso >= firstStart; iso = addDays(iso, -7)) starts.push(iso);
+    return starts;
+  }
+
+  function renderCheckinWeekOptions(selectedStart) {
+    var currentStart = startOfWeek(TODAY);
+    return checkinWeekStarts().map(function (start) {
+      var current = start === currentStart;
+      var end = current ? TODAY : addDays(start, 6);
+      var label = current ? "This week · " : "";
+      label += formatDate(start, { month: "short", day: "numeric" }) + "–" + formatDate(end, { month: "short", day: "numeric" });
+      if (current) label += " · In progress";
+      return '<option value="' + start + '" ' + (start === selectedStart ? "selected" : "") + '>' + esc(label) + '</option>';
+    }).join("");
   }
 
   function weeklyCheckin(startIso) {
     state.data.weeklyCheckins = state.data.weeklyCheckins || {};
     if (!state.data.weeklyCheckins[startIso]) state.data.weeklyCheckins[startIso] = {};
     return state.data.weeklyCheckins[startIso];
+  }
+
+  function readWeeklyCheckin(startIso) {
+    return state.data.weeklyCheckins && state.data.weeklyCheckins[startIso] || {};
   }
 
   function reminderSettings() { return state.data.preferences.reminders; }
@@ -1029,8 +1058,7 @@
     return planned.length > 0 && completed / planned.length >= 0.5;
   }
 
-  function buildCheckin(endIso) {
-    var startIso = addDays(endIso, -6);
+  function buildCheckin(startIso, endIso, inProgress) {
     var stats = periodStats(startIso, endIso);
     var average = stats.weights.length ? stats.weights.reduce(function (a, b) { return a + b; }, 0) / stats.weights.length : 0;
     var priorStats = periodStats(addDays(startIso, -7), addDays(startIso, -1));
@@ -1059,9 +1087,9 @@
         training.push(formatDate(iso, { weekday: "short", month: "short", day: "numeric" }) + " · " + plan.title + (day.workout.rating ? " · " + day.workout.rating : "") + "\n" + exerciseLines.join("\n") + resultLine);
       }
     }
-    var checkin = weeklyCheckin(startIso);
+    var checkin = readWeeklyCheckin(startIso);
     return [
-      "VINNY WORKOUT 2.0 WEEKLY CHECK-IN",
+      "VINNY WORKOUT 2.0 WEEKLY CHECK-IN" + (inProgress ? " · IN PROGRESS" : ""),
       formatDate(startIso, { month: "short", day: "numeric" }) + " to " + formatDate(endIso, { month: "short", day: "numeric", year: "numeric" }),
       "",
       "Morning weights: " + (stats.weights.length ? stats.weights.map(function (w) { return w.toFixed(1); }).join(", ") + " lb" : "none logged"),
@@ -1110,6 +1138,8 @@
     var proteinTarget = document.getElementById("protein-target");
     if (proteinTarget) proteinTarget.addEventListener("change", function () { var value = clamp(number(proteinTarget.value), 50, 300); state.data.targets.protein = value; state.data.targets.proteinMin = Math.max(0, value - 5); state.data.targets.proteinMax = value + 10; queueSave(true); });
     if (state.view !== "today") {
+      var checkinWeek = document.getElementById("checkin-week");
+      if (checkinWeek) checkinWeek.addEventListener("change", function () { state.checkinWeekStart = checkinWeek.value; render(); });
       var copy = document.getElementById("copy-checkin");
       if (copy) copy.addEventListener("click", copyCheckin);
       var backup = document.getElementById("download-backup");
@@ -1130,7 +1160,7 @@
       document.querySelectorAll("[data-reminder-number]").forEach(function (input) { input.addEventListener("change", function () { reminderSettings()[input.dataset.reminderNumber] = clamp(number(input.value), 300, 1200); queueSave(false); }); });
       var pauseReminders = document.getElementById("pause-reminders");
       if (pauseReminders) pauseReminders.addEventListener("click", function () { reminderSettings().pausedDate = reminderSettings().pausedDate === TODAY ? "" : TODAY; queueSave(true); });
-      document.querySelectorAll("[data-weekly-checkin]").forEach(function (input) { input.addEventListener("change", function () { var range = lastCompletedWeek(); weeklyCheckin(range.start)[input.dataset.weeklyCheckin] = input.value.trim(); queueSave(true); }); });
+      document.querySelectorAll("[data-weekly-checkin]").forEach(function (input) { input.addEventListener("change", function () { var range = selectedCheckinRange(); weeklyCheckin(range.start)[input.dataset.weeklyCheckin] = input.value.trim(); queueSave(true); }); });
       return;
     }
 
