@@ -189,6 +189,7 @@
     serviceWorker: null,
     notificationEnabled: false,
     exerciseTimer: null,
+    timerWakeLock: null,
     cardioPollTimer: null,
     mealPhotoPreviewUrl: "",
     toastTimer: null
@@ -512,7 +513,7 @@
     toast.textContent = message;
     toast.className = "toast " + (tone || "");
     toast.hidden = false;
-    state.toastTimer = setTimeout(function () { toast.hidden = true; }, 4800);
+    state.toastTimer = setTimeout(function () { toast.hidden = true; }, 8000);
   }
 
   function showMealFeedback(day, name) {
@@ -676,10 +677,23 @@
   }
 
   function renderSidePlankInputs(id, log) {
-    var source = Array.isArray(log.sets) ? log.sets.slice() : String(log.reps || "").split(/[,/]+/).map(function (value) { return value.trim(); }).filter(Boolean);
-    var sets = source.length >= 4 ? source.slice(0, 4) : source.length === 2 ? [source[0], source[0], source[1], source[1]] : ["", "", "", ""];
-    var labels = ["Set 1 left", "Set 1 right", "Set 2 left", "Set 2 right"];
-    return '<div class="set-entry"><div class="set-grid side-plank-grid">' + sets.map(function (value, index) { return '<label>' + labels[index] + ' (sec)<input data-exercise-set="' + id + '" data-set-index="' + index + '" inputmode="numeric" min="0" value="' + esc(value) + '"></label>'; }).join("") + '</div></div>';
+    var sets = sidePlankSets(log);
+    return '<div class="set-entry"><div class="set-grid side-plank-grid">' + sets.map(function (value, index) {
+      var label = "Set " + (Math.floor(index / 2) + 1) + " " + (index % 2 === 0 ? "left" : "right");
+      return '<label>' + label + ' (sec)<input data-exercise-set="' + id + '" data-set-index="' + index + '" inputmode="numeric" min="0" value="' + esc(value) + '" aria-label="Side Plank ' + label.toLowerCase() + '"></label>';
+    }).join("") + '</div><button type="button" class="ghost add-set" data-add-side-plank-set="' + id + '">+ Add set</button></div>';
+  }
+
+  function sidePlankSets(log) {
+    var sets;
+    if (Array.isArray(log.sets)) sets = log.sets.map(function (value) { return String(value == null ? "" : value); });
+    else {
+      var legacy = String(log.reps || "").split(/[,/]+/).map(function (value) { return value.trim(); }).filter(Boolean);
+      sets = legacy.length === 2 ? [legacy[0], legacy[0], legacy[1], legacy[1]] : legacy;
+    }
+    while (sets.length < 4) sets.push("");
+    if (sets.length % 2) sets.push("");
+    return sets;
   }
 
   function timedExerciseOptions(exercise) {
@@ -697,7 +711,7 @@
     var timer = state.exerciseTimer && state.exerciseTimer.id === id ? state.exerciseTimer : null;
     var selected = timer ? timer.duration : options[0];
     var remaining = timer ? timer.remaining : selected;
-    return '<div class="exercise-timer"><div><span class="timer-label">Stopwatch</span><strong data-timer-display="' + id + '">' + formatTimer(remaining) + '</strong></div><select data-timer-duration="' + id + '" aria-label="Timer length for ' + esc(exercise.name) + '">' + options.map(function (seconds) { return '<option value="' + seconds + '" ' + (selected === seconds ? "selected" : "") + '>' + seconds + ' sec</option>'; }).join("") + '</select><button type="button" class="primary" data-timer-start="' + id + '">' + (timer && timer.running ? "Pause" : timer && timer.remaining < timer.duration ? "Resume" : "Start") + '</button><button type="button" class="ghost" data-timer-reset="' + id + '">Reset</button></div>';
+    return '<div class="exercise-timer"><div><span class="timer-label">Stopwatch</span><strong data-timer-display="' + id + '">' + formatTimer(remaining) + '</strong></div><select data-timer-duration="' + id + '" aria-label="Timer length for ' + esc(exercise.name) + '">' + options.map(function (seconds) { return '<option value="' + seconds + '" ' + (selected === seconds ? "selected" : "") + '>' + seconds + ' sec</option>'; }).join("") + '</select><button type="button" class="primary" data-timer-start="' + id + '">' + (timer && timer.running ? "Pause" : timer && timer.remaining > 0 && timer.remaining < timer.duration ? "Resume" : "Start") + '</button><button type="button" class="ghost" data-timer-reset="' + id + '">Reset</button></div>';
   }
 
   function formatTimer(seconds) {
@@ -1131,6 +1145,7 @@
     document.querySelectorAll("[data-exercise-reps]").forEach(function (input) { input.addEventListener("change", function () { updateExercise(input.dataset.exerciseReps, "reps", input.value); }); });
     document.querySelectorAll("[data-exercise-set]").forEach(function (input) { input.addEventListener("change", function () { updateExerciseSet(input.dataset.exerciseSet, Number(input.dataset.setIndex), input.value); }); });
     document.querySelectorAll("[data-add-set]").forEach(function (button) { button.addEventListener("click", function () { addExerciseSet(button.dataset.addSet); }); });
+    document.querySelectorAll("[data-add-side-plank-set]").forEach(function (button) { button.addEventListener("click", function () { addSidePlankSet(button.dataset.addSidePlankSet); }); });
     document.querySelectorAll("[data-load-feel]").forEach(function (button) { button.addEventListener("click", function () { updateExercise(button.dataset.loadFeel, "loadFeel", button.dataset.feel); }); });
     document.querySelectorAll("[data-timer-start]").forEach(function (button) { button.addEventListener("click", function () { toggleExerciseTimer(button.dataset.timerStart); }); });
     document.querySelectorAll("[data-timer-reset]").forEach(function (button) { button.addEventListener("click", function () { resetExerciseTimer(button.dataset.timerReset); }); });
@@ -1179,7 +1194,7 @@
     var day = getDay(state.selectedDate);
     if (!day.exercises[id]) day.exercises[id] = {};
     var exercise = exercisesForPlan(planForDate(state.selectedDate)).find(function (item) { return exerciseId(item.name) === id; });
-    var sets = exerciseSets(day.exercises[id], exercise || { prescription: "1 set" });
+    var sets = exercise && exercise.name === "Side Plank" ? sidePlankSets(day.exercises[id]) : exerciseSets(day.exercises[id], exercise || { prescription: "1 set" });
     sets[index] = value;
     day.exercises[id].sets = sets;
     day.exercises[id].reps = sets.filter(function (item) { return item !== ""; }).join(", ");
@@ -1212,6 +1227,7 @@
 
   function setExerciseTimerDuration(id, seconds) {
     stopExerciseTimerInterval();
+    releaseTimerWakeLock();
     state.exerciseTimer = { id: id, duration: seconds, remaining: seconds, endAt: 0, running: false, interval: null };
     render();
   }
@@ -1225,6 +1241,7 @@
       timer.remaining = Math.max(0, Math.ceil((timer.endAt - Date.now()) / 1000));
       stopExerciseTimerInterval();
       timer.running = false;
+      releaseTimerWakeLock();
       render();
       return;
     }
@@ -1232,6 +1249,7 @@
     timer.running = true;
     timer.endAt = Date.now() + timer.remaining * 1000;
     timer.interval = setInterval(tickExerciseTimer, 250);
+    acquireTimerWakeLock();
     render();
   }
 
@@ -1245,6 +1263,7 @@
     var id = timer.id, duration = timer.duration;
     stopExerciseTimerInterval();
     timer.running = false;
+    releaseTimerWakeLock();
     if (navigator.vibrate) navigator.vibrate([180, 80, 180]);
     logCompletedTimedSet(id, duration);
   }
@@ -1253,8 +1272,8 @@
     var day = getDay(state.selectedDate);
     var exercise = exercisesForPlan(planForDate(state.selectedDate)).find(function (item) { return exerciseId(item.name) === id; });
     var log = day.exercises[id] || {};
-    var sets = exerciseSets(log, exercise || { prescription: "1 set" });
-    var required = exercise && exercise.name === "Side Plank" ? 4 : prescribedSetCount(exercise || { prescription: "1 set" });
+    var sets = exercise && exercise.name === "Side Plank" ? sidePlankSets(log) : exerciseSets(log, exercise || { prescription: "1 set" });
+    var required = exercise && exercise.name === "Side Plank" ? sets.length : prescribedSetCount(exercise || { prescription: "1 set" });
     var index = -1;
     for (var i = 0; i < required; i++) if (!String(sets[i] == null ? "" : sets[i]).trim()) { index = i; break; }
     if (index >= 0) updateExerciseSet(id, index, seconds);
@@ -1267,12 +1286,28 @@
     stopExerciseTimerInterval();
     timer.running = false;
     timer.remaining = timer.duration;
+    releaseTimerWakeLock();
     render();
   }
 
   function stopExerciseTimerInterval() {
     if (state.exerciseTimer && state.exerciseTimer.interval) clearInterval(state.exerciseTimer.interval);
     if (state.exerciseTimer) state.exerciseTimer.interval = null;
+  }
+
+  async function acquireTimerWakeLock() {
+    if (!state.exerciseTimer || !state.exerciseTimer.running || document.hidden || state.timerWakeLock) return;
+    if (!("wakeLock" in navigator)) { showFeedback("Your phone does not support keeping the screen awake automatically. Keep the dashboard visible during the timer.", "warning"); return; }
+    try {
+      state.timerWakeLock = await navigator.wakeLock.request("screen");
+      state.timerWakeLock.addEventListener("release", function () { state.timerWakeLock = null; });
+    } catch (error) { showFeedback("Screen wake protection could not start. Keep the dashboard visible during the timer.", "warning"); }
+  }
+
+  async function releaseTimerWakeLock() {
+    var lock = state.timerWakeLock;
+    state.timerWakeLock = null;
+    if (lock) try { await lock.release(); } catch (ignore) {}
   }
 
   function addExerciseSet(id) {
@@ -1283,6 +1318,16 @@
     sets.push("");
     day.exercises[id].sets = sets;
     render();
+  }
+
+  function addSidePlankSet(id) {
+    var day = getDay(state.selectedDate);
+    if (!day.exercises[id]) day.exercises[id] = {};
+    var sets = sidePlankSets(day.exercises[id]);
+    sets.push("", "");
+    day.exercises[id].sets = sets;
+    day.exercises[id].reps = sets.filter(function (item) { return item !== ""; }).join(", ");
+    queueSave(true);
   }
 
   function togglePhotoReveal(side) {
@@ -1337,8 +1382,14 @@
     favorite.lastUsedAt = new Date().toISOString();
     getDay(state.selectedDate).meals.push(mealFromNutrition(favorite, "Repeated favorite"));
     document.getElementById("meal-dialog").close();
+    collapseFavoritePicker();
     showMealFeedback(getDay(state.selectedDate), favorite.name || "Meal");
     queueSave(true);
+  }
+
+  function collapseFavoritePicker() {
+    state.favoritesOpen = false;
+    state.favoriteManagerOpen = false;
   }
 
   function bindFavoritePickerEvents() {
@@ -1750,6 +1801,7 @@
     state.adjustingFavoriteId = null;
     state.adviceImage = "";
     document.getElementById("meal-dialog").close();
+    collapseFavoritePicker();
     clearMealPhotoPreview();
     showMealFeedback(getDay(mealDate), meal.name);
     queueSave(true);
@@ -2253,8 +2305,9 @@
   document.querySelectorAll("dialog").forEach(function (dialog) { dialog.addEventListener("close", releaseDialogScrollLock); });
   document.addEventListener("touchstart", handleDialogTouchStart, { passive: true, capture: true });
   document.addEventListener("touchmove", handleDialogTouchMove, { passive: false, capture: true });
-  document.addEventListener("visibilitychange", function () { if (document.hidden && state.revealedPhoto) { state.revealedPhoto = null; render(); } if (!document.hidden) syncCardioCompletion(); });
-  window.addEventListener("pagehide", function () { state.revealedPhoto = null; });
+  document.getElementById("toast").addEventListener("click", function (event) { clearTimeout(state.toastTimer); event.currentTarget.hidden = true; });
+  document.addEventListener("visibilitychange", function () { if (document.hidden && state.revealedPhoto) { state.revealedPhoto = null; render(); } if (!document.hidden) { syncCardioCompletion(); if (state.exerciseTimer && state.exerciseTimer.running) acquireTimerWakeLock(); } });
+  window.addEventListener("pagehide", function () { state.revealedPhoto = null; releaseTimerWakeLock(); });
   if ("serviceWorker" in navigator && !localMode) navigator.serviceWorker.register("./sw.js").then(async function (registration) { state.serviceWorker = registration; await refreshNotificationState(); render(); }).catch(function () {});
   if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", function (event) { var data = event.data || {}; if (data.type === "cardio-complete") completeCardioSession(data.date, data.sessionId, data.durationMinutes); });
   loadData();

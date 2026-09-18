@@ -258,7 +258,7 @@ textarea { resize: vertical; min-height: 74px; }
 .treadmill-fields input { margin-top: 4px; }
 .active-session { border-color: var(--good); }
 .error { color: #ff7770; min-height: 18px; }
-.toast { position: fixed; z-index: 30; left: 50%; bottom: calc(82px + var(--safe-bottom)); width: min(calc(100% - 28px), 480px); transform: translateX(-50%); padding: 13px 15px; border: 1px solid var(--line); border-radius: 13px; background: #19191e; color: var(--text); box-shadow: 0 12px 35px rgba(0,0,0,.45); font-size: 14px; font-weight: 700; }
+.toast { position: fixed; z-index: 30; left: 50%; bottom: calc(82px + var(--safe-bottom)); width: min(calc(100% - 28px), 480px); transform: translateX(-50%); padding: 13px 15px; border: 1px solid var(--line); border-radius: 13px; background: #19191e; color: var(--text); box-shadow: 0 12px 35px rgba(0,0,0,.45); font-size: 14px; font-weight: 700; text-align: left; cursor: pointer; }
 .toast.success { border-color: color-mix(in srgb, var(--good) 55%, var(--line)); }
 .toast.warning { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
 .toast[hidden] { display: none; }
