@@ -999,8 +999,7 @@
     return checkinWeekStarts().map(function (start) {
       var current = start === currentStart;
       var end = current ? TODAY : addDays(start, 6);
-      var label = current ? "This week · " : "";
-      label += formatDate(start, { month: "short", day: "numeric" }) + "–" + formatDate(end, { month: "short", day: "numeric" });
+      var label = formatDate(start, { month: "short", day: "numeric" }) + "–" + formatDate(end, { month: "short", day: "numeric" });
       if (current) label += " · In progress";
       return '<option value="' + start + '" ' + (start === selectedStart ? "selected" : "") + '>' + esc(label) + '</option>';
     }).join("");
