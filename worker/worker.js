@@ -4,7 +4,7 @@ const MAX_DATA_BYTES = 24 * 1024 * 1024;
 const MAX_PHOTO_BYTES = 1024 * 1024;
 const BACKUP_LIMIT = 30;
 const MEAL_MODEL = "@cf/google/gemma-4-26b-a4b-it";
-const BUILD_ID = "workout-2.7-guided-feedback";
+const BUILD_ID = "workout-2.8-calorie-guidance";
 
 export default {
   async fetch(request, env, ctx) {
@@ -534,8 +534,7 @@ async function sendDailyReminder(now, env) {
   if ((reminders.proteinTimes || []).some((value) => hhmm === compactTime(value))) type = "protein";
   if ((reminders.calorieTimes || []).some((value) => hhmm === compactTime(value))) type = "calories";
   if (!type || reminders[type] === false) return;
-  const marker = "reminder:" + parts.iso + ":" + type + ":" + hhmm;
-  if (await env.TRACKER_KV.get(marker)) return;
+  let marker = "reminder:" + parts.iso + ":" + type + ":" + hhmm;
   const totals = (day.meals || []).reduce((sum, meal) => ({ protein: sum.protein + (Number(meal.protein) || 0), calories: sum.calories + (Number(meal.calories) || 0) }), { protein: 0, calories: 0 });
   const proteinLeft = Math.max(0, Math.round((Number(targets.protein) || 150) - totals.protein));
   const waterLeft = Math.max(0, (Number(targets.water) || 10) - (Number(day.water) || 0));
@@ -561,14 +560,25 @@ async function sendDailyReminder(now, env) {
     const remaining = Math.round(calorieTarget - totals.calories);
     const hour = Number(parts.hour);
     const reserve = Math.max(300, Number(reminders.dinnerReserve) || 600);
-    if (totals.calories > calorieMax) message = { title: "Calorie pace check", body: "You’re about " + Math.round(totals.calories - calorieMax) + " calories above today’s target zone. Keep the next choice light and protein-forward—one day does not define your progress." };
+    if (totals.calories > calorieMax) {
+      marker = "reminder:" + parts.iso + ":calories:over";
+      message = overCalorieMessage(Math.round(totals.calories - calorieMax));
+    }
     else if (hour < 17 && remaining < reserve) message = { title: "Save some room for dinner", body: "About " + Math.max(0, remaining) + " calories remain today. Holding off or choosing something very light now will leave dinner more comfortable." };
     else if (hour >= 17 && remaining <= 350) message = { title: "You’re close to today’s calorie target", body: "About " + Math.max(0, remaining) + " calories remain. A lighter, protein-forward choice keeps you in range." };
     else return;
   }
   if (!message) return;
+  if (await env.TRACKER_KV.get(marker)) return;
   await broadcastPush(env, { ...message, tag: marker, url: "https://vinnyvuitton.github.io/tracker/" });
   await env.TRACKER_KV.put(marker, "1", { expirationTtl: 172800 });
+}
+
+function overCalorieMessage(amount) {
+  return {
+    title: "Calorie check-in",
+    body: "You’re about " + Math.max(0, Math.round(Number(amount) || 0)) + " calories above today’s target zone. No additional food is needed for the goal. If genuinely hungry, keep it small and protein-forward; otherwise, you’re all set. Resume normally tomorrow."
+  };
 }
 
 function compactTime(value) { return String(value || "").replace(":", ""); }
@@ -684,4 +694,4 @@ function json(body, status, extraHeaders) {
   return new Response(JSON.stringify(body), { status, headers });
 }
 
-export { chicagoParts, compactTime, deliverAlertMessage, inQuietHours, pacedTarget, parseMealEstimate, sendWebPush };
+export { chicagoParts, compactTime, deliverAlertMessage, inQuietHours, overCalorieMessage, pacedTarget, parseMealEstimate, sendDailyReminder, sendWebPush };

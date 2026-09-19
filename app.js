@@ -519,10 +519,16 @@
 
   function showMealFeedback(day, name) {
     var t = totals(day);
-    var calorieLeft = Math.round(number(state.data.targets.calories) - t.calories);
+    var calorieTarget = number(state.data.targets.calories);
+    var calorieMax = number(state.data.targets.calorieMax) || calorieTarget + 100;
+    var calorieLeft = Math.round(calorieTarget - t.calories);
     var proteinLeft = Math.max(0, Math.round(number(state.data.targets.protein) - t.protein));
-    var message = calorieLeft >= 0 ? name + " saved. About " + calorieLeft + " calories and " + proteinLeft + " g protein remain." : name + " saved. You’re about " + Math.abs(calorieLeft) + " calories over today’s center target—keep the next choice light.";
-    showFeedback(message, calorieLeft < 0 ? "warning" : "success");
+    var aboveZone = t.calories > calorieMax;
+    var message;
+    if (aboveZone) message = name + " saved. You’re about " + Math.round(t.calories - calorieMax) + " calories above today’s target zone. No additional food is needed for the goal unless you’re genuinely hungry.";
+    else if (calorieLeft < 0) message = name + " saved. You’re within today’s target zone, with about " + Math.max(0, Math.round(calorieMax - t.calories)) + " calories before its upper end and " + proteinLeft + " g protein remaining.";
+    else message = name + " saved. About " + calorieLeft + " calories and " + proteinLeft + " g protein remain.";
+    showFeedback(message, aboveZone ? "warning" : "success");
   }
 
   function header(title, eyebrow) {
