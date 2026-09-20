@@ -65,6 +65,16 @@ This is the protected replacement for the original tracker. The original live da
 - Added supported balance options for lower-body training and a lower-day recovery version.
 - Expanded Saturday cardio to a full 60-minute plan with a 30-minute express option, incline-first alerts, an immediate “Time to rock 🤘🏻” confirmation, and optional treadmill-result photo analysis with editable results.
 
+## Workout 2.8 weekly progression
+
+- Kept the 1,750–1,950 calorie and 135–150 g protein zones while adding a visible weekly calorie guide and a reminder not to subtract treadmill calories.
+- Standardized weigh-ins and official progress photos to happen after the bathroom but before pre-workout drinks, shakes, food, other drinks, or training.
+- Replaced latest-versus-first weight emphasis with the most recent completed weekly average and its week-over-week change.
+- Changed automatic load progression so a slightly easy exercise increases only after all prescribed sets reach the top of the rep range.
+- Progressed both full treadmill sessions with modest incline increases and moved the cooldown to the treadmill's automatic five minutes after the programmed hour.
+- Reduced Bulgarian split squats to two supported one-dumbbell sets, reduced sumo squats to two sets, and removed the unstable kickstand Romanian deadlift from the September 20 onward plan.
+- Made the recovery fields more prominent and added specific prompts for leg soreness and back tightness.
+
 ## Data safety
 
 The access code is never committed to source control. It is stored as a Cloudflare Worker secret and entered once on each device. The browser keeps it locally on that device.

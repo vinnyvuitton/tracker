@@ -15,6 +15,7 @@
   var MEAL_CATEGORIES = ["breakfast", "lunch", "dinner", "snack"];
   var NUTRITION_FIELDS = ["calories", "protein", "carbs", "fat", "fiber", "saturatedFat", "addedSugar", "sodium"];
   var PROGRESS_RANGES = [7, 14, 21, 30, 90, "all"];
+  var WEEK_TWO_START = "2026-09-20";
   var EFFORT_OPTIONS = [
     { value: "much-too-easy", label: "Much too easy" },
     { value: "slightly-easy", label: "Slightly easy" },
@@ -236,6 +237,91 @@
     ];
   }
 
+  function cardioOneProgressed() {
+    return [
+      cardio(0, 5, 2.5, 0, "Easy warmup"),
+      cardio(5, 10, 2.8, 1.5, "Settle into a brisk walk"),
+      cardio(10, 20, 3.0, 3, "Build into steady work—stay tall and avoid holding the rails"),
+      cardio(20, 30, 3.1, 5, "Target 5–6/10 effort. Reduce one incline level if form changes"),
+      cardio(30, 40, 3.1, 6, "Strong, controlled work—short sentences should still be possible"),
+      cardio(40, 50, 3.0, 4.5, "Stay tall and keep the effort controlled"),
+      cardio(50, 55, 3.0, 3, "Purposeful work—do not begin cooling down yet"),
+      cardio(55, 60, 2.9, 2, "Finish controlled, then use the treadmill's automatic five-minute cooldown")
+    ];
+  }
+
+  function cardioTwoProgressed() {
+    return [
+      cardio(0, 5, 2.5, 0, "Easy warmup"),
+      cardio(5, 15, 3.0, 2, "Settle into a smooth brisk walk"),
+      cardio(15, 25, 3.1, 4, "Target 5–6/10 and keep your hands off the rails"),
+      cardio(25, 35, 3.2, 5, "Strong but sustainable"),
+      cardio(35, 45, 3.1, 4, "Keep the effort steady and controlled"),
+      cardio(45, 55, 3.0, 3, "Purposeful pace—do not begin cooling down yet"),
+      cardio(55, 60, 3.0, 2, "Finish controlled, then use the treadmill's automatic five-minute cooldown")
+    ];
+  }
+
+  function lowerBProgressed() {
+    return {
+      title: "Lower B + Core",
+      subtitle: "Stable lower-body strength, glutes, and trunk",
+      type: "Strength",
+      sections: [
+        { label: "Lower Body", exercises: [
+          ex("Bulgarian Split Squat", "2 sets of 8 to 10 each side", "Hold one dumbbell in the free hand and keep the other hand firmly on the bench. Use bodyweight if you cannot stay stable.", load(10, 1)),
+          ex("Dumbbell Hip Thrust", "3 sets of 10 to 15", "Pause and squeeze your glutes at the top.", load(21, 1)),
+          ex("Dumbbell Sumo Squat", "2 sets of 10 to 15", "Use a wide stance and keep your knees tracking over your toes.", load(21, 1)),
+          ex("Standing Calf Raise", "3 sets of 12 to 20", "Pause at the top and lower for three controlled seconds.", load(15, 2))
+        ] },
+        { label: "Core", exercises: [
+          ex("Reverse Crunch", "3 sets of 10 to 15", "Curl your pelvis up without swinging your legs."),
+          ex("Side Plank", "2 sets of 20 to 40 seconds each side", "Keep your body in a straight line and breathe steadily.")
+        ] }
+      ]
+    };
+  }
+
+  function progressedStrengthPlan(plan, updates) {
+    return Object.assign({}, plan, { sections: plan.sections.map(function (section) {
+      return Object.assign({}, section, { exercises: section.exercises.map(function (exercise) {
+        return updates[exercise.name] ? Object.assign({}, exercise, updates[exercise.name]) : exercise;
+      }) });
+    }) });
+  }
+
+  function upperAProgressed() {
+    return progressedStrengthPlan(PLAN.Mon, {
+      "Dumbbell Flat Bench Press": { prescription: "3 sets of 11 to 12" },
+      "One Arm Dumbbell Row": { prescription: "3 sets of 13 to 15 each side" },
+      "Seated Dumbbell Shoulder Press": { prescription: "3 sets of 11 to 12" },
+      "Dumbbell Lateral Raise": { prescription: "3 sets of 13 to 20" },
+      "Overhead Dumbbell Triceps Extension": { prescription: "3 sets of 13 to 15" },
+      "Alternating Dumbbell Curl": { prescription: "3 sets of 13 to 15 each side" }
+    });
+  }
+
+  function lowerAProgressed() {
+    return progressedStrengthPlan(PLAN.Tue, {
+      "Goblet Squat": { prescription: "3 sets of 11 to 15" },
+      "Dumbbell Romanian Deadlift": { prescription: "3 sets of 11 to 12" },
+      "Standing Calf Raise": { prescription: "3 sets of 15 to 20", tip: "Pause at the top and lower for three controlled seconds." },
+      "Dead Bug": { prescription: "3 sets of 11 to 12 each side" },
+      "Forearm Plank": { prescription: "3 sets of 35 to 45 seconds", tip: "Brace your abs and glutes without holding your breath." }
+    });
+  }
+
+  function upperBProgressed() {
+    return progressedStrengthPlan(PLAN.Thu, {
+      "Incline Dumbbell Bench Press": { prescription: "3 sets of 10 to 12", tip: "Use the modest incline for every set and keep your shoulder blades set." },
+      "Chest Supported Dumbbell Row": { prescription: "3 sets of 11 to 15" },
+      "Push Up": { prescription: "3 sets of 11 to 12 clean reps" },
+      "Incline Rear Delt Raise": { prescription: "2 sets of 14 to 20" },
+      "Dumbbell Hammer Curl": { prescription: "3 sets of 10 to 12", tip: "Try the next available load. If you cannot reach 10 clean reps, return to the prior load and use a slow lowering phase.", equipment: load(13, 2) },
+      "Lying Dumbbell Triceps Extension": { prescription: "3 sets of 10 to 12", tip: "Try the next available load. If you cannot reach 10 clean reps, return to the prior load and move slowly.", equipment: load(13, 2) }
+    });
+  }
+
   function cardio(start, end, speed, incline, cue) { return { start: start, end: end, speed: speed, incline: incline, cue: cue }; }
 
   function cardioDuration(plan) {
@@ -427,8 +513,8 @@
     var weight = number(previous.log.load);
     var index = LOAD_OPTIONS.findIndex(function (option) { return option.weight === weight; });
     if (index < 0) return exercise.equipment.start;
-    if (previous.log.loadFeel === "much-too-easy") return LOAD_OPTIONS[Math.min(index + 2, LOAD_OPTIONS.length - 1)].weight;
-    if (previous.log.loadFeel === "slightly-easy" || previous.log.loadFeel === "too-light") return LOAD_OPTIONS[Math.min(index + 1, LOAD_OPTIONS.length - 1)].weight;
+    if (previous.log.loadFeel === "much-too-easy") return LOAD_OPTIONS[Math.min(index + 1, LOAD_OPTIONS.length - 1)].weight;
+    if ((previous.log.loadFeel === "slightly-easy" || previous.log.loadFeel === "too-light") && completedTopOfRepRange(previous.log, exercise)) return LOAD_OPTIONS[Math.min(index + 1, LOAD_OPTIONS.length - 1)].weight;
     if (previous.log.loadFeel === "too-hard" || previous.log.loadFeel === "too-heavy") return LOAD_OPTIONS[Math.max(index - 1, 1)].weight;
     return weight;
   }
@@ -436,6 +522,13 @@
   function prescribedSetCount(exercise) {
     var match = String(exercise.prescription || "").match(/(\d+)\s+sets?/i);
     return match ? Math.max(1, Number(match[1])) : 1;
+  }
+
+  function completedTopOfRepRange(log, exercise) {
+    var match = String(exercise.prescription || "").match(/(?:to|–|-)\s*(\d+)/i);
+    if (!match) return false;
+    var top = Number(match[1]), required = prescribedSetCount(exercise);
+    return exerciseSets(log, exercise).slice(0, required).length === required && exerciseSets(log, exercise).slice(0, required).every(function (value) { return number(value) >= top; });
   }
 
   function exerciseSets(log, exercise) {
@@ -488,7 +581,18 @@
     return out;
   }
 
-  function planForDate(iso) { return SPECIAL_DAYS[iso] || PLAN[dayKey(iso)]; }
+  function planForDate(iso) {
+    if (SPECIAL_DAYS[iso]) return SPECIAL_DAYS[iso];
+    var key = dayKey(iso), plan = PLAN[key];
+    if (iso < WEEK_TWO_START) return plan;
+    if (key === "Mon") return upperAProgressed();
+    if (key === "Tue") return lowerAProgressed();
+    if (key === "Wed") return Object.assign({}, plan, { subtitle: "Progressed treadmill conditioning · automatic cooldown follows", cardioSegments: cardioOneProgressed() });
+    if (key === "Thu") return upperBProgressed();
+    if (key === "Fri") return lowerBProgressed();
+    if (key === "Sat") return Object.assign({}, plan, { subtitle: "Progressed steady treadmill endurance · automatic cooldown follows", cardioSegments: cardioTwoProgressed() });
+    return plan;
+  }
 
   function exerciseId(name) { return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); }
   function exerciseGuide(exercise) {
@@ -562,7 +666,7 @@
       nutritionStatCard("Calories", Math.round(t.calories), "cal", state.data.targets.calorieMin, state.data.targets.calorieMax) +
       '</div>';
 
-    html += '<section class="card"><div class="card-head"><div><h2>Morning check</h2><p>Weight after the bathroom, before food or drink</p></div></div>' +
+    html += '<section class="card"><div class="card-head"><div><h2>Morning check</h2><p>Immediately after the bathroom—before pre-workout, shakes, food, other drinks, photos, or training</p></div></div>' +
       '<div class="row wrap"><label class="field">Weight, lb<input id="weight" type="number" inputmode="decimal" min="90" max="300" step="0.1" value="' + esc(day.weight) + '"></label>' +
       '<div class="field">Water, glasses<div class="stepper"><button type="button" data-water-step="-1" aria-label="Subtract one glass">−</button><input id="water" type="number" inputmode="numeric" min="0" max="30" step="1" value="' + esc(day.water) + '" aria-label="Water glasses"><button type="button" data-water-step="1" aria-label="Add one glass">+</button></div></div></div></section>';
 
@@ -590,7 +694,7 @@
 
   function renderPhotos(day, iso) {
     var official = dayKey(iso) === "Wed";
-    var html = '<section class="card"><div class="card-head"><div><h2>Progress photos</h2><p>' + (official ? "Official weekly checkpoint today" : "Daily is optional. Wednesday is the official checkpoint.") + '</p></div></div><div class="photos">';
+    var html = '<section class="card"><div class="card-head"><div><h2>Progress photos</h2><p>' + (official ? "Official weekly checkpoint—take these before pre-workout and training" : "Daily is optional. Wednesday before training is the official checkpoint.") + '</p></div></div><div class="photos">';
     ["front", "side", "back"].forEach(function (side) {
       var ref = day.photos[side];
       var revealed = state.revealedPhoto === iso + ":" + side;
@@ -822,18 +926,31 @@
   function renderProgress() {
     var dates = Object.keys(state.data.days).sort();
     var weights = dates.filter(function (iso) { return number(state.data.days[iso].weight) > 0; });
-    var latest = weights.length ? number(state.data.days[weights[weights.length - 1]].weight) : 0;
-    var first = weights.length ? number(state.data.days[weights[0]].weight) : 0;
-    var change = latest && first ? latest - first : 0;
+    var latestFullWeekEnd = addDays(startOfWeek(TODAY), -1);
+    var latestFullWeekStart = addDays(latestFullWeekEnd, -6);
+    var priorFullWeekEnd = addDays(latestFullWeekStart, -1);
+    var priorFullWeekStart = addDays(priorFullWeekEnd, -6);
+    var weeklyAverage = averageWeightBetween(latestFullWeekStart, latestFullWeekEnd);
+    var priorAverage = averageWeightBetween(priorFullWeekStart, priorFullWeekEnd);
+    var averageChange = weeklyAverage && priorAverage ? weeklyAverage - priorAverage : 0;
     var html = header("Progress", "Trend over noise");
-    html += '<section class="card"><div class="grid two"><div><p class="eyebrow">Latest weight</p><div class="stat">' + (latest ? latest.toFixed(1) : "No data") + (latest ? ' <small>lb</small>' : '') + '</div></div><div><p class="eyebrow">Change shown</p><div class="stat">' + (weights.length > 1 ? (change > 0 ? "+" : "") + change.toFixed(1) : "No trend") + (weights.length > 1 ? ' <small>lb</small>' : '') + '</div></div></div></section>';
-    html += '<section class="card"><div class="card-head"><div><h2>Recent morning weights</h2><p>Use the weekly average to judge progress</p></div></div><div class="weight-list">';
+    html += '<section class="card"><div class="grid two"><div><p class="eyebrow">Last full-week average</p><div class="stat">' + (weeklyAverage ? weeklyAverage.toFixed(1) : "No data") + (weeklyAverage ? ' <small>lb</small>' : '') + '</div></div><div><p class="eyebrow">Week-over-week</p><div class="stat">' + (weeklyAverage && priorAverage ? (averageChange > 0 ? "+" : "") + averageChange.toFixed(1) : "No trend") + (weeklyAverage && priorAverage ? ' <small>lb</small>' : '') + '</div></div></div><p class="notification-status">' + esc(formatDate(latestFullWeekStart, { month: "short", day: "numeric" })) + '–' + esc(formatDate(latestFullWeekEnd, { month: "short", day: "numeric" })) + ' · Daily changes are context, not the score.</p></section>';
+    html += '<section class="card"><div class="card-head"><div><h2>Recent morning weights</h2><p>Weigh before drinks, training, and photos; judge only the weekly average</p></div></div><div class="weight-list">';
     weights.slice(-8).forEach(function (iso) { html += '<div class="weight-chip"><small>' + esc(formatDate(iso, { month: "short", day: "numeric" })) + '</small><strong>' + number(state.data.days[iso].weight).toFixed(1) + '</strong></div>'; });
     if (!weights.length) html += '<div class="empty">Your weight trend will appear here.</div>';
     html += '</div></section>';
     html += renderProgressChart();
     html += renderGoalProgress();
     return html;
+  }
+
+  function averageWeightBetween(startIso, endIso) {
+    var values = [];
+    for (var iso = startIso; iso <= endIso; iso = addDays(iso, 1)) {
+      var day = state.data.days[iso];
+      if (day && number(day.weight)) values.push(number(day.weight));
+    }
+    return values.length ? values.reduce(function (sum, value) { return sum + value; }, 0) / values.length : 0;
   }
 
   function progressWindow() {
@@ -953,9 +1070,9 @@
 
   function renderPlan() {
     var html = header("The Plan", "September 10 to December 31");
-    html += '<section class="card"><div class="notice">Four strength days, two cardio days, and one active recovery day. Week 1 establishes safe working weights.</div></section>';
+    html += '<section class="card"><div class="notice">Four strength days, two cardio days, and one active recovery day. Progress reps before load; clean form and repeatability matter more than adding exercises.</div></section>';
     DAYS.forEach(function (key) {
-      var plan = PLAN[key];
+      var plan = planForDate(addDays(startOfWeek(TODAY), DAYS.indexOf(key)));
       html += '<section class="card"><div class="card-head"><div><p class="eyebrow">' + DAY_NAMES[DAYS.indexOf(key)] + ' · ' + plan.type + '</p><h2>' + esc(plan.title) + '</h2><p>' + esc(plan.subtitle) + '</p></div></div>';
       plan.sections.forEach(function (section) {
         html += '<div class="section-label">' + esc(section.label) + '</div>';
@@ -974,8 +1091,8 @@
   function renderCheckin() {
     var range = selectedCheckinRange(), summary = buildCheckin(range.start, range.end, range.inProgress), checkin = readWeeklyCheckin(range.start);
     return header("Weekly Check-In", "Current and previous weeks") +
-      '<section class="card goals-card"><div class="card-head"><div><h2>Nutrition goals</h2><p>Starting targets stay steady until you approve a change.</p></div></div><div class="grid two"><label class="field">Daily calories<input id="calorie-target" type="number" inputmode="numeric" min="1200" max="4000" step="25" value="' + esc(state.data.targets.calories) + '"></label><label class="field">Daily protein, g<input id="protein-target" type="number" inputmode="numeric" min="50" max="300" step="5" value="' + esc(state.data.targets.protein) + '"></label></div><p class="notification-status">Calorie zone: ' + esc(state.data.targets.calorieMin) + '–' + esc(state.data.targets.calorieMax) + ' · Protein zone: ' + esc(state.data.targets.proteinMin) + '–' + esc(state.data.targets.proteinMax) + ' g</p></section>' +
-      '<section class="card"><label class="field">Week<select id="checkin-week">' + renderCheckinWeekOptions(range.start) + '</select></label><div class="card-head"><div><h2>Weekly recovery</h2><p>' + esc(formatDate(range.start, { month: "short", day: "numeric" })) + ' to ' + esc(formatDate(range.end, { month: "short", day: "numeric" })) + (range.inProgress ? ' · In progress' : '') + '</p></div></div><div class="grid two"><label class="field">Hunger, 1–10<input data-weekly-checkin="hunger" type="number" min="1" max="10" value="' + esc(checkin.hunger || "") + '"></label><label class="field">Energy, 1–10<input data-weekly-checkin="energy" type="number" min="1" max="10" value="' + esc(checkin.energy || "") + '"></label><label class="field">Average sleep, hours<input data-weekly-checkin="sleep" type="number" min="0" max="14" step="0.25" value="' + esc(checkin.sleep || "") + '"></label><label class="field">Soreness, 1–10<input data-weekly-checkin="soreness" type="number" min="1" max="10" value="' + esc(checkin.soreness || "") + '"></label></div><label class="field">Recovery notes<textarea data-weekly-checkin="recoveryNotes" placeholder="Anything affecting recovery or performance">' + esc(checkin.recoveryNotes || "") + '</textarea></label></section>' +
+      '<section class="card goals-card"><div class="card-head"><div><h2>Nutrition goals</h2><p>Targets stay steady this week—improve consistency before lowering calories.</p></div></div><div class="grid two"><label class="field">Daily calories<input id="calorie-target" type="number" inputmode="numeric" min="1200" max="4000" step="25" value="' + esc(state.data.targets.calories) + '"></label><label class="field">Daily protein, g<input id="protein-target" type="number" inputmode="numeric" min="50" max="300" step="5" value="' + esc(state.data.targets.protein) + '"></label></div><p class="notification-status">Calorie zone: ' + esc(state.data.targets.calorieMin) + '–' + esc(state.data.targets.calorieMax) + ' · Aim near 13,300 calories for the full week · Protein zone: ' + esc(state.data.targets.proteinMin) + '–' + esc(state.data.targets.proteinMax) + ' g · Do not subtract treadmill calories.</p></section>' +
+      '<section class="card"><label class="field">Week<select id="checkin-week">' + renderCheckinWeekOptions(range.start) + '</select></label><div class="card-head"><div><h2>Weekly recovery</h2><p>' + esc(formatDate(range.start, { month: "short", day: "numeric" })) + ' to ' + esc(formatDate(range.end, { month: "short", day: "numeric" })) + (range.inProgress ? ' · In progress' : '') + '</p></div></div><div class="notice">Complete all four recovery fields before exporting so next week can be adjusted safely.</div><div class="grid two"><label class="field">Hunger, 1–10<input data-weekly-checkin="hunger" type="number" min="1" max="10" value="' + esc(checkin.hunger || "") + '"></label><label class="field">Energy, 1–10<input data-weekly-checkin="energy" type="number" min="1" max="10" value="' + esc(checkin.energy || "") + '"></label><label class="field">Average sleep, hours<input data-weekly-checkin="sleep" type="number" min="0" max="14" step="0.25" value="' + esc(checkin.sleep || "") + '"></label><label class="field">Soreness, 1–10<input data-weekly-checkin="soreness" type="number" min="1" max="10" value="' + esc(checkin.soreness || "") + '"></label></div><label class="field">Recovery notes<textarea data-weekly-checkin="recoveryNotes" placeholder="Include leg soreness before Tuesday and Friday, plus any back tightness">' + esc(checkin.recoveryNotes || "") + '</textarea></label></section>' +
       '<section class="card"><div class="card-head"><div><h2>Export selected week</h2><p>' + (range.inProgress ? 'Includes Sunday through today. Future days are left out.' : 'Includes the full Sunday–Saturday week.') + '</p></div></div>' +
       '<textarea id="checkin-output" class="checkin-output" readonly>' + esc(summary) + '</textarea>' +
       '<div class="row wrap"><button id="copy-checkin" class="primary">Copy selected week</button><button id="download-backup" class="secondary">Download private backup</button><button id="lock-tracker" class="secondary">Lock this device</button></div></section>' +
@@ -1068,7 +1185,6 @@
     var average = stats.weights.length ? stats.weights.reduce(function (a, b) { return a + b; }, 0) / stats.weights.length : 0;
     var priorStats = periodStats(addDays(startIso, -7), addDays(startIso, -1));
     var priorAverage = priorStats.weights.length ? priorStats.weights.reduce(function (a, b) { return a + b; }, 0) / priorStats.weights.length : 0;
-    var change = stats.weights.length > 1 ? stats.weights[stats.weights.length - 1] - stats.weights[0] : 0;
     var notes = [], nutrition = [], calorieTotal = 0, proteinTotal = 0, nutritionDays = 0;
     var training = [];
     for (var iso = startIso; iso <= endIso; iso = addDays(iso, 1)) {
@@ -1100,7 +1216,6 @@
       "Morning weights: " + (stats.weights.length ? stats.weights.map(function (w) { return w.toFixed(1); }).join(", ") + " lb" : "none logged"),
       "Weekly average: " + (average ? average.toFixed(1) + " lb" : "not available"),
       "Week-over-week average change: " + (average && priorAverage ? ((average - priorAverage) > 0 ? "+" : "") + (average - priorAverage).toFixed(1) + " lb" : "not available"),
-      "First to latest change: " + (stats.weights.length > 1 ? (change > 0 ? "+" : "") + change.toFixed(1) + " lb" : "not available"),
       "Strength sessions: " + stats.strengthDone + " completed",
       "Cardio sessions: " + stats.cardioDone + " completed",
       "Protein target days: " + stats.proteinDays,
@@ -1241,6 +1356,8 @@
     if (prescribedSetsComplete && !day.exercises[id].done) {
       day.exercises[id].done = true;
       day.exercises[id].autoCompleted = true;
+      if (!day.exercises[id].load && exercise && exercise.equipment && exercise.equipment.type === "dumbbell") day.exercises[id].load = recommendedLoad(exercise, id);
+      if (!day.exercises[id].load && exercise && exercise.equipment && exercise.equipment.type === "bodyweight") day.exercises[id].load = exercise.equipment.start;
       completionChanged = true;
     } else if (!prescribedSetsComplete && day.exercises[id].done && day.exercises[id].autoCompleted) {
       day.exercises[id].done = false;
@@ -2211,7 +2328,7 @@
     while (data.preferences.reminders.proteinTimes.length < 2) data.preferences.reminders.proteinTimes.push(defaultData().preferences.reminders.proteinTimes[data.preferences.reminders.proteinTimes.length]);
     while (data.preferences.reminders.calorieTimes.length < 3) data.preferences.reminders.calorieTimes.push(defaultData().preferences.reminders.calorieTimes[data.preferences.reminders.calorieTimes.length]);
     delete data.reward;
-    data.meta = Object.assign({}, data.meta || {}, { planVersion: "workout-2.7-2026-09-16" });
+    data.meta = Object.assign({}, data.meta || {}, { planVersion: "workout-2.8-2026-09-20" });
     Object.keys(data.days || {}).forEach(function (iso) {
       var day = data.days[iso];
       day.meals = Array.isArray(day.meals) ? day.meals : [];
