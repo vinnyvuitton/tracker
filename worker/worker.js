@@ -4,7 +4,7 @@ const MAX_DATA_BYTES = 24 * 1024 * 1024;
 const MAX_PHOTO_BYTES = 1024 * 1024;
 const BACKUP_LIMIT = 30;
 const MEAL_MODEL = "@cf/google/gemma-4-26b-a4b-it";
-const BUILD_ID = "workout-2.8-calorie-guidance";
+const BUILD_ID = "workout-2.9-cardio-countdown";
 
 export default {
   async fetch(request, env, ctx) {
@@ -457,14 +457,15 @@ function isValidSubscription(subscription) {
 async function startCardioAlerts(request, env, cors) {
   if (!env.ALERT_QUEUE) return json({ error: "Workout alerts are temporarily unavailable" }, 503, cors);
   const body = await request.json();
-  const alerts = Array.isArray(body && body.alerts) ? body.alerts.slice(0, 10).map((alert) => ({
+  const alerts = Array.isArray(body && body.alerts) ? body.alerts.slice(0, 20).map((alert) => ({
     atMinutes: Math.max(1, Math.min(90, Number(alert.atMinutes) || 0)),
     title: String(alert.title || "Treadmill update").slice(0, 90),
     body: String(alert.body || "Check your next treadmill setting.").slice(0, 240)
   })) : [];
   if (!alerts.length) return json({ error: "No cardio alerts supplied" }, 400, cors);
   const id = crypto.randomUUID();
-  const startedAt = Date.now();
+  const countdownSeconds = Math.max(3, Math.min(15, Number(body.countdownSeconds) || 5));
+  const startedAt = Date.now() + countdownSeconds * 1000;
   const durationMinutes = Math.max(1, Math.min(90, Number(body.durationMinutes) || Math.max(...alerts.map((alert) => alert.atMinutes))));
   const startAlert = body && body.startAlert ? {
     title: String(body.startAlert.title || "Time to rock 🤘🏻").slice(0, 90),
@@ -473,20 +474,27 @@ async function startCardioAlerts(request, env, cors) {
     url: "https://vinnyvuitton.github.io/tracker/"
   } : null;
   await env.TRACKER_KV.put("cardio:" + id, JSON.stringify({ id, date: String(body.date || ""), title: String(body.title || "Cardio"), startedAt, durationMinutes, alerts, sent: [], status: "active" }), { expirationTtl: 7200 });
+  const delayFromStart = (offsetSeconds) => Math.max(1, Math.round((startedAt - Date.now()) / 1000 + offsetSeconds));
   try {
-    if (startAlert) await broadcastPush(env, startAlert);
+    if (startAlert) await env.ALERT_QUEUE.send({
+      type: "cardio",
+      sessionId: id,
+      index: "start",
+      final: false,
+      payload: startAlert
+    }, { delaySeconds: delayFromStart(0) });
     await Promise.all(alerts.map((alert, index) => env.ALERT_QUEUE.send({
       type: "cardio",
       sessionId: id,
       index,
       final: index === alerts.length - 1,
       payload: { title: alert.title, body: alert.body, tag: "cardio-" + id + "-" + index, url: "https://vinnyvuitton.github.io/tracker/", cardioComplete: index === alerts.length - 1, sessionId: id, date: String(body.date || ""), durationMinutes }
-    }, { delaySeconds: Math.max(1, Math.round(alert.atMinutes * 60)) })));
+    }, { delaySeconds: delayFromStart(alert.atMinutes * 60) })));
   } catch (error) {
     await env.TRACKER_KV.delete("cardio:" + id);
     throw error;
   }
-  return json({ ok: true, id, startedAt: new Date(startedAt).toISOString() }, 200, cors);
+  return json({ ok: true, id, startedAt: new Date(startedAt).toISOString(), countdownSeconds }, 200, cors);
 }
 
 async function getCardioAlertsStatus(env, id, cors) {
@@ -514,7 +522,7 @@ async function deliverAlertMessage(body, env) {
   if (!session || session.status !== "active" || session.sent.includes(body.index)) return;
   await broadcastPush(env, body.payload);
   session.sent.push(body.index);
-  if (body.final || session.sent.length >= session.alerts.length) session.status = "complete";
+  if (body.final) session.status = "complete";
   await env.TRACKER_KV.put(key, JSON.stringify(session), { expirationTtl: session.status === "complete" ? 3600 : 7200 });
 }
 
