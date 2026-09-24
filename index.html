@@ -9,10 +9,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Workout 2.0">
   <title>Workout 2.0</title>
-  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=2.8.1">
-  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png?v=2.8.1">
-  <link rel="manifest" href="manifest.webmanifest?v=2.8.1">
-  <link rel="stylesheet" href="styles.css?v=2.8.1">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=2.8.2">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png?v=2.8.2">
+  <link rel="manifest" href="manifest.webmanifest?v=2.8.2">
+  <link rel="stylesheet" href="styles.css?v=2.8.2">
 </head>
 <body>
   <div id="app" aria-live="polite"></div>
@@ -67,6 +67,14 @@
         <p>Describe it, add a photo, or use both. You will review every estimate before it is saved.</p>
       </div>
       <div id="meal-favorites-slot"></div>
+      <div id="favorite-portion-adjustment" class="favorite-portion-adjustment" hidden>
+        <div><p class="eyebrow">Favorite portion</p><strong id="favorite-portion-name"></strong><p>1 is your usual portion. This adjustment applies only to the meal you’re logging now.</p></div>
+        <div class="quantity-stepper favorite-portion-stepper" aria-label="Favorite portion quantity">
+          <button type="button" data-favorite-portion="-0.25" aria-label="Decrease favorite portion">−</button>
+          <input id="favorite-portion-quantity" type="number" inputmode="decimal" min="0.25" max="50" step="0.25" value="1" aria-label="Favorite portion quantity">
+          <button type="button" data-favorite-portion="0.25" aria-label="Increase favorite portion">+</button>
+        </div>
+      </div>
       <label>Meal notes
         <textarea id="meal-notes" placeholder="Example: Chipotle bowl, two scoops chicken, white rice, pinto beans, hot salsa, and cheese"></textarea>
       </label>
@@ -154,7 +162,7 @@
     </form>
   </dialog>
 
-  <script src="migration.js?v=2.8.1"></script>
-  <script src="app.js?v=2.8.1"></script>
+  <script src="migration.js?v=2.8.2"></script>
+  <script src="app.js?v=2.8.2"></script>
 </body>
 </html>

@@ -147,6 +147,12 @@ textarea { resize: vertical; min-height: 74px; }
 .favorite-picker { display: grid; grid-template-columns: minmax(110px, .8fr) minmax(150px, 1.2fr); gap: 8px; margin: 8px 0; }
 .favorite-picker-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .favorite-picker-actions button { flex: 1 1 145px; }
+.favorite-portion-adjustment { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin: 14px 0; padding: 14px; border: 1px solid rgba(75, 163, 255, .35); border-radius: 14px; background: rgba(75, 163, 255, .08); }
+.favorite-portion-adjustment[hidden] { display: none; }
+.favorite-portion-adjustment .eyebrow { margin-bottom: 3px; }
+.favorite-portion-adjustment strong { display: block; font-size: 17px; }
+.favorite-portion-adjustment p:last-child { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+.favorite-portion-stepper { flex: 0 0 auto; grid-template-columns: 38px 56px 38px; }
 .favorite-manager { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 10px; }
 .favorite-manager summary, .nutrition-details summary, .nutrition-entry-details summary { color: var(--blue); cursor: pointer; font-size: 14px; font-weight: 750; }
 .favorite-edit { display: grid; grid-template-columns: minmax(0, 1fr) minmax(110px, .6fr) auto; gap: 7px; align-items: center; margin-top: 9px; }
@@ -294,6 +300,8 @@ dialog label { display: grid; gap: 6px; color: var(--muted); font-size: 12px; }
   .pending-meal { grid-template-columns: 1fr; }
   .pending-actions { justify-content: flex-start; }
   .favorite-picker, .favorite-edit { grid-template-columns: 1fr; }
+  .favorite-portion-adjustment { align-items: flex-start; flex-direction: column; }
+  .favorite-portion-stepper { justify-self: start; }
   .favorite-edit button { justify-self: start; }
   .chart-summary { grid-template-columns: repeat(2, 1fr); }
   .reminder-types { grid-template-columns: repeat(2, 1fr); }

@@ -175,6 +175,9 @@
     mealEstimate: null,
     activePendingMealId: null,
     adjustingFavoriteId: null,
+    adjustingFavoriteQuantity: 1,
+    adjustingFavoriteBase: null,
+    selectedFavoriteId: null,
     favoriteFilter: "all",
     favoritesOpen: false,
     favoriteManagerOpen: false,
@@ -940,8 +943,10 @@
     var all = sortedFavorites("all");
     if (!all.length) return '';
     var filtered = sortedFavorites(state.favoriteFilter);
+    var selectedId = filtered.some(function (favorite) { return favorite.id === state.selectedFavoriteId; }) ? state.selectedFavoriteId : (filtered[0] && filtered[0].id || "");
+    state.selectedFavoriteId = selectedId || null;
     var categoryOptions = ['<option value="all">All favorites</option>'].concat(MEAL_CATEGORIES.map(function (category) { return '<option value="' + category + '" ' + (state.favoriteFilter === category ? "selected" : "") + '>' + categoryLabel(category) + '</option>'; })).join("");
-    var favoriteOptions = filtered.length ? filtered.map(function (favorite) { return '<option value="' + esc(favorite.id) + '">' + esc(favorite.name) + '</option>'; }).join("") : '<option value="">No favorites in this category</option>';
+    var favoriteOptions = filtered.length ? filtered.map(function (favorite) { return '<option value="' + esc(favorite.id) + '" ' + (favorite.id === selectedId ? "selected" : "") + '>' + esc(favorite.name) + '</option>'; }).join("") : '<option value="">No favorites in this category</option>';
     var manager = all.map(function (favorite) {
       var options = MEAL_CATEGORIES.map(function (category) { return '<option value="' + category + '" ' + (favorite.category === category ? "selected" : "") + '>' + categoryLabel(category) + '</option>'; }).join("");
       return '<div class="favorite-edit"><input data-favorite-name="' + esc(favorite.id) + '" value="' + esc(favorite.name) + '" aria-label="Favorite name"><select data-favorite-category="' + esc(favorite.id) + '" aria-label="Favorite category">' + options + '</select><button data-remove-favorite="' + esc(favorite.id) + '" aria-label="Remove ' + esc(favorite.name) + '">Remove</button></div>';
@@ -1567,14 +1572,19 @@
 
   function selectedFavorite() {
     var select = document.getElementById("favorite-meal-select");
-    return select ? favoriteById(select.value) : null;
+    var id = select && select.value || state.selectedFavoriteId;
+    return id ? favoriteById(id) : null;
   }
 
   function useSelectedFavorite(adjustFirst) {
     var favorite = selectedFavorite();
     if (!favorite) return;
+    state.selectedFavoriteId = favorite.id;
     if (adjustFirst) {
       state.adjustingFavoriteId = favorite.id;
+      state.adjustingFavoriteQuantity = 1;
+      state.adjustingFavoriteBase = nutritionSnapshot(favorite, number(favorite.quantity) || 1);
+      collapseFavoritePicker();
       openMealDialog(true, favorite);
       return;
     }
@@ -1592,10 +1602,42 @@
     state.favoriteManagerOpen = false;
   }
 
+  function clearFavoriteAdjustment() {
+    state.adjustingFavoriteId = null;
+    state.adjustingFavoriteQuantity = 1;
+    state.adjustingFavoriteBase = null;
+    syncFavoriteAdjustmentUi();
+  }
+
+  function syncFavoriteAdjustmentUi() {
+    var panel = document.getElementById("favorite-portion-adjustment");
+    if (!panel) return;
+    var favorite = state.adjustingFavoriteId && favoriteById(state.adjustingFavoriteId);
+    panel.hidden = !favorite;
+    if (!favorite) return;
+    document.getElementById("favorite-portion-name").textContent = "Adjusting: " + favorite.name;
+    document.getElementById("favorite-portion-quantity").value = state.adjustingFavoriteQuantity;
+  }
+
+  function updateFavoriteAdjustment(quantity) {
+    var favorite = state.adjustingFavoriteId && favoriteById(state.adjustingFavoriteId);
+    if (!favorite || !state.adjustingFavoriteBase) return;
+    var next = clamp(Math.round(number(quantity) * 4) / 4, 0.25, 50);
+    state.adjustingFavoriteQuantity = next;
+    var adjusted = Object.assign({}, favorite, { quantity: next, perServing: state.adjustingFavoriteBase });
+    NUTRITION_FIELDS.forEach(function (field) {
+      adjusted[field] = state.adjustingFavoriteBase[field] == null ? null : Math.round(state.adjustingFavoriteBase[field] * next * 10) / 10;
+    });
+    showMealResult(adjusted);
+    syncFavoriteAdjustmentUi();
+  }
+
   function bindFavoritePickerEvents() {
     document.querySelectorAll("#meal-favorites-slot .favorites-panel, #meal-favorites-slot .favorite-manager").forEach(function (details) { details.addEventListener("toggle", function () { if (details.classList.contains("favorites-panel")) state.favoritesOpen = details.open; else state.favoriteManagerOpen = details.open; }); });
     var favoriteFilter = document.getElementById("favorite-category-filter");
     if (favoriteFilter) favoriteFilter.addEventListener("change", function () { state.favoriteFilter = favoriteFilter.value; state.favoritesOpen = true; document.getElementById("meal-favorites-slot").innerHTML = renderFavoritePicker(); bindFavoritePickerEvents(); });
+    var favoriteSelect = document.getElementById("favorite-meal-select");
+    if (favoriteSelect) favoriteSelect.addEventListener("change", function () { state.selectedFavoriteId = favoriteSelect.value || null; });
     var addFavorite = document.getElementById("add-favorite-meal");
     if (addFavorite) addFavorite.addEventListener("click", function () { useSelectedFavorite(false); });
     var adjustFavorite = document.getElementById("adjust-favorite-meal");
@@ -1617,14 +1659,16 @@
     var favorite = favoriteById(id);
     if (!favorite || !confirm("Remove " + favorite.name + " from favorites?")) return;
     state.data.favorites = state.data.favorites.filter(function (item) { return item.id !== id; });
+    if (state.selectedFavoriteId === id) state.selectedFavoriteId = null;
     queueSave(true);
   }
 
   function openMealDialog(manual, source, editing) {
+    var continuingFavoriteAdjustment = Boolean(!editing && source && source.id && source.id === state.adjustingFavoriteId);
+    if (!continuingFavoriteAdjustment) clearFavoriteAdjustment();
     state.mealEstimate = null;
     state.activePendingMealId = null;
     state.editingMeal = editing || null;
-    if (!source) state.adjustingFavoriteId = null;
     state.adviceImage = source && source.adviceImage || "";
     clearMealPhotoPreview();
     document.getElementById("meal-favorites-slot").innerHTML = editing ? "" : renderFavoritePicker();
@@ -1643,6 +1687,7 @@
     document.getElementById("meal-result").hidden = !manual;
     if (source) showMealResult(source);
     else if (manual) showMealResult({ name: "Meal", calories: "", protein: "", carbs: "", fat: "", fiber: null, saturatedFat: null, addedSugar: null, sodium: null, category: defaultMealCategory(), confidence: "Manual entry", nutritionBasis: "Manual", assumptions: "Enter the package, restaurant, or measured values you trust." });
+    syncFavoriteAdjustmentUi();
     openDashboardDialog(document.getElementById("meal-dialog"));
     document.getElementById("meal-close").focus({ preventScroll: true });
     hydratePhotos();
@@ -1948,7 +1993,7 @@
       includedItems: state.mealEstimate && state.mealEstimate.includedItems || "",
       nutritionBasis: state.mealEstimate && state.mealEstimate.nutritionBasis || "Manual"
     };
-    meal.quantity = Math.max(0.25, number(existingMeal && existingMeal.quantity) || 1);
+    meal.quantity = state.adjustingFavoriteId ? Math.max(0.25, number(state.adjustingFavoriteQuantity) || 1) : Math.max(0.25, number(existingMeal && existingMeal.quantity) || 1);
     meal.perServing = nutritionSnapshot(meal, meal.quantity);
     var file = selectedPhotoFile("meal-photo", "meal-photo-camera");
     if (pending && pending.photoId && document.getElementById("keep-meal-photo").checked) {
@@ -1998,7 +2043,7 @@
     }
     state.activePendingMealId = null;
     state.editingMeal = null;
-    state.adjustingFavoriteId = null;
+    clearFavoriteAdjustment();
     state.adviceImage = "";
     document.getElementById("meal-dialog").close();
     collapseFavoritePicker();
@@ -2543,8 +2588,11 @@
   document.getElementById("photo-cancel").addEventListener("click", function () { document.getElementById("photo-dialog").close(); clearPhotoInputs("photo-input", "photo-camera-input"); document.getElementById("photo-error").textContent = ""; });
   document.getElementById("analyze-meal").addEventListener("click", analyzeMeal);
   document.getElementById("manual-meal").addEventListener("click", function () { showMealResult({ name: "Meal", calories: "", protein: "", carbs: "", fat: "", fiber: null, saturatedFat: null, addedSugar: null, sodium: null, category: defaultMealCategory(), confidence: "Manual entry", nutritionBasis: "Manual", assumptions: "Enter the package, restaurant, or measured values you trust." }); });
+  document.querySelectorAll("[data-favorite-portion]").forEach(function (button) { button.addEventListener("click", function () { updateFavoriteAdjustment(state.adjustingFavoriteQuantity + Number(button.dataset.favoritePortion)); }); });
+  document.getElementById("favorite-portion-quantity").addEventListener("change", function (event) { updateFavoriteAdjustment(event.target.value); });
   document.getElementById("save-meal-favorite").addEventListener("change", function (event) { document.getElementById("favorite-category-wrap").hidden = !event.target.checked; });
-  document.getElementById("meal-cancel").addEventListener("click", function () { document.getElementById("meal-dialog").close(); clearMealPhotoPreview(); });
+  document.getElementById("meal-close").addEventListener("click", clearFavoriteAdjustment);
+  document.getElementById("meal-cancel").addEventListener("click", function () { document.getElementById("meal-dialog").close(); clearFavoriteAdjustment(); clearMealPhotoPreview(); });
   document.getElementById("duplicate-meal-edit").addEventListener("click", duplicateEditingMeal);
   document.getElementById("save-meal").addEventListener("click", saveMeal);
   document.getElementById("ask-meal-advice").addEventListener("click", askMealAdvice);
