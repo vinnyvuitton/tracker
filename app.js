@@ -704,7 +704,7 @@
       '<div class="field">Water, glasses<div class="stepper"><button type="button" data-water-step="-1" aria-label="Subtract one glass">−</button><input id="water" type="number" inputmode="numeric" min="0" max="30" step="1" value="' + esc(day.water) + '" aria-label="Water glasses"><button type="button" data-water-step="1" aria-label="Add one glass">+</button></div></div></div></section>';
 
     html += renderMeals(day, t);
-    html += renderPendingMeals();
+    html += renderPendingMeals(iso);
     html += renderPhotos(day, iso);
     html += renderWorkout(day, plan, iso);
     html += '<section class="card"><div class="card-head"><div><h2>Day note</h2><p>Energy, sleep, soreness, schedule, or anything I should know</p></div></div>' +
@@ -956,10 +956,10 @@
       '<details class="favorite-manager" ' + (state.favoriteManagerOpen ? "open" : "") + '><summary>Manage favorites</summary>' + manager + '<p class="notification-status">Changes save automatically.</p></details></details>';
   }
 
-  function renderPendingMeals() {
-    var pending = state.data.pendingMeals || [];
+  function renderPendingMeals(iso) {
+    var pending = (state.data.pendingMeals || []).filter(function (meal) { return meal.date === iso; });
     if (!pending.length) return "";
-    var html = '<section class="card pending-meals"><div class="card-head"><div><p class="eyebrow">Saved safely</p><h2>Meal estimates</h2><p>These stay here on Daily—you never need to hunt through old dates.</p></div></div>';
+    var html = '<section class="card pending-meals"><div class="card-head"><div><p class="eyebrow">Saved safely</p><h2>Meal estimates</h2><p>Pending estimates for this date stay with this date until you review or discard them.</p></div></div>';
     pending.slice().sort(function (a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)); }).forEach(function (meal) {
       var ready = meal.status === "ready" && meal.result;
       var label = ready ? "Ready for your review" : meal.status === "estimating" ? "Estimating now" : meal.lastError === "daily_limit" ? "Daily free limit reached—saved for automatic retry. No charge" : "Saved—will retry automatically";
@@ -1884,6 +1884,7 @@
         var photoStatus = document.getElementById("meal-photo-status");
         if (photoStatus && (pending.photoId || pending.localImage)) photoStatus.textContent = "Photo uploaded and analyzed successfully.";
       } else {
+        if (pending.date && pending.date !== state.selectedDate) showFeedback("Meal estimate ready for " + formatDate(pending.date, { month: "short", day: "numeric" }) + ".", "success");
         render();
       }
       return true;

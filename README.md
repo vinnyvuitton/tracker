@@ -4,6 +4,7 @@ This is the protected replacement for the original tracker. The original live da
 
 ## What changed
 
+- Pending meal estimates now appear only on their intended date, with a dated confirmation when a background estimate finishes while another day is open.
 - Favorite selections now persist when opening portion adjustment, with a dedicated quarter-portion control that scales the logged meal without changing the saved favorite.
 - Replaced the old gym and cable-machine plan with the home dumbbell, adjustable bench, mat, and treadmill plan.
 - Added all seven days, including two cardio days and one recovery day.
