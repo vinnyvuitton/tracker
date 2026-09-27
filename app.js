@@ -16,6 +16,7 @@
   var NUTRITION_FIELDS = ["calories", "protein", "carbs", "fat", "fiber", "saturatedFat", "addedSugar", "sodium"];
   var PROGRESS_RANGES = [7, 14, 21, 30, 90, "all"];
   var WEEK_TWO_START = "2026-09-20";
+  var WEEK_THREE_START = "2026-09-27";
   var EFFORT_OPTIONS = [
     { value: "much-too-easy", label: "Much too easy" },
     { value: "slightly-easy", label: "Slightly easy" },
@@ -313,6 +314,45 @@
     };
   }
 
+  function weekThreeStrengthPlan(key) {
+    if (key === "Mon") return progressedStrengthPlan(upperAProgressed(), {
+      "Dumbbell Flat Bench Press": { prescription: "3 sets of 8 to 10", weeklyLoad: 21, tip: "Try 21 lb per dumbbell. Keep your feet planted and finish with about two good reps left." },
+      "One Arm Dumbbell Row": { prescription: "3 sets of 10 to 12 each side", weeklyLoad: 21, tip: "Try 21 lb. Brace on the bench and pull your elbow toward your hip." },
+      "Seated Dumbbell Shoulder Press": { weeklyLoad: 15 },
+      "Dumbbell Lateral Raise": { weeklyLoad: 10 },
+      "Overhead Dumbbell Triceps Extension": { prescription: "3 sets of 10 to 15", weeklyLoad: 15, tip: "Stay at 15 lb. Stop before your elbows or back shift to finish a rep." },
+      "Alternating Dumbbell Curl": { weeklyLoad: 13 }
+    });
+    if (key === "Tue") return progressedStrengthPlan(lowerAProgressed(), {
+      "Goblet Squat": { prescription: "3 sets of 13 to 15", weeklyLoad: 17, tip: "Stay at 17 lb and work toward three clean sets of 15 before increasing." },
+      "Dumbbell Romanian Deadlift": { prescription: "3 sets of 8 to 10", weeklyLoad: 19, tip: "Try 19 lb per dumbbell. Push your hips back while keeping a long neutral spine." },
+      "Dumbbell Reverse Lunge": { prescription: "2 sets of 8 to 10 each side", weeklyLoad: 10, equipment: load(10, 1), tip: "Hold one 10 lb dumbbell and use the bench with your free hand. Step back only as far as you can stay balanced." },
+      "Standing Calf Raise": { prescription: "3 sets of 12 to 15", weeklyLoad: 17, tip: "Try 17 lb per dumbbell. Pause at the top and lower slowly." }
+    });
+    if (key === "Thu") return progressedStrengthPlan(upperBProgressed(), {
+      "Incline Dumbbell Bench Press": { weeklyLoad: 23, tip: "Stay at 23 lb per dumbbell. Use a modest incline and lower each rep with control." },
+      "Chest Supported Dumbbell Row": { prescription: "3 sets of 10 to 12", weeklyLoad: 19, tip: "Try 19 lb per dumbbell. Keep your chest supported throughout." },
+      "Push Up": { prescription: "3 sets of 8 to 12 clean reps", tip: "Lower for about two seconds and keep your body in one line. Stop with two good reps left." },
+      "Incline Rear Delt Raise": { prescription: "2 sets of 18 to 20", weeklyLoad: 6, tip: "Stay at 6 lb and move slowly without swinging." },
+      "Dumbbell Hammer Curl": { prescription: "3 sets of 10 to 12", weeklyLoad: 14, tip: "Try 14 lb per dumbbell for three clean sets. Keep your elbows still." },
+      "Lying Dumbbell Triceps Extension": { weeklyLoad: 13 }
+    });
+    if (key === "Fri") return progressedStrengthPlan(lowerBProgressed(), {
+      "Bulgarian Split Squat": { prescription: "2 sets of 10 each side", weeklyLoad: 10, tip: "Keep one 10 lb dumbbell and one hand on the bench. Build balance before load." },
+      "Dumbbell Hip Thrust": { weeklyLoad: 21, tip: "Stay at 21 lb. Pad the hip crease, hold the dumbbell with both hands, and use a stable bench. If it rocks, do a floor glute bridge instead." },
+      "Dumbbell Sumo Squat": { prescription: "2 sets of 10 to 15", weeklyLoad: 22, tip: "Try 22 lb on one dumbbell. Keep knees tracking over toes." },
+      "Standing Calf Raise": { prescription: "3 sets of 12 to 15", weeklyLoad: 19, tip: "Try 19 lb per dumbbell. Pause at the top and lower slowly." }
+    });
+    return null;
+  }
+
+  function weekThreeCardio(segments, firstWorkMinute, lastWorkMinute, target) {
+    return segments.map(function (segment) {
+      if (segment.automatic || segment.start < firstWorkMinute || segment.end > lastWorkMinute) return segment;
+      return Object.assign({}, segment, { incline: segment.incline + 1, cue: "Aim for " + target + "/10 effort. Keep your stride smooth and hands off the rails; reduce incline if your form changes." });
+    });
+  }
+
   function progressedStrengthPlan(plan, updates) {
     return Object.assign({}, plan, { sections: plan.sections.map(function (section) {
       return Object.assign({}, section, { exercises: section.exercises.map(function (exercise) {
@@ -542,7 +582,8 @@
 
   function recommendedLoad(exercise, id) {
     var previous = previousExerciseLog(id, state.selectedDate);
-    if (!previous) return exercise.equipment.start;
+    if (!previous) return exercise.weeklyLoad || exercise.equipment.start;
+    if (exercise.weeklyLoad && previous.iso < WEEK_THREE_START && state.selectedDate >= WEEK_THREE_START) return exercise.weeklyLoad;
     var weight = number(previous.log.load);
     var index = LOAD_OPTIONS.findIndex(function (option) { return option.weight === weight; });
     if (index < 0) return exercise.equipment.start;
@@ -618,6 +659,12 @@
     if (SPECIAL_DAYS[iso]) return SPECIAL_DAYS[iso];
     var key = dayKey(iso), plan = PLAN[key];
     if (iso < WEEK_TWO_START) return plan;
+    if (iso >= WEEK_THREE_START) {
+      var updatedStrength = weekThreeStrengthPlan(key);
+      if (updatedStrength) return updatedStrength;
+      if (key === "Wed") return Object.assign({}, plan, { subtitle: "60 minutes guided work · 5-minute automatic cooldown", cardioSegments: weekThreeCardio(cardioOneProgressed(), 20, 50, 6) });
+      if (key === "Sat") return Object.assign({}, plan, { subtitle: "60 minutes steady work · 5-minute automatic cooldown", cardioSegments: weekThreeCardio(cardioTwoProgressed(), 15, 45, "5–6") });
+    }
     if (key === "Mon") return upperAProgressed();
     if (key === "Tue") return lowerAProgressed();
     if (key === "Wed") return Object.assign({}, plan, { subtitle: "60 minutes progressed work · 5-minute automatic cooldown", cardioSegments: cardioOneProgressed() });
@@ -751,7 +798,7 @@
     var html = '<section class="card"><div class="card-head workout-title"><div><p class="eyebrow">' + esc(plan.type) + '</p><h2>' + esc(plan.title) + '</h2><p>' + esc(plan.subtitle) + '</p></div><div class="stat" aria-label="' + done + ' of ' + total + '">' + done + '<small>/' + total + '</small></div></div>';
     if (plan.type === "Strength") {
       html += renderEquipmentPrep(day, plan);
-      html += '<div class="notice">Choose a load that leaves about 3 good reps in reserve. The plate setup is exact; total dumbbell weight is approximate.</div>';
+      html += '<div class="notice">Choose a load that leaves about 2–3 good reps in reserve. The plate setup is exact; total dumbbell weight is approximate.</div>';
       if (/Lower/.test(plan.title)) html += '<details class="recovery-option"><summary>Still very sore? Use the recovery version</summary><p>Use bench support, keep every load the same or lighter, and complete two controlled sets per lower-body exercise. Stop if soreness changes your normal movement or becomes sharp pain.</p></details>';
     }
     if (plan.type === "Cardio") html += renderCardioGuide(day, plan);
@@ -770,6 +817,7 @@
           renderTimedExerciseTimer(plan, exercise, id) + renderExerciseLog(plan, exercise, id, log, firstLabel, secondLabel, firstPlaceholder, secondPlaceholder) + '</div>';
       });
     });
+    if (plan.type === "Recovery" && plan.sections.some(function (section) { return section.exercises.some(function (exercise) { return exercise.name === "Easy Walk"; }); })) html += renderTreadmillResult(day);
     html += '<label class="field">Session effort<select id="session-rating"><option value="">Choose after training</option>';
     ["Easy", "Solid", "Hard", "Brutal"].forEach(function (rating) { html += '<option ' + (day.workout.rating === rating ? "selected" : "") + '>' + rating + '</option>'; });
     html += '</select></label></section>';
@@ -817,6 +865,7 @@
       if (exercise.name === "Side Plank") return renderSidePlankInputs(id, log) + renderEffortButtons(id, log);
       return renderSetInputs(exercise, id, log) + renderEffortButtons(id, log);
     }
+    if (plan.type === "Recovery") return '<div class="exercise-log">' + (log.load ? '<p class="previous-load">Earlier entry: ' + esc(log.load) + '</p>' : '') + '<label class="field">' + (exercise.name === "Easy Walk" ? "Walk notes (optional)" : "Notes (optional)") + '<input data-exercise-reps="' + id + '" value="' + esc(log.reps || "") + '" placeholder="Optional"></label></div>';
     return '<div class="exercise-log"><label class="field">' + firstLabel + '<input data-exercise-load="' + id + '" value="' + esc(log.load || "") + '" placeholder="' + firstPlaceholder + '"></label><label class="field">' + secondLabel + '<input data-exercise-reps="' + id + '" inputmode="numeric" value="' + esc(log.reps || "") + '" placeholder="' + secondPlaceholder + '"></label></div>';
   }
 
@@ -878,7 +927,13 @@
     if (active) html += '<button class="secondary" id="cancel-cardio">Cancel alerts</button>';
     html += '</div><p class="notification-status">' + (complete ? "Session complete · " + number(day.cardio.durationMinutes || duration) + " minutes logged automatically." : state.notificationEnabled ? "You can switch to YouTube—push alerts will tell you every incline and speed change." : "Enable notifications first so alerts can reach you while YouTube is open.") + '</p>';
     if (state.cardioCountdown && state.cardioCountdown.date === state.selectedDate) html += renderCardioCountdown();
+    html += renderTreadmillResult(day);
+    return html;
+  }
+
+  function renderTreadmillResult(day) {
     var treadmillRef = day.photos && day.photos.treadmill;
+    var html = '';
     html += '<div class="treadmill-result"><strong>Workout result</strong>';
     if (treadmillRef) html += '<div class="treadmill-photo ' + (state.revealedPhoto === state.selectedDate + ":treadmill" ? "revealed" : "") + '" data-photo-container="treadmill"><img alt="Treadmill results" data-photo-ref="' + esc(photoRefValue(treadmillRef)) + '"><span class="photo-load-status" data-photo-status>Loading photo…</span><button type="button" class="treadmill-reveal" data-reveal-photo="treadmill">' + (state.revealedPhoto === state.selectedDate + ":treadmill" ? "Hide result" : "Reveal result") + '</button><button type="button" class="photo-retry" data-retry-photo="treadmill" hidden>Retry photo</button><button type="button" class="treadmill-remove" data-remove-photo="treadmill" aria-label="Remove treadmill result">×</button></div>';
     else html += '<button type="button" class="secondary" data-add-photo="treadmill">Upload treadmill results photo</button>';
@@ -1129,7 +1184,10 @@
         html += '<div class="section-label">' + esc(section.label) + '</div>';
         section.exercises.forEach(function (exercise) {
           html += '<div class="exercise"><div class="exercise-name">' + esc(exercise.name) + equipmentBadge(exercise) + '</div><div class="exercise-prescription">' + esc(exercise.prescription) + '</div>';
-          if (exercise.equipment && exercise.equipment.type === "dumbbell") html += '<p class="exercise-tip">Starting point: ≈ ' + exercise.equipment.start + ' lb ' + (exercise.equipment.dumbbells === 2 ? "per dumbbell. " : "on one dumbbell. ") + esc(plateText(exercise.equipment.start, exercise.equipment.dumbbells)) + '</p>';
+          if (exercise.equipment && exercise.equipment.type === "dumbbell") {
+            var suggestedLoad = exercise.weeklyLoad || exercise.equipment.start;
+            html += '<p class="exercise-tip">Starting point: ≈ ' + suggestedLoad + ' lb ' + (exercise.equipment.dumbbells === 2 ? "per dumbbell. " : "on one dumbbell. ") + esc(plateText(suggestedLoad, exercise.equipment.dumbbells)) + '</p>';
+          }
           html += '</div>';
         });
       });

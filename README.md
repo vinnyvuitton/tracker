@@ -77,6 +77,13 @@ This is the protected replacement for the original tracker. The original live da
 - Reduced Bulgarian split squats to two supported one-dumbbell sets, reduced sumo squats to two sets, and removed the unstable kickstand Romanian deadlift from the September 20 onward plan.
 - Made the recovery fields more prominent and added specific prompts for leg soreness and back tightness.
 
+## Workout 2.9 September 27 check-in
+
+- Kept the four-strength, two-cardio, one-recovery schedule and current nutrition zones.
+- Advanced selected dumbbell loads and rep ranges from the September 20–26 check-in, with supported reverse lunges and stable hip-thrust guidance.
+- Increased incline by one level only in the middle work intervals of the two full guided treadmill sessions; speeds and durations remain unchanged.
+- Added private treadmill-result photo upload to Sunday's recovery walk and replaced unnecessary recovery-exercise setup fields with optional notes.
+
 ## Data safety
 
 The access code is never committed to source control. It is stored as a Cloudflare Worker secret and entered once on each device. The browser keeps it locally on that device.
