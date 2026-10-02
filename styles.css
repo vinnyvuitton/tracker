@@ -101,6 +101,9 @@ textarea { resize: vertical; min-height: 74px; }
 .load-guide strong { font-size: 14px; }
 .load-guide span { margin-top: 4px; color: var(--muted); font-size: 13px; line-height: 1.4; }
 .previous-load { color: var(--blue) !important; }
+.exercise-history { margin: 10px 0 12px 38px; padding: 10px 12px; border-left: 2px solid var(--blue); border-radius: 0 8px 8px 0; background: var(--panel-2); color: var(--muted); font-size: 13px; line-height: 1.5; }
+.exercise-history strong, .exercise-history span { display: block; }
+.exercise-history strong { color: var(--blue); font-size: 12px; }
 .set-entry { margin: 10px 0 0 38px; }
 .set-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 7px; }
 .set-grid label { color: var(--muted); font-size: 11px; }

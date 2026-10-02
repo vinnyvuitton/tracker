@@ -573,15 +573,16 @@
     return "On each end: " + plates + ". " + (count === 2 ? "Make both dumbbells identical. " : "Use one dumbbell. ") + "Handle + collars assumed ≈ 1 lb.";
   }
 
-  function previousExerciseLog(id, beforeIso) {
+  function previousExerciseLog(id, beforeIso, requireLoad) {
     return Object.keys(state.data.days || {}).filter(function (iso) { return iso < beforeIso; }).sort().reverse().map(function (iso) {
       var log = state.data.days[iso].exercises && state.data.days[iso].exercises[id];
-      return log && log.load ? { iso: iso, log: log } : null;
+      var hasEntry = log && (log.load || log.reps || log.done || Array.isArray(log.sets) && log.sets.some(function (value) { return String(value == null ? "" : value).trim(); }));
+      return hasEntry && (!requireLoad || log.load) ? { iso: iso, log: log } : null;
     }).find(Boolean) || null;
   }
 
   function recommendedLoad(exercise, id) {
-    var previous = previousExerciseLog(id, state.selectedDate);
+    var previous = previousExerciseLog(id, state.selectedDate, true);
     if (!previous) return exercise.weeklyLoad || exercise.equipment.start;
     if (exercise.weeklyLoad && previous.iso < WEEK_THREE_START && state.selectedDate >= WEEK_THREE_START) return exercise.weeklyLoad;
     var weight = number(previous.log.load);
@@ -843,30 +844,47 @@
   }
 
   function renderExerciseLog(plan, exercise, id, log, firstLabel, secondLabel, firstPlaceholder, secondPlaceholder) {
+    var history = renderExerciseHistory(plan, exercise, id);
     if (plan.type === "Strength" && exercise.equipment && exercise.equipment.type === "dumbbell") {
       var recommended = recommendedLoad(exercise, id);
       var selected = number(log.load) || recommended;
-      var previous = previousExerciseLog(id, state.selectedDate);
       var options = LOAD_OPTIONS.filter(function (option) { return option.weight > 1; }).map(function (option) {
         return '<option value="' + option.weight + '" ' + (option.weight === selected ? "selected" : "") + '>≈ ' + option.weight + ' lb ' + (exercise.equipment.dumbbells === 2 ? "each" : "total") + '</option>';
       }).join("");
-      return '<div class="load-guide"><strong>Recommended: approximately ' + selected + ' lb ' + (exercise.equipment.dumbbells === 2 ? "per dumbbell" : "on one dumbbell") + '</strong><span>' + esc(plateText(selected, exercise.equipment.dumbbells)) + '</span>' +
-        (previous ? '<span class="previous-load">Last time: ≈ ' + esc(previous.log.load) + ' lb' + (previous.log.reps ? ' · ' + esc(previous.log.reps) + ' reps' : '') + '</span>' : '') + '</div>' +
+      return history + '<div class="load-guide"><strong>Recommended: approximately ' + selected + ' lb ' + (exercise.equipment.dumbbells === 2 ? "per dumbbell" : "on one dumbbell") + '</strong><span>' + esc(plateText(selected, exercise.equipment.dumbbells)) + '</span></div>' +
         '<div class="exercise-log"><label class="field">Load used<select data-exercise-load="' + id + '">' + options + '</select></label></div>' +
         renderSetInputs(exercise, id, log) + renderEffortButtons(id, log);
     }
     if (plan.type === "Strength" && exercise.equipment && exercise.equipment.type === "bodyweight") {
       var variations = ["Floor push-up", "Incline push-up", "Knee push-up", "Weighted push-up"];
       var chosen = log.load || exercise.equipment.start;
-      return '<div class="exercise-log"><label class="field">Variation<select data-exercise-load="' + id + '">' + variations.map(function (variation) { return '<option ' + (variation === chosen ? "selected" : "") + '>' + variation + '</option>'; }).join("") + '</select></label></div>' +
+      return history + '<div class="exercise-log"><label class="field">Variation<select data-exercise-load="' + id + '">' + variations.map(function (variation) { return '<option ' + (variation === chosen ? "selected" : "") + '>' + variation + '</option>'; }).join("") + '</select></label></div>' +
         renderSetInputs(exercise, id, log) + renderEffortButtons(id, log);
     }
     if (plan.type === "Strength") {
-      if (exercise.name === "Side Plank") return renderSidePlankInputs(id, log) + renderEffortButtons(id, log);
-      return renderSetInputs(exercise, id, log) + renderEffortButtons(id, log);
+      if (exercise.name === "Side Plank") return history + renderSidePlankInputs(id, log) + renderEffortButtons(id, log);
+      return history + renderSetInputs(exercise, id, log) + renderEffortButtons(id, log);
     }
-    if (plan.type === "Recovery") return '<div class="exercise-log">' + (log.load ? '<p class="previous-load">Earlier entry: ' + esc(log.load) + '</p>' : '') + '<label class="field">' + (exercise.name === "Easy Walk" ? "Walk notes (optional)" : "Notes (optional)") + '<input data-exercise-reps="' + id + '" value="' + esc(log.reps || "") + '" placeholder="Optional"></label></div>';
-    return '<div class="exercise-log"><label class="field">' + firstLabel + '<input data-exercise-load="' + id + '" value="' + esc(log.load || "") + '" placeholder="' + firstPlaceholder + '"></label><label class="field">' + secondLabel + '<input data-exercise-reps="' + id + '" inputmode="numeric" value="' + esc(log.reps || "") + '" placeholder="' + secondPlaceholder + '"></label></div>';
+    if (plan.type === "Recovery") return history + '<div class="exercise-log">' + (log.load ? '<p class="previous-load">Earlier entry: ' + esc(log.load) + '</p>' : '') + '<label class="field">' + (exercise.name === "Easy Walk" ? "Walk notes (optional)" : "Notes (optional)") + '<input data-exercise-reps="' + id + '" value="' + esc(log.reps || "") + '" placeholder="Optional"></label></div>';
+    return history + '<div class="exercise-log"><label class="field">' + firstLabel + '<input data-exercise-load="' + id + '" value="' + esc(log.load || "") + '" placeholder="' + firstPlaceholder + '"></label><label class="field">' + secondLabel + '<input data-exercise-reps="' + id + '" inputmode="numeric" value="' + esc(log.reps || "") + '" placeholder="' + secondPlaceholder + '"></label></div>';
+  }
+
+  function renderExerciseHistory(plan, exercise, id) {
+    var weekStart = startOfWeek(state.selectedDate), previousWeekStart = addDays(weekStart, -7);
+    var previous = previousExerciseLog(id, weekStart);
+    var lastWeek = previous && previous.iso >= previousWeekStart;
+    if (!lastWeek) previous = previousExerciseLog(id, state.selectedDate);
+    if (!previous) return '<div class="exercise-history">No entry last week · No earlier result recorded.</div>';
+    var log = previous.log, parts = [];
+    if (log.load) parts.push(exercise.equipment && exercise.equipment.type === "dumbbell" ? log.load + " lb " + (exercise.equipment.dumbbells === 2 ? "each" : "on one dumbbell") : String(log.load));
+    if (exercise.name === "Side Plank" && (log.reps || log.sets)) {
+      parts.push(sidePlankSets(log).map(function (value, index) { return "Set " + (Math.floor(index / 2) + 1) + " " + (index % 2 ? "right" : "left") + ": " + (value || "—") + " sec"; }).join(" · "));
+    } else if (plan.type === "Strength" && (log.reps || log.sets)) {
+      var values = Array.isArray(log.sets) ? log.sets : String(log.reps).split(/[,/]+/);
+      parts.push(values.map(function (value) { return String(value == null ? "" : value).trim() || "—"; }).join(" / ") + (/sec|second/i.test(exercise.prescription) ? " sec" : " reps"));
+    } else if (log.reps) parts.push(String(log.reps) + (plan.type === "Cardio" ? " min" : ""));
+    if (!parts.length) parts.push(log.done ? "Completed · amounts not recorded" : "Amounts not recorded");
+    return '<div class="exercise-history"><strong>' + (lastWeek ? 'Last week' : 'No entry last week · Last recorded') + ' · ' + esc(formatDate(previous.iso, { month: "short", day: "numeric" })) + '</strong><span>' + esc(parts.join(" · ")) + '</span></div>';
   }
 
   function renderSidePlankInputs(id, log) {
@@ -1346,11 +1364,106 @@
       "Training details:",
       training.length ? training.join("\n") : "No exercise details entered.",
       "",
+      "Cardio notification timing:",
+      cardioTimingForWeek(startIso, endIso),
+      "",
       "Notes:",
       notes.length ? notes.join("\n") : "No notes entered.",
       "",
       "Please review my trend, adherence, recovery, and exercise logs, then give me any changes for next week."
     ].join("\n");
+  }
+
+  function summarizeCardioTiming(day) {
+    var alerts = day.alerts || [], receipts = day.receipts || [];
+    if (!alerts.length) return "";
+    var sessions = Array.from(new Set(alerts.map(function (alert) { return alert.sessionId; })));
+    return sessions.map(function (sessionId) {
+      var scheduled = alerts.filter(function (alert) { return alert.sessionId === sessionId; }).sort(function (a, b) { return a.dueAt - b.dueAt; });
+      var firstReceipts = new Map();
+      receipts.filter(function (receipt) { return receipt.sessionId === sessionId; }).sort(function (a, b) { return a.receivedAt - b.receivedAt; }).forEach(function (receipt) { if (!firstReceipts.has(receipt.index)) firstReceipts.set(receipt.index, receipt); });
+      var attempted = scheduled.filter(function (alert) { return Number.isFinite(alert.sentAt); });
+      var accepted = scheduled.filter(function (alert) { return alert.acceptedCount > 0; });
+      var device = Array.from(firstReceipts.values());
+      var serverDelays = attempted.map(function (alert) { return (alert.sentAt - alert.dueAt) / 1000; });
+      var phoneDelays = device.map(function (receipt) { return (receipt.receivedAt - receipt.dueAt) / 1000; });
+      function delayStats(values) { return values.length ? "average " + (values.reduce(function (sum, value) { return sum + value; }, 0) / values.length).toFixed(1) + "s, range " + Math.min.apply(Math, values).toFixed(1) + " to " + Math.max.apply(Math, values).toFixed(1) + "s" : "not captured"; }
+      var lines = [formatDate(day.date, { weekday: "short", month: "short", day: "numeric" }) + ": " + scheduled.length + " alerts scheduled; " + accepted.length + " accepted by push service; " + device.length + " device receipts captured.",
+        "  Server send delay: " + delayStats(serverDelays) + ". Device receipt delay: " + delayStats(phoneDelays) + "."];
+      var go = firstReceipts.get("start");
+      if (go) lines.push("  GO reached a device " + ((go.receivedAt - go.dueAt) / 1000).toFixed(1) + "s after the scheduled start.");
+      var retried = scheduled.filter(function (alert) { return alert.attempts > 1; });
+      if (retried.length) lines.push("  " + retried.length + " alerts needed more than one send attempt.");
+      var issues = scheduled.filter(function (alert) { return alert.status === "expired" || alert.status === "retrying" || alert.status === "no-subscriber" || alert.failedCount > 0; });
+      if (issues.length) lines.push("  Delivery issues: " + issues.map(function (alert) { return (alert.index === "start" ? "GO" : "alert " + (alert.index + 1)) + " " + alert.status; }).join("; ") + ".");
+      var outliers = device.filter(function (receipt) { var delay = (receipt.receivedAt - receipt.dueAt) / 1000; return delay > 10 || delay < -1; });
+      if (outliers.length) lines.push("  Device timing outliers: " + outliers.map(function (receipt) { var minute = Math.round((receipt.dueAt - scheduled[0].dueAt) / 60000); return (receipt.index === "start" ? "GO" : "minute " + minute) + " " + ((receipt.receivedAt - receipt.dueAt) / 1000).toFixed(1) + "s"; }).join("; ") + ".");
+      return lines.join("\n");
+    }).join("\n");
+  }
+
+  function cardioTimingForWeek(startIso, endIso) {
+    var saved = state.data.cardioTimingReports || {}, lines = [];
+    for (var iso = startIso; iso <= endIso; iso = addDays(iso, 1)) if (saved[iso]) lines.push(saved[iso]);
+    return (lines.length ? lines.join("\n") : "No timing records captured for this week.") + "\nDevice receipt means the notification handler received the push, not that it was read. Delay uses the device clock and first captured receipt per alert; missing receipts do not prove a missed notification. Raw timing records are retained for 30 days; saved weekly summaries remain available.";
+  }
+
+  async function serviceWorkerReceipts(type, ids) {
+    var registration = state.serviceWorker;
+    var worker = registration && registration.active;
+    if (!worker) return { receipts: [] };
+    return await new Promise(function (resolve) {
+      var channel = new MessageChannel();
+      var timeout = setTimeout(function () { channel.port1.close(); resolve({ receipts: [] }); }, 3000);
+      channel.port1.onmessage = function (event) { clearTimeout(timeout); channel.port1.close(); resolve(event.data || { receipts: [] }); };
+      worker.postMessage({ type: type, ids: ids || [] }, [channel.port2]);
+    });
+  }
+
+  async function diagnosticFetch(path, options) {
+    var controller = new AbortController();
+    var timeout = setTimeout(function () { controller.abort(); }, 8000);
+    try { return await apiFetch(path, Object.assign({}, options, { signal: controller.signal })); }
+    finally { clearTimeout(timeout); }
+  }
+
+  async function syncCardioReceipts() {
+    if (localMode || !localStorage.getItem(TOKEN_KEY)) return;
+    if (state.receiptSyncPromise) return state.receiptSyncPromise;
+    state.receiptSyncPromise = (async function () {
+      var stored = await serviceWorkerReceipts("cardio-receipts-get");
+      for (var index = 0; index < (stored.receipts || []).length; index += 100) {
+        var receipts = stored.receipts.slice(index, index + 100);
+        var response = await diagnosticFetch("/notifications/cardio-receipts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ receipts: receipts }) });
+        var result = await response.json();
+        await serviceWorkerReceipts("cardio-receipts-delete", result.acknowledged || []);
+      }
+    })();
+    try { await state.receiptSyncPromise; } catch (ignore) {} finally { state.receiptSyncPromise = null; }
+  }
+
+  async function refreshCardioTiming(force, requestedRange) {
+    if (localMode || !localStorage.getItem(TOKEN_KEY)) return;
+    var range = requestedRange || selectedCheckinRange(), key = range.start + ":" + range.end;
+    var fetched = state.timingFetched || (state.timingFetched = {});
+    var requests = state.timingRequests || (state.timingRequests = {});
+    if (requests[key]) return requests[key];
+    if (!force && Date.now() - (fetched[key] || 0) < 60000) return;
+    fetched[key] = Date.now();
+    requests[key] = (async function () {
+      try {
+        await syncCardioReceipts();
+        var response = await diagnosticFetch("/notifications/cardio-timing?start=" + encodeURIComponent(range.start) + "&end=" + encodeURIComponent(range.end), { method: "GET" });
+        var result = await response.json();
+        var reports = state.data.cardioTimingReports || (state.data.cardioTimingReports = {});
+        var changed = false;
+        (result.days || []).forEach(function (day) { var summary = summarizeCardioTiming(day); if (summary && summary !== reports[day.date]) { reports[day.date] = summary; changed = true; } });
+        if (changed) queueSave(false);
+        var selected = selectedCheckinRange(), output = document.getElementById("checkin-output");
+        if (output) output.value = buildCheckin(selected.start, selected.end, selected.inProgress);
+      } catch (ignore) { delete fetched[key]; }
+    })();
+    try { await requests[key]; } finally { delete requests[key]; }
   }
 
   function bindViewEvents() {
@@ -1368,7 +1481,7 @@
     if (proteinTarget) proteinTarget.addEventListener("change", function () { var value = clamp(number(proteinTarget.value), 50, 300); state.data.targets.protein = value; state.data.targets.proteinMin = Math.max(0, value - 5); state.data.targets.proteinMax = value + 10; queueSave(true); });
     if (state.view !== "today") {
       var checkinWeek = document.getElementById("checkin-week");
-      if (checkinWeek) checkinWeek.addEventListener("change", function () { state.checkinWeekStart = checkinWeek.value; render(); });
+      if (checkinWeek) { refreshCardioTiming(); checkinWeek.addEventListener("change", function () { state.checkinWeekStart = checkinWeek.value; render(); }); }
       var copy = document.getElementById("copy-checkin");
       if (copy) copy.addEventListener("click", copyCheckin);
       var backup = document.getElementById("download-backup");
@@ -2484,6 +2597,7 @@
       if (migrated) queueSave(false);
       startPendingRetry();
       startCardioStatusPolling();
+      syncCardioReceipts();
     } catch (error) {
       if (error.message === "unauthorized") { localStorage.removeItem(TOKEN_KEY); showAccessDialog("That access code did not work."); return; }
       var cached = localStorage.getItem(STORAGE_KEY);
@@ -2588,6 +2702,7 @@
       if (!(result.payload && result.payload.schemaVersion === 2)) queueSave(false);
       startPendingRetry();
       startCardioStatusPolling();
+      syncCardioReceipts();
     } catch (error) {
       localStorage.removeItem(TOKEN_KEY);
       document.getElementById("access-error").textContent = error.message === "unauthorized" ? "That access code did not work." : "The secure tracker could not be reached.";
@@ -2598,7 +2713,13 @@
 
   async function copyCheckin() {
     var output = document.getElementById("checkin-output");
-    await navigator.clipboard.writeText(output.value);
+    var range = selectedCheckinRange();
+    var summary = (async function () { await refreshCardioTiming(true, range); return buildCheckin(range.start, range.end, range.inProgress); })();
+    // Starting the clipboard write in the tap handler preserves Safari's user gesture.
+    if (typeof ClipboardItem !== "undefined" && navigator.clipboard.write) {
+      await navigator.clipboard.write([new ClipboardItem({ "text/plain": summary.then(function (text) { return new Blob([text], { type: "text/plain" }); }) })]);
+    } else await navigator.clipboard.writeText(await summary);
+    output.value = await summary;
     var button = document.getElementById("copy-checkin");
     button.textContent = "Copied";
     setTimeout(function () { button.textContent = "Copy check-in"; }, 1500);
@@ -2661,9 +2782,9 @@
   document.addEventListener("touchstart", handleDialogTouchStart, { passive: true, capture: true });
   document.addEventListener("touchmove", handleDialogTouchMove, { passive: false, capture: true });
   document.getElementById("toast").addEventListener("click", function (event) { clearTimeout(state.toastTimer); event.currentTarget.hidden = true; });
-  document.addEventListener("visibilitychange", function () { if (document.hidden && state.revealedPhoto) { state.revealedPhoto = null; render(); } if (!document.hidden) { syncCardioCompletion(); if (state.exerciseTimer && state.exerciseTimer.running) acquireTimerWakeLock(); } });
+  document.addEventListener("visibilitychange", function () { if (document.hidden && state.revealedPhoto) { state.revealedPhoto = null; render(); } if (!document.hidden) { syncCardioCompletion(); syncCardioReceipts(); if (document.getElementById("checkin-output")) { state.timingFetched = {}; refreshCardioTiming(); } if (state.exerciseTimer && state.exerciseTimer.running) acquireTimerWakeLock(); } });
   window.addEventListener("pagehide", function () { state.revealedPhoto = null; releaseTimerWakeLock(); });
-  if ("serviceWorker" in navigator && !localMode) navigator.serviceWorker.register("./sw.js").then(async function (registration) { state.serviceWorker = registration; await refreshNotificationState(); render(); }).catch(function () {});
-  if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", function (event) { var data = event.data || {}; if (data.type === "cardio-complete") completeCardioSession(data.date, data.sessionId, data.durationMinutes); });
+  if ("serviceWorker" in navigator && !localMode) navigator.serviceWorker.register("./sw.js").then(async function (registration) { state.serviceWorker = registration; await refreshNotificationState(); syncCardioReceipts(); render(); }).catch(function () {});
+  if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", function (event) { var data = event.data || {}; if (data.type === "cardio-complete") completeCardioSession(data.date, data.sessionId, data.durationMinutes); if (data.type === "cardio-timing-ready") { syncCardioReceipts(); state.timingFetched = {}; if (document.getElementById("checkin-output")) refreshCardioTiming(); } });
   loadData();
 })();

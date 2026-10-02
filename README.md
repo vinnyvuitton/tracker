@@ -84,6 +84,14 @@ This is the protected replacement for the original tracker. The original live da
 - Increased incline by one level only in the middle work intervals of the two full guided treadmill sessions; speeds and durations remain unchanged.
 - Added private treadmill-result photo upload to Sunday's recovery walk and replaced unnecessary recovery-exercise setup fields with optional notes.
 
+## Workout 2.10 history and cardio diagnostics
+
+- Every exercise displays the previous week's recorded amounts and sets, including bodyweight variations, timed holds, and separate left/right side-plank values. Missing weeks and older records are labeled explicitly; dumbbell progression logic stays the same.
+- Cardio alerts retain their shared start timestamp. An early queue delivery is held until the due time, temporary push failures retry, and instructions that have outlived their interval are skipped.
+- Background diagnostics record each alert's scheduled time and server attempt. The service worker stores device receipt and notification-display submission times locally even when the dashboard is closed. Receipts sync through authenticated requests when the dashboard opens; no access credential is stored in the service worker.
+- Weekly check-in exports include alert counts, server/device delay summaries, GO timing, retries, and outliers. Device receipt does not mean the notification was read; device clock differences can affect the measured delay.
+- Raw diagnostics expire after 30 days. The device outbox is limited to 256 receipts and 30 days. Compact summaries are retained with the existing tracker data after export preparation; no historical timing is invented for older sessions.
+
 ## Data safety
 
 The access code is never committed to source control. It is stored as a Cloudflare Worker secret and entered once on each device. The browser keeps it locally on that device.

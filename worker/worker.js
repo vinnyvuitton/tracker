@@ -4,7 +4,8 @@ const MAX_DATA_BYTES = 24 * 1024 * 1024;
 const MAX_PHOTO_BYTES = 1024 * 1024;
 const BACKUP_LIMIT = 30;
 const MEAL_MODEL = "@cf/google/gemma-4-26b-a4b-it";
-const BUILD_ID = "workout-2.9-cardio-countdown";
+const BUILD_ID = "workout-2.10-cardio-timing";
+const TIMING_TTL = 30 * 86400;
 
 export default {
   async fetch(request, env, ctx) {
@@ -63,6 +64,12 @@ export default {
       }
       if (url.pathname === "/notifications/cardio/start" && request.method === "POST") {
         return await startCardioAlerts(request, env, cors);
+      }
+      if (url.pathname === "/notifications/cardio-receipts" && request.method === "POST") {
+        return await saveCardioReceipts(request, env, cors);
+      }
+      if (url.pathname === "/notifications/cardio-timing" && request.method === "GET") {
+        return await getCardioTiming(url, env, cors);
       }
       if (url.pathname.startsWith("/notifications/cardio/") && request.method === "GET") {
         return await getCardioAlertsStatus(env, decodeURIComponent(url.pathname.slice(22)), cors);
@@ -475,21 +482,27 @@ async function startCardioAlerts(request, env, cors) {
   } : null;
   await env.TRACKER_KV.put("cardio:" + id, JSON.stringify({ id, date: String(body.date || ""), title: String(body.title || "Cardio"), startedAt, durationMinutes, alerts, sent: [], status: "active" }), { expirationTtl: 7200 });
   const delayFromStart = (offsetSeconds) => Math.max(1, Math.round((startedAt - Date.now()) / 1000 + offsetSeconds));
+  const enqueue = async (message, offsetSeconds) => {
+    message.dueAt = startedAt + offsetSeconds * 1000;
+    message.date = String(body.date || "");
+    await env.TRACKER_KV.put(timingKey(message), JSON.stringify({ sessionId: id, index: message.index, date: message.date, dueAt: message.dueAt, status: "scheduled", attempts: 0, accepted: [] }), { expirationTtl: TIMING_TTL });
+    await env.ALERT_QUEUE.send(message, { delaySeconds: delayFromStart(offsetSeconds) });
+  };
   try {
-    if (startAlert) await env.ALERT_QUEUE.send({
+    if (startAlert) await enqueue({
       type: "cardio",
       sessionId: id,
       index: "start",
       final: false,
       payload: startAlert
-    }, { delaySeconds: delayFromStart(0) });
-    await Promise.all(alerts.map((alert, index) => env.ALERT_QUEUE.send({
+    }, 0);
+    await Promise.all(alerts.map((alert, index) => enqueue({
       type: "cardio",
       sessionId: id,
       index,
       final: index === alerts.length - 1,
       payload: { title: alert.title, body: alert.body, tag: "cardio-" + id + "-" + index, url: "https://vinnyvuitton.github.io/tracker/", cardioComplete: index === alerts.length - 1, sessionId: id, date: String(body.date || ""), durationMinutes }
-    }, { delaySeconds: delayFromStart(alert.atMinutes * 60) })));
+    }, alert.atMinutes * 60)));
   } catch (error) {
     await env.TRACKER_KV.delete("cardio:" + id);
     throw error;
@@ -520,10 +533,74 @@ async function deliverAlertMessage(body, env) {
   const key = "cardio:" + body.sessionId;
   const session = await env.TRACKER_KV.get(key, "json");
   if (!session || session.status !== "active" || session.sent.includes(body.index)) return;
-  await broadcastPush(env, body.payload);
+  const dueAt = Number(body.dueAt) || session.startedAt + (body.index === "start" ? 0 : session.alerts[body.index].atMinutes * 60000);
+  if (Date.now() < dueAt) {
+    await env.ALERT_QUEUE.send(body, { delaySeconds: Math.max(1, Math.ceil((dueAt - Date.now()) / 1000)) });
+    return;
+  }
+  const recordKey = timingKey({ ...body, date: session.date });
+  const timing = await env.TRACKER_KV.get(recordKey, "json") || { sessionId: body.sessionId, date: session.date, index: body.index, dueAt, attempts: 0, accepted: [] };
+  // A setting instruction is no longer useful once the next interval has started.
+  const nextAlert = body.index === "start" ? session.alerts[0] : session.alerts[Number(body.index) + 1];
+  const expiresAt = nextAlert ? session.startedAt + nextAlert.atMinutes * 60000 : dueAt + 60000;
+  if (Date.now() >= expiresAt) {
+    timing.status = "expired";
+    timing.expiredAt = Date.now();
+  } else {
+    timing.sentAt = Date.now();
+    timing.attempts++;
+    const delivery = await broadcastPush(env, { ...body.payload, timing: { sessionId: body.sessionId, date: session.date, index: body.index, dueAt, sentAt: timing.sentAt } }, timing.accepted);
+    timing.accepted = delivery.accepted;
+    timing.failedCount = delivery.failed;
+    timing.status = delivery.failed ? "retrying" : delivery.accepted.length ? "accepted" : "no-subscriber";
+  }
+  await env.TRACKER_KV.put(recordKey, JSON.stringify(timing), { expirationTtl: TIMING_TTL });
+  if (timing.status === "retrying") throw new Error("Temporary cardio push delivery failure");
   session.sent.push(body.index);
   if (body.final) session.status = "complete";
   await env.TRACKER_KV.put(key, JSON.stringify(session), { expirationTtl: session.status === "complete" ? 3600 : 7200 });
+}
+
+function timingKey(value) { return "cardio-timing:" + value.date + ":" + value.sessionId + ":" + value.index; }
+
+async function saveCardioReceipts(request, env, cors) {
+  const body = await request.json();
+  const acknowledged = [];
+  for (const receipt of (Array.isArray(body.receipts) ? body.receipts : []).slice(0, 100)) {
+    if (!receipt || !/^[a-f0-9-]{36}$/i.test(receipt.sessionId) || !/^[a-f0-9-]{36}$/i.test(receipt.id) || !/^\d{4}-\d{2}-\d{2}$/.test(receipt.date) || !(receipt.index === "start" || Number.isInteger(receipt.index) && receipt.index >= 0 && receipt.index < 20)) continue;
+    if (![receipt.dueAt, receipt.sentAt, receipt.receivedAt, receipt.shownAt].every(Number.isFinite)) continue;
+    const timing = await env.TRACKER_KV.get(timingKey(receipt), "json");
+    if (!timing || timing.dueAt !== receipt.dueAt) continue;
+    const safeReceipt = { id: receipt.id, sessionId: receipt.sessionId, date: receipt.date, index: receipt.index, dueAt: timing.dueAt, sentAt: receipt.sentAt, receivedAt: receipt.receivedAt, shownAt: receipt.shownAt };
+    await env.TRACKER_KV.put("cardio-receipt:" + receipt.date + ":" + receipt.sessionId + ":" + receipt.id, JSON.stringify(safeReceipt), { expirationTtl: TIMING_TTL });
+    acknowledged.push(receipt.id);
+  }
+  return json({ acknowledged }, 200, cors);
+}
+
+async function listTimingRecords(env, prefix) {
+  const records = [];
+  let cursor;
+  do {
+    const page = await env.TRACKER_KV.list({ prefix, cursor });
+    const values = await Promise.all(page.keys.map((key) => env.TRACKER_KV.get(key.name, "json")));
+    records.push(...values.filter(Boolean));
+    cursor = page.list_complete === false ? page.cursor : undefined;
+  } while (cursor);
+  return records;
+}
+
+async function getCardioTiming(url, env, cors) {
+  const start = url.searchParams.get("start"), end = url.searchParams.get("end");
+  const from = Date.parse(start + "T12:00:00Z"), to = Date.parse(end + "T12:00:00Z");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start || "") || !/^\d{4}-\d{2}-\d{2}$/.test(end || "") || !Number.isFinite(from) || !Number.isFinite(to) || to < from || to - from > 6 * 86400000) return json({ error: "Choose a single week" }, 400, cors);
+  const days = [];
+  for (let at = from; at <= to; at += 86400000) {
+    const date = new Date(at).toISOString().slice(0, 10);
+    const [alerts, receipts] = await Promise.all([listTimingRecords(env, "cardio-timing:" + date + ":"), listTimingRecords(env, "cardio-receipt:" + date + ":")]);
+    days.push({ date, alerts: alerts.map(({ accepted, ...record }) => ({ ...record, acceptedCount: accepted.length })), receipts });
+  }
+  return json({ days }, 200, cors);
 }
 
 async function sendDailyReminder(now, env) {
@@ -614,16 +691,22 @@ function chicagoParts(date) {
   return { iso: values.year + "-" + values.month + "-" + values.day, weekday: values.weekday, hour: values.hour, minute: values.minute };
 }
 
-async function broadcastPush(env, payload) {
+async function broadcastPush(env, payload, alreadyAccepted = []) {
+  const accepted = alreadyAccepted.slice();
+  let failed = 0;
   const listed = await env.TRACKER_KV.list({ prefix: "push:" });
   for (const item of listed.keys) {
+    if (accepted.includes(item.name)) continue;
     const saved = await env.TRACKER_KV.get(item.name, "json");
     if (!saved || !isValidSubscription(saved.subscription)) continue;
     try {
       const response = await sendWebPush(saved.subscription, payload, env);
       if (response.status === 404 || response.status === 410) await env.TRACKER_KV.delete(item.name);
-    } catch (error) { console.error("Push send failed", item.name, error && error.message); }
+      else if (response.ok) accepted.push(item.name);
+      else failed++;
+    } catch (error) { failed++; console.error("Push send failed", error && error.message); }
   }
+  return { accepted, failed };
 }
 
 async function sendWebPush(subscription, payload, env) {
