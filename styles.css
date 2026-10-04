@@ -104,6 +104,11 @@ textarea { resize: vertical; min-height: 74px; }
 .exercise-history { margin: 10px 0 12px 38px; padding: 10px 12px; border-left: 2px solid var(--blue); border-radius: 0 8px 8px 0; background: var(--panel-2); color: var(--muted); font-size: 13px; line-height: 1.5; }
 .exercise-history strong, .exercise-history span { display: block; }
 .exercise-history strong { color: var(--blue); font-size: 12px; }
+.exercise-coaching { margin: 0 0 12px 38px; padding: 9px 12px; border-left: 2px solid var(--accent-2); border-radius: 0 8px 8px 0; background: color-mix(in srgb, var(--accent-2) 6%, var(--panel-2)); font-size: 12px; line-height: 1.45; }
+.exercise-coaching.in-plan { margin: 10px 0 0; }
+.exercise-coaching strong, .exercise-coaching span { display: block; }
+.exercise-coaching strong { margin-bottom: 2px; color: var(--accent-2); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
+.exercise-coaching span { color: var(--text); }
 .set-entry { margin: 10px 0 0 38px; }
 .set-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 7px; }
 .set-grid label { color: var(--muted); font-size: 11px; }

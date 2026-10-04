@@ -17,6 +17,7 @@
   var PROGRESS_RANGES = [7, 14, 21, 30, 90, "all"];
   var WEEK_TWO_START = "2026-09-20";
   var WEEK_THREE_START = "2026-09-27";
+  var WEEK_FOUR_START = "2026-10-04";
   var EFFORT_OPTIONS = [
     { value: "much-too-easy", label: "Much too easy" },
     { value: "slightly-easy", label: "Slightly easy" },
@@ -353,6 +354,49 @@
     });
   }
 
+  function weekFourStrengthPlan(key) {
+    if (key === "Mon") return progressedStrengthPlan(weekThreeStrengthPlan(key), {
+      "Dumbbell Flat Bench Press": { prescription: "3 sets of 8 to 12", weeklyLoad: 22, tip: "Keep your feet planted, lower with control, and finish with about two good reps left.", coachingNote: "Move up one available step; last week's 21 lb sets felt easy. Keep all reps clean." },
+      "One Arm Dumbbell Row": { prescription: "3 sets of 10 to 12 each side", weeklyLoad: 22, tip: "Brace on the bench and pull your elbow toward your hip without twisting.", coachingNote: "Move up one step after an easy 21 lb week. Brace on the bench; pull the elbow toward your hip." },
+      "Seated Dumbbell Shoulder Press": { prescription: "3 sets of 12", weeklyLoad: 15, coachingNote: "Keep 15 lb and 12 reps. Last week felt just right; avoid leaning back to finish." },
+      "Dumbbell Lateral Raise": { prescription: "3 sets of 20", weeklyLoad: 10, coachingNote: "Keep 10 lb and three sets of 20. The late reps were already challenging; control each raise." },
+      "Overhead Dumbbell Triceps Extension": { prescription: "3 sets of 12 to 15", weeklyLoad: 17, tip: "Keep your elbows pointed forward and your back still as you extend.", coachingNote: "Try the next small step after clean 15 lb sets. Keep elbows steady; use 15 if form slips." },
+      "Alternating Dumbbell Curl": { prescription: "3 sets of 10 to 15 each side", weeklyLoad: 14, coachingNote: "Move up one step after easy 13 lb reps. Make three sets count instead of adding a fourth." }
+    });
+    if (key === "Tue") return progressedStrengthPlan(weekThreeStrengthPlan(key), {
+      "Goblet Squat": { prescription: "3 sets of 12 to 15", weeklyLoad: 19, tip: "Hold one dumbbell close to your chest and sit down between your hips.", coachingNote: "Try the next load after three smooth sets of 15. Keep the dumbbell close to your chest." },
+      "Dumbbell Romanian Deadlift": { prescription: "3 sets of 10 to 12", weeklyLoad: 21, tip: "Push your hips back while keeping a long neutral spine.", coachingNote: "Increase one step; the 19 lb sets were slightly easy. Hinge back without rounding." },
+      "Dumbbell Reverse Lunge": { prescription: "2 sets of 10 to 12 each side", weeklyLoad: 13, equipment: load(13, 1), tip: "Hold one dumbbell and use the bench with your free hand. Step back only as far as you can stay balanced.", coachingNote: "Use one 13 lb dumbbell for a modest increase from 10. Keep bench support and control each step." },
+      "Standing Calf Raise": { prescription: "3 sets of 12 to 15 each leg", weeklyLoad: 17, equipment: load(17, 1), tip: "Do single-leg raises with one hand on the bench. Hold one dumbbell only if balance and range stay solid.", coachingNote: "Switch to single-leg work because two-leg raises at 17 lb each were too easy. Use the bench for balance." },
+      "Dead Bug": { prescription: "3 sets of 12 each side", tip: "Extend slowly for about three seconds, exhale fully, and keep your lower back gently pressed into the mat.", coachingNote: "Keep the movement. A three-second extension and full exhale should make your core work harder." },
+      "Forearm Plank": { prescription: "3 sets of 50 seconds", coachingNote: "Add five seconds per set after last week's steady 45s. Keep abs and glutes braced." }
+    });
+    if (key === "Thu") return progressedStrengthPlan(weekThreeStrengthPlan(key), {
+      "Incline Dumbbell Bench Press": { prescription: "3 sets of 10 to 12", weeklyLoad: 26, tip: "Use a modest incline, keep shoulder blades set, and lower each rep with control.", coachingNote: "Try the next available load after smooth 23 lb sets. Keep the incline modest and reps controlled." },
+      "Chest Supported Dumbbell Row": { prescription: "3 sets of 10 to 12", weeklyLoad: 21, tip: "Keep your chest on the bench and pull without jerking your torso.", coachingNote: "Move up one step; 19 lb felt easy. Keep your chest against the bench." },
+      "Push Up": { prescription: "3 sets of 15 clean reps", coachingNote: "Build from three sets of 12 to three sets of 15. Keep your body straight; we'll change the variation when 15s feel easy." },
+      "Incline Rear Delt Raise": { prescription: "2 sets of 15 to 20", weeklyLoad: 8, tip: "Use the shoulders, not momentum; stop if you have to swing.", coachingNote: "Try one small load increase after easy 6 lb sets. No swinging; return to 6 if the motion changes." },
+      "Dumbbell Hammer Curl": { prescription: "3 sets of 10 to 12", weeklyLoad: 17, tip: "Keep palms facing in and elbows still. Use a lighter load if you need to swing.", coachingNote: "Move up one step from the 15 lb you logged easily. Keep three strict sets instead of a fourth." },
+      "Lying Dumbbell Triceps Extension": { prescription: "3 sets of 12", weeklyLoad: 14, tip: "Move at the elbows and lower the weights with control.", coachingNote: "Keep the 14 lb and 12 reps you logged. The third set reached the right challenge." }
+    });
+    if (key === "Fri") return progressedStrengthPlan(weekThreeStrengthPlan(key), {
+      "Bulgarian Split Squat": { prescription: "3 sets of 10 each side", weeklyLoad: 10, coachingNote: "Add a third set now that two sets went well. Keep one hand on the bench and the 10 lb load stable." },
+      "Dumbbell Hip Thrust": { prescription: "3 sets of 15", weeklyLoad: 21, tip: "Place the wheel-style dumbbell crosswise over the hip crease with a folded towel or hip pad underneath. Hold it steady with both hands throughout every rep. If it still slides, use a floor glute bridge instead.", coachingNote: "Keep 21 lb until the dumbbell stays put. Pad the hip crease, set it crosswise, and stabilize it with both hands." },
+      "Dumbbell Sumo Squat": { prescription: "3 sets of 12 to 15", weeklyLoad: 23, tip: "Use a wide stance and keep your knees tracking over your toes.", coachingNote: "Move up one step after three comfortable 22 lb sets. Keep the third set; don't add a fourth." },
+      "Standing Calf Raise": { prescription: "3 sets of 12 to 15 each leg", weeklyLoad: 19, equipment: load(19, 1), tip: "Do single-leg raises with one hand on the bench. Hold one dumbbell only if balance and range stay solid.", coachingNote: "Use the harder single-leg version; bilateral 19 lb each was only moderately challenging. Pause at the top." },
+      "Reverse Crunch": { prescription: "3 sets of 15", tip: "Curl your pelvis upward, then lower slowly without swinging your legs.", coachingNote: "Keep 15 reps. Make the pelvis curl and slow lowering do the work, rather than adding reps." },
+      "Side Plank": { prescription: "2 sets of 45 seconds each side", coachingNote: "Add five seconds per side after last week's 40s. Keep hips stacked and breathe." }
+    });
+    return null;
+  }
+
+  function weekFourCardio(segments, firstWorkMinute, lastWorkMinute) {
+    return segments.map(function (segment) {
+      if (segment.automatic || segment.start < firstWorkMinute || segment.end > lastWorkMinute) return segment;
+      return Object.assign({}, segment, { incline: segment.incline + 1, cue: "Aim for 5.5–6/10 effort. Keep the same speed, stand tall, and lower incline if form changes." });
+    });
+  }
+
   function progressedStrengthPlan(plan, updates) {
     return Object.assign({}, plan, { sections: plan.sections.map(function (section) {
       return Object.assign({}, section, { exercises: section.exercises.map(function (exercise) {
@@ -422,7 +466,7 @@
         }
       },
       weeklyCheckins: {},
-      meta: { planVersion: "workout-2.6-2026-09-13", createdAt: new Date().toISOString() }
+      meta: { planVersion: "workout-2.11-2026-10-04", createdAt: new Date().toISOString() }
     };
   }
 
@@ -582,6 +626,8 @@
   }
 
   function recommendedLoad(exercise, id) {
+    // The check-in sets this week's starting loads; effort-based changes resume afterward.
+    if (exercise.weeklyLoad && state.selectedDate >= WEEK_FOUR_START && state.selectedDate < addDays(WEEK_FOUR_START, 7)) return exercise.weeklyLoad;
     var previous = previousExerciseLog(id, state.selectedDate, true);
     if (!previous) return exercise.weeklyLoad || exercise.equipment.start;
     if (exercise.weeklyLoad && previous.iso < WEEK_THREE_START && state.selectedDate >= WEEK_THREE_START) return exercise.weeklyLoad;
@@ -660,6 +706,12 @@
     if (SPECIAL_DAYS[iso]) return SPECIAL_DAYS[iso];
     var key = dayKey(iso), plan = PLAN[key];
     if (iso < WEEK_TWO_START) return plan;
+    if (iso >= WEEK_FOUR_START) {
+      var currentStrength = weekFourStrengthPlan(key);
+      if (currentStrength) return currentStrength;
+      if (key === "Wed") return Object.assign({}, plan, { subtitle: "60 minutes guided work · 5-minute automatic cooldown · target 5.5–6/10", cardioSegments: weekFourCardio(weekThreeCardio(cardioOneProgressed(), 20, 50, 6), 20, 50), sections: [{ label: "Treadmill", exercises: [Object.assign({}, plan.sections[0].exercises[0], { coachingNote: "Keep the full 65 minutes and the same speeds. Add one incline level only to the middle work intervals after last week's easy session." })] }] });
+      if (key === "Sat") return Object.assign({}, plan, { subtitle: "60 minutes steady work · 5-minute automatic cooldown · target 5.5–6/10", cardioSegments: weekFourCardio(weekThreeCardio(cardioTwoProgressed(), 15, 45, "5–6"), 15, 45), sections: [{ label: "Treadmill", exercises: [Object.assign({}, plan.sections[0].exercises[0], { coachingNote: "Keep the full 65 minutes and the same speeds. Add one incline level only to the middle work intervals; stay smooth and off the rails." })] }] });
+    }
     if (iso >= WEEK_THREE_START) {
       var updatedStrength = weekThreeStrengthPlan(key);
       if (updatedStrength) return updatedStrength;
@@ -679,6 +731,11 @@
   function exerciseGuide(exercise) {
     var url = "https://www.google.com/search?q=" + encodeURIComponent("site:acefitness.org " + exercise.name + " exercise demonstration");
     return '<details class="form-guide"><summary>Show form guide</summary><p>' + esc(exercise.tip) + '</p><a href="' + url + '" target="_blank" rel="noopener noreferrer">Find a verified ACE demonstration ↗</a></details>';
+  }
+
+  function renderExerciseCoaching(exercise, inPlan) {
+    if (!exercise.coachingNote) return "";
+    return '<div class="exercise-coaching' + (inPlan ? ' in-plan' : '') + '"><strong>Coach note</strong><span>' + esc(exercise.coachingNote) + '</span></div>';
   }
 
   function render() {
@@ -844,7 +901,7 @@
   }
 
   function renderExerciseLog(plan, exercise, id, log, firstLabel, secondLabel, firstPlaceholder, secondPlaceholder) {
-    var history = renderExerciseHistory(plan, exercise, id);
+    var history = renderExerciseHistory(plan, exercise, id) + renderExerciseCoaching(exercise);
     if (plan.type === "Strength" && exercise.equipment && exercise.equipment.type === "dumbbell") {
       var recommended = recommendedLoad(exercise, id);
       var selected = number(log.load) || recommended;
@@ -876,7 +933,10 @@
     if (!lastWeek) previous = previousExerciseLog(id, state.selectedDate);
     if (!previous) return '<div class="exercise-history">No entry last week · No earlier result recorded.</div>';
     var log = previous.log, parts = [];
-    if (log.load) parts.push(exercise.equipment && exercise.equipment.type === "dumbbell" ? log.load + " lb " + (exercise.equipment.dumbbells === 2 ? "each" : "on one dumbbell") : String(log.load));
+    var previousPlan = typeof planForDate === "function" ? planForDate(previous.iso) : null;
+    var previousExercise = previousPlan && typeof exercisesForPlan === "function" ? exercisesForPlan(previousPlan).find(function (item) { return exerciseId(item.name) === id; }) : null;
+    var previousEquipment = previousExercise ? previousExercise.equipment : exercise.equipment;
+    if (log.load) parts.push(previousEquipment && previousEquipment.type === "dumbbell" ? log.load + " lb " + (previousEquipment.dumbbells === 2 ? "each" : "on one dumbbell") : String(log.load));
     if (exercise.name === "Side Plank" && (log.reps || log.sets)) {
       parts.push(sidePlankSets(log).map(function (value, index) { return "Set " + (Math.floor(index / 2) + 1) + " " + (index % 2 ? "right" : "left") + ": " + (value || "—") + " sec"; }).join(" · "));
     } else if (plan.type === "Strength" && (log.reps || log.sets)) {
@@ -1206,6 +1266,7 @@
             var suggestedLoad = exercise.weeklyLoad || exercise.equipment.start;
             html += '<p class="exercise-tip">Starting point: ≈ ' + suggestedLoad + ' lb ' + (exercise.equipment.dumbbells === 2 ? "per dumbbell. " : "on one dumbbell. ") + esc(plateText(suggestedLoad, exercise.equipment.dumbbells)) + '</p>';
           }
+          html += renderExerciseCoaching(exercise, true);
           html += '</div>';
         });
       });
@@ -2642,7 +2703,7 @@
     while (data.preferences.reminders.proteinTimes.length < 2) data.preferences.reminders.proteinTimes.push(defaultData().preferences.reminders.proteinTimes[data.preferences.reminders.proteinTimes.length]);
     while (data.preferences.reminders.calorieTimes.length < 3) data.preferences.reminders.calorieTimes.push(defaultData().preferences.reminders.calorieTimes[data.preferences.reminders.calorieTimes.length]);
     delete data.reward;
-    data.meta = Object.assign({}, data.meta || {}, { planVersion: "workout-2.9-2026-09-22" });
+    data.meta = Object.assign({}, data.meta || {}, { planVersion: "workout-2.11-2026-10-04" });
     Object.keys(data.days || {}).forEach(function (iso) {
       var day = data.days[iso];
       day.meals = Array.isArray(day.meals) ? day.meals : [];

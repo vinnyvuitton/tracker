@@ -92,6 +92,13 @@ This is the protected replacement for the original tracker. The original live da
 - Weekly check-in exports include alert counts, server/device delay summaries, GO timing, retries, and outliers. Device receipt does not mean the notification was read; device clock differences can affect the measured delay.
 - Raw diagnostics expire after 30 days. The device outbox is limited to 256 receipts and 30 days. Compact summaries are retained with the existing tracker data after export preparation; no historical timing is invented for older sessions.
 
+## Workout 2.11 October 4 check-in
+
+- Added the October 4–10 prescriptions from the September 27–October 3 check-in, including modest load increases, unchanged exercises that were already challenging, a third Bulgarian split-squat set, and a more stable hip-thrust setup.
+- Added a compact coach note beside last week's result on every strength and cardio movement; the Plan view shows the same note without changing logged history.
+- Progressed incline by one level in the middle working intervals of each full cardio session while keeping speed and the 65-minute duration.
+- Preserved the prior week's exact prescriptions and labeled prior calf-raise history with the dumbbell count used on that date.
+
 ## Data safety
 
 The access code is never committed to source control. It is stored as a Cloudflare Worker secret and entered once on each device. The browser keeps it locally on that device.
