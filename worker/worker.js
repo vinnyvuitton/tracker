@@ -4,7 +4,7 @@ const MAX_DATA_BYTES = 24 * 1024 * 1024;
 const MAX_PHOTO_BYTES = 1024 * 1024;
 const BACKUP_LIMIT = 30;
 const MEAL_MODEL = "@cf/google/gemma-4-26b-a4b-it";
-const BUILD_ID = "workout-2.10-cardio-timing";
+const BUILD_ID = "workout-2.12-midweek-checkin";
 const TIMING_TTL = 30 * 86400;
 
 export default {
@@ -618,6 +618,7 @@ async function sendDailyReminder(now, env) {
   if ((reminders.waterTimes || []).some((value) => hhmm === compactTime(value))) type = "water";
   if ((reminders.proteinTimes || []).some((value) => hhmm === compactTime(value))) type = "protein";
   if ((reminders.calorieTimes || []).some((value) => hhmm === compactTime(value))) type = "calories";
+  if (parts.weekday === "Wed" && hhmm === compactTime(reminders.midweekTime || "20:00")) type = "midweek";
   if (!type || reminders[type] === false) return;
   let marker = "reminder:" + parts.iso + ":" + type + ":" + hhmm;
   const totals = (day.meals || []).reduce((sum, meal) => ({ protein: sum.protein + (Number(meal.protein) || 0), calories: sum.calories + (Number(meal.calories) || 0) }), { protein: 0, calories: 0 });
@@ -625,6 +626,9 @@ async function sendDailyReminder(now, env) {
   const waterLeft = Math.max(0, (Number(targets.water) || 10) - (Number(day.water) || 0));
   const workoutNames = { Sun: "Recovery Day", Mon: "Upper A", Tue: "Lower A + Core", Wed: "Cardio 1", Thu: "Upper B", Fri: "Lower B + Core", Sat: "Cardio 2" };
   let message;
+  if (type === "midweek") {
+    message = { title: "Wednesday workout check-in", body: "Log your waist, photos, cardio effort, food, and recovery. Your Mon–Wed review can guide the rest of the week." };
+  }
   if (type === "workout") {
     if (day.workout && day.workout.completed) return;
     message = { title: "Good morning, Vinny", body: workoutNames[parts.weekday] + " is ready when you are dressed and hydrated." };

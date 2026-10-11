@@ -120,3 +120,12 @@ The Worker retains 30 rotating daily tracker snapshots in KV. The Check-in scree
 7. Download a fresh backup.
 
 Do not replace the live frontend before the protected Worker is deployed. The new frontend intentionally requires the protected API.
+
+## Workout 2.12 October 11 review
+
+- Progresses Monday bench, row, and shoulder press; Tuesday goblet squat and calf raise. Reverse lunges use two 8 lb dumbbells (16 lb total), with a supported one-13 fallback. Holds technique-sensitive and already challenging movements, including the 21 lb RDL and hip thrust and three Bulgarian split-squat sets.
+- Full cardio working blocks add 0.1 mph plus one incline setting Wednesday and two Saturday. Every five-minute boundary, the warmup/tail, and the automatic cooldown are retained. Express cardio remains the existing shorter option.
+- Adds optional waist readings to Morning check, averaging two readings; dated history, a graph, and exports preserve both raw readings. Missing readings stay missing.
+- Adds Wednesday recovery fields saved separately from Sunday, a one-tap partial-week export, matching-weekday weight comparisons, and a Chicago-time Wednesday phone reminder respecting quiet hours, pause, toggle, and duplicate suppression.
+- Retains nonstandard weights in the daily log and excludes them from morning trends. October 7 is initially marked from its explicit saved note; its raw weight remains unchanged. Protein values above the reference zone count toward the minimum. The weekly calorie anchor correctly follows the daily target (1,850 × 7 = 12,950).
+- Cardio push timing collection and retention continue unchanged. Private photos, raw snapshots, local preview output, and personal reports must stay outside the public deployment repository.

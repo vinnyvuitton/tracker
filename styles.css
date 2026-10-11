@@ -31,6 +31,16 @@ button { cursor: pointer; }
 h1 { font-size: clamp(28px, 8vw, 42px); line-height: .98; margin: 12px 0 6px; letter-spacing: -.04em; }
 h2 { font-size: 20px; margin: 0 0 12px; }
 h3 { font-size: 14px; margin: 0; }
+.waist-entry { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+.weight-timing { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); margin-top: 14px; }
+.weight-timing input { width: 18px; min-height: 18px; flex: 0 0 auto; }
+.waist-entry .card-head { margin-bottom: 12px; }
+.waist-history, .checkpoint-list { list-style: none; padding: 0; margin: 12px 0 0; }
+.waist-history li, .checkpoint-list li { display: grid; gap: 5px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.waist-history li:last-child, .checkpoint-list li:last-child { border-bottom: 0; }
+.waist-history span, .checkpoint-list span { color: var(--muted); font-size: 13px; line-height: 1.5; }
+.midweek-card .form-guide { margin-bottom: 16px; }
+.midweek-card .form-guide .grid { margin-top: 14px; }
 p { color: var(--muted); line-height: 1.45; }
 .eyebrow { margin: 0; color: var(--accent); font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
 .date-copy { margin: 0; color: var(--muted); font-size: 13px; }

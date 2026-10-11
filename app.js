@@ -18,6 +18,7 @@
   var WEEK_TWO_START = "2026-09-20";
   var WEEK_THREE_START = "2026-09-27";
   var WEEK_FOUR_START = "2026-10-04";
+  var WEEK_FIVE_START = "2026-10-11";
   var EFFORT_OPTIONS = [
     { value: "much-too-easy", label: "Much too easy" },
     { value: "slightly-easy", label: "Slightly easy" },
@@ -397,6 +398,57 @@
     });
   }
 
+  function weekFiveStrengthPlan(key) {
+    var plan = weekFourStrengthPlan(key);
+    if (!plan) return null;
+    var updates = {
+      Mon: {
+        "Dumbbell Flat Bench Press": { weeklyLoad: 23, coachingNote: "Try 23 lb each after three easy sets of 12 at 22. Aim for 8–12 clean reps with about two good reps left; lower under control." },
+        "One Arm Dumbbell Row": { weeklyLoad: 23, coachingNote: "Try 23 lb after easy 22 lb sets. Aim for 10–12 each side; brace on the bench and avoid rotating your torso." },
+        "Seated Dumbbell Shoulder Press": { prescription: "3 sets of 8 to 10", weeklyLoad: 17, coachingNote: "Try 17 lb each, the next available setup, after three slightly easy sets of 12 at 15. Start at 8 reps; use 15 if you lean back or lose control." },
+        "Dumbbell Lateral Raise": { coachingNote: "Hold 10 lb each and three sets of 20. Last week reached the right challenge; keep shoulders down and avoid swinging." },
+        "Overhead Dumbbell Triceps Extension": { coachingNote: "Hold one 17 lb dumbbell for 12–15 reps. Last week felt right; keep ribs down and elbows steady." },
+        "Alternating Dumbbell Curl": { prescription: "3 sets of 12 to 15 each side", coachingNote: "Hold 14 lb each for three strict sets of 12–15. Last week felt right. A fourth set is optional if you recover well; keep the same load." }
+      },
+      Tue: {
+        "Goblet Squat": { weeklyLoad: 21, coachingNote: "Try one 21 lb dumbbell after three straightforward sets of 15 at 19. Aim for 12–15; keep the weight close and knees tracking over toes." },
+        "Dumbbell Romanian Deadlift": { coachingNote: "Hold 21 lb each. The first two sets last week used the wrong movement, so earn a clean session before increasing: hips back, soft knees, weights close, neutral spine." },
+        "Dumbbell Reverse Lunge": { prescription: "2 sets of 8 to 12 each side", weeklyLoad: 8, equipment: load(8, 2), tip: "Hold two 8 lb dumbbells (16 lb total). Take a controlled step back and keep the front foot planted. If balance changes, use one 13 lb dumbbell with bench support.", coachingNote: "Try two 8s: 16 lb total versus last week's one 13. This is a modest total-load increase. Start at 8 each side; return to one 13 with support if needed." },
+        "Standing Calf Raise": { weeklyLoad: 19, equipment: load(19, 1), coachingNote: "Try one 19 lb dumbbell for single-leg raises after Tuesday's 17 felt easy. Friday's 19 felt right. Use bench support, pause at the top, and lower fully." },
+        "Dead Bug": { coachingNote: "Hold three sets of 12 each side. Last week's slower version was challenging; extend for about three seconds, exhale, and keep the lower back on the mat." },
+        "Forearm Plank": { coachingNote: "Hold three sets of 50 seconds. These were already challenging; brace abs and glutes and keep breathing." }
+      },
+      Thu: {
+        "Incline Dumbbell Bench Press": { coachingNote: "Hold 26 lb each for 10–12 reps. Last week felt right; keep a modest incline and stop before your shoulders or back change position." },
+        "Chest Supported Dumbbell Row": { coachingNote: "Hold 21 lb each for 10–12 reps. Last week felt right; keep your chest on the bench and avoid jerking the weights." },
+        "Push Up": { prescription: "3 sets of 12 to 15 clean reps", coachingNote: "Keep floor push-ups for three sets of 12–15. The 15s felt right; maintain a straight body and controlled lowering before changing the variation." },
+        "Incline Rear Delt Raise": { coachingNote: "Hold 8 lb each for two sets of 15–20. Last week felt right; lift without swinging or shrugging." },
+        "Dumbbell Hammer Curl": { prescription: "3 sets of 12 to 15", coachingNote: "Hold 17 lb each for three sets of 12–15. You logged 15 reps and the right challenge last week; keep elbows still and avoid swinging." },
+        "Lying Dumbbell Triceps Extension": { coachingNote: "Hold 14 lb each for three sets of 12. The last set already challenged you; keep upper arms steady and lower with control." }
+      },
+      Fri: {
+        "Bulgarian Split Squat": { coachingNote: "Keep one 10 lb dumbbell and three sets of 10 each side. The third set stays. Use one hand on the bench and build balance before adding weight." },
+        "Dumbbell Hip Thrust": { tip: "Use a stable bench with your upper back supported. Pad the hip crease and place the dumbbell crosswise; hold it with both hands. Keep ribs down, pause at the top, and avoid arching your lower back. Use a floor glute bridge if the setup slides or rocks.", coachingNote: "Hold one 21 lb dumbbell for three sets of 15. You corrected the technique last week; repeat that setup before increasing. Stable bench, padded hip crease, both hands on the weight." },
+        "Dumbbell Sumo Squat": { coachingNote: "Hold one 23 lb dumbbell for three sets of 12–15. Last week felt right; keep knees aligned with toes and lower under control." },
+        "Standing Calf Raise": { coachingNote: "Hold one 19 lb dumbbell for three sets of 12–15 each leg. This felt right last Friday; use support and a full controlled range." },
+        "Reverse Crunch": { coachingNote: "Hold three sets of 15. Last week was challenging with better form; curl the pelvis and lower slowly without swinging your legs." },
+        "Side Plank": { coachingNote: "Hold two sets of 45 seconds each side. These were already challenging; keep hips stacked, breathe, and log all four holds." }
+      }
+    };
+    return progressedStrengthPlan(plan, updates[key]);
+  }
+
+  function weekFiveCardio(segments, firstWorkMinute, lastWorkMinute, inclineIncrease) {
+    return segments.map(function (segment) {
+      if (segment.automatic || segment.start < firstWorkMinute || segment.end > lastWorkMinute) return segment;
+      return Object.assign({}, segment, {
+        speed: Math.round((segment.speed + 0.1) * 10) / 10,
+        incline: segment.incline + inclineIncrease,
+        cue: "Target about 6/10 effort: breathing harder, still able to talk. Stay off the rails and keep a smooth walking stride. Reduce incline or speed if form changes."
+      });
+    });
+  }
+
   function progressedStrengthPlan(plan, updates) {
     return Object.assign({}, plan, { sections: plan.sections.map(function (section) {
       return Object.assign({}, section, { exercises: section.exercises.map(function (exercise) {
@@ -459,20 +511,23 @@
       preferences: {
         notifications: true,
         reminders: {
-          workout: true, water: true, protein: true, calories: true, pausedDate: "",
+          workout: true, water: true, protein: true, calories: true, midweek: true, midweekTime: "20:00", pausedDate: "",
           workoutTime: "04:10", waterTimes: ["07:00", "16:30"], proteinTimes: ["12:00", "20:30"],
           calorieTimes: ["13:00", "17:00", "21:00"], dinnerReserve: 600,
           quietStart: "23:00", quietEnd: "04:00"
         }
       },
       weeklyCheckins: {},
-      meta: { planVersion: "workout-2.11-2026-10-04", createdAt: new Date().toISOString() }
+      midweekCheckins: {},
+      meta: { planVersion: "workout-2.12-2026-10-11", createdAt: new Date().toISOString() }
     };
   }
 
   function defaultDay() {
     return {
       weight: "",
+      weightTiming: "morning",
+      waist: { first: "", second: "" },
       steps: "",
       water: 0,
       meals: [],
@@ -484,6 +539,23 @@
       cannabisNote: "",
       extraActivities: []
     };
+  }
+
+  function waistAverage(day) {
+    var readings = day && day.waist || {};
+    var first = optionalNumber(readings.first), second = optionalNumber(readings.second);
+    if (first == null || first < 10 || first > 80) return null;
+    if (readings.second != null && String(readings.second).trim() && (second == null || second < 10 || second > 80)) return null;
+    return second == null ? first : (first + second) / 2;
+  }
+
+  function morningWeight(day) {
+    return day && day.weightTiming !== "other" ? number(day.weight) : 0;
+  }
+
+  function renderWaistInputs(day, iso) {
+    var readings = day.waist || {}, average = waistAverage(day);
+    return '<div class="waist-entry"><div class="card-head"><div><h3>Waist measurement</h3><p>' + (dayKey(iso) === "Wed" ? 'Wednesday checkpoint · Measure before food, drinks, and training.' : 'Optional today · Wednesday morning is the weekly checkpoint.') + '</p></div></div><div class="grid two"><label class="field">Waist, inches<input id="waist-first" type="number" inputmode="decimal" min="10" max="80" step="0.01" value="' + esc(readings.first || "") + '"></label><label class="field">Second reading, optional<input id="waist-second" type="number" inputmode="decimal" min="10" max="80" step="0.01" value="' + esc(readings.second || "") + '"></label></div><p id="waist-average" class="notification-status">' + (average == null ? 'No waist baseline logged yet.' : 'Recorded measurement: ' + average.toFixed(2) + ' in' + (String(readings.second || "").trim() ? ' · average of two readings' : ' · one reading')) + '</p><details class="form-guide"><summary>How to measure consistently</summary><p>Use a flexible tape just above your hip bones. Keep it level all the way around, snug without pressing into your skin. Relax your abdomen and read after a normal exhale. Remove and reposition the tape for a second reading; the dashboard averages both. Use the same spot each Wednesday, after the bathroom and before food, drinks, or training.</p></details></div>';
   }
 
   function openDashboardDialog(dialog) {
@@ -628,6 +700,7 @@
   function recommendedLoad(exercise, id) {
     // The check-in sets this week's starting loads; effort-based changes resume afterward.
     if (exercise.weeklyLoad && state.selectedDate >= WEEK_FOUR_START && state.selectedDate < addDays(WEEK_FOUR_START, 7)) return exercise.weeklyLoad;
+    if (exercise.weeklyLoad && state.selectedDate >= WEEK_FIVE_START && state.selectedDate < addDays(WEEK_FIVE_START, 7)) return exercise.weeklyLoad;
     var previous = previousExerciseLog(id, state.selectedDate, true);
     if (!previous) return exercise.weeklyLoad || exercise.equipment.start;
     if (exercise.weeklyLoad && previous.iso < WEEK_THREE_START && state.selectedDate >= WEEK_THREE_START) return exercise.weeklyLoad;
@@ -706,6 +779,21 @@
     if (SPECIAL_DAYS[iso]) return SPECIAL_DAYS[iso];
     var key = dayKey(iso), plan = PLAN[key];
     if (iso < WEEK_TWO_START) return plan;
+    if (iso >= WEEK_FIVE_START) {
+      var nextStrength = weekFiveStrengthPlan(key);
+      if (nextStrength) return nextStrength;
+      if (key === "Wed" || key === "Sat") {
+        var firstWork = key === "Wed" ? 20 : 15, lastWork = key === "Wed" ? 50 : 45;
+        var previousCardio = weekFourCardio(weekThreeCardio(key === "Wed" ? cardioOneProgressed() : cardioTwoProgressed(), firstWork, lastWork, 6), firstWork, lastWork);
+        return Object.assign({}, plan, {
+          subtitle: "60 minutes programmed work · 5-minute automatic cooldown · target about 6/10",
+          cardioSegments: weekFiveCardio(previousCardio, firstWork, lastWork, key === "Wed" ? 1 : 2),
+          sections: [{ label: "Treadmill", exercises: [Object.assign({}, plan.sections[0].exercises[0], {
+            coachingNote: key === "Wed" ? "Last week felt 5–5.5/10. During minutes 20–50, try +0.1 mph and +1 incline setting; peak 3.2 mph at setting 9. Keep the warmup and cooldown. Log actual effort for Wednesday's review." : "Last week felt 4–4.5/10. During minutes 15–45, try +0.1 mph and +2 incline settings; peak 3.3 mph at setting 9. Keep the warmup and cooldown. Aim for about 6/10 with a smooth walk."
+          })] }]
+        });
+      }
+    }
     if (iso >= WEEK_FOUR_START) {
       var currentStrength = weekFourStrengthPlan(key);
       if (currentStrength) return currentStrength;
@@ -806,7 +894,7 @@
 
     html += '<section class="card"><div class="card-head"><div><h2>Morning check</h2><p>Immediately after the bathroom—before pre-workout, shakes, food, other drinks, photos, or training</p></div></div>' +
       '<div class="row wrap"><label class="field">Weight, lb<input id="weight" type="number" inputmode="decimal" min="90" max="300" step="0.1" value="' + esc(day.weight) + '"></label>' +
-      '<div class="field">Water, glasses<div class="stepper"><button type="button" data-water-step="-1" aria-label="Subtract one glass">−</button><input id="water" type="number" inputmode="numeric" min="0" max="30" step="1" value="' + esc(day.water) + '" aria-label="Water glasses"><button type="button" data-water-step="1" aria-label="Add one glass">+</button></div></div></div></section>';
+      '<div class="field">Water, glasses<div class="stepper"><button type="button" data-water-step="-1" aria-label="Subtract one glass">−</button><input id="water" type="number" inputmode="numeric" min="0" max="30" step="1" value="' + esc(day.water) + '" aria-label="Water glasses"><button type="button" data-water-step="1" aria-label="Add one glass">+</button></div></div></div><label class="weight-timing"><input id="weight-standard" type="checkbox" ' + (day.weightTiming !== "other" ? 'checked' : '') + '> Taken before food, drinks, and exercise</label><p class="notification-status">Other weigh-ins stay in your log and are excluded from the morning trend.</p>' + renderWaistInputs(day, iso) + '</section>';
 
     html += renderMeals(day, t);
     html += renderPendingMeals(iso);
@@ -826,6 +914,7 @@
     low = number(low); high = number(high) || low;
     var status = value < low ? (low - value) + " " + unit + " to target zone" : value > high ? (value - high) + " " + unit + " above target zone" : "Inside target zone";
     var css = value > high ? " over" : value >= low ? " in-zone" : "";
+    if (label === "Protein" && value >= low) { status = "Protein minimum met"; css = " in-zone"; }
     return '<section class="card nutrition-stat' + css + '"><p class="eyebrow">' + esc(label) + '</p><div class="stat">' + esc(value) + ' <small>/ ' + esc(low) + '–' + esc(high) + ' ' + esc(unit) + '</small></div>' +
       '<div class="progress-bar"><span style="width:' + pct(value, high) + '%"></span></div><p class="target-status">' + esc(status) + '</p></section>';
   }
@@ -1109,7 +1198,7 @@
 
   function renderProgress() {
     var dates = Object.keys(state.data.days).sort();
-    var weights = dates.filter(function (iso) { return number(state.data.days[iso].weight) > 0; });
+    var weights = dates.filter(function (iso) { return morningWeight(state.data.days[iso]) > 0; });
     var latestFullWeekEnd = addDays(startOfWeek(TODAY), -1);
     var latestFullWeekStart = addDays(latestFullWeekEnd, -6);
     var priorFullWeekEnd = addDays(latestFullWeekStart, -1);
@@ -1124,6 +1213,8 @@
     if (!weights.length) html += '<div class="empty">Your weight trend will appear here.</div>';
     html += '</div></section>';
     html += renderProgressChart();
+    html += renderWaistHistory();
+    html += renderReviewCheckpoints();
     html += renderGoalProgress();
     return html;
   }
@@ -1132,9 +1223,27 @@
     var values = [];
     for (var iso = startIso; iso <= endIso; iso = addDays(iso, 1)) {
       var day = state.data.days[iso];
-      if (day && number(day.weight)) values.push(number(day.weight));
+      if (morningWeight(day)) values.push(morningWeight(day));
     }
     return values.length ? values.reduce(function (sum, value) { return sum + value; }, 0) / values.length : 0;
+  }
+
+  function renderWaistHistory() {
+    var dates = Object.keys(state.data.days || {}).filter(function (iso) { return iso <= TODAY && waistAverage(state.data.days[iso]) != null; }).sort();
+    var latest = dates.length ? waistAverage(state.data.days[dates[dates.length - 1]]) : null;
+    var first = dates.length ? waistAverage(state.data.days[dates[0]]) : null;
+    var html = '<section class="card"><div class="card-head"><div><h2>Waist trend</h2><p>Same location and morning conditions each Wednesday</p></div></div>';
+    if (latest == null) return html + '<div class="empty">Log your first measurement in Morning check. That becomes your baseline.</div></section>';
+    html += '<div class="stat">' + latest.toFixed(2) + ' <small>in</small></div><p class="notification-status">' + esc(formatDate(dates[dates.length - 1], { month: "short", day: "numeric" })) + (dates.length > 1 ? ' · ' + (latest - first > 0 ? '+' : '') + (latest - first).toFixed(2) + ' in since ' + esc(formatDate(dates[0], { month: "short", day: "numeric" })) : ' · First baseline') + '</p><details class="form-guide"><summary>Measurement history (' + dates.length + ')</summary><ul class="waist-history">';
+    dates.slice().reverse().forEach(function (iso) {
+      var readings = state.data.days[iso].waist;
+      html += '<li><strong>' + esc(formatDate(iso, { month: "short", day: "numeric" })) + ': ' + waistAverage(state.data.days[iso]).toFixed(2) + ' in</strong><span>' + esc(readings.first) + (String(readings.second || "").trim() ? ' / ' + esc(readings.second) + ' in · two-reading average' : ' in · one reading') + '</span></li>';
+    });
+    return html + '</ul></details></section>';
+  }
+
+  function renderReviewCheckpoints() {
+    return '<section class="card"><div class="card-head"><div><h2>Next checkpoints</h2><p>Judge the plan using weight averages, waist, photos, and recovery together.</p></div></div><ul class="checkpoint-list"><li><strong>Wednesday · 8 pm Chicago</strong><span>Review Mon–Wed logs, actual cardio effort, waist, photos, hunger, energy, and sleep. Adjust Thu–Sat if needed.</span></li><li><strong>October 18 · Process check</strong><span>Review consistent morning weights, the 1,850-calorie anchor, protein minimum, form, and recovery.</span></li><li><strong>October 25 · Results decision</strong><span>Assess two full weeks and waist change. Working weight-average range: 151.9–152.4 lb; a planning target, not a promised result. If weight and waist stay flat, review intake accuracy and activity before changing the plan.</span></li><li><strong>November 4 · Photo checkpoint</strong><span>Repeat front, side, and back photos with matching position, lighting, camera distance, and waistband.</span></li></ul><p class="notification-status">First milestone: a 150 lb weekly average. Reassess appearance, waist, strength, and recovery before deciding on 145 or 140.</p></section>';
   }
 
   function progressWindow() {
@@ -1156,7 +1265,8 @@
     var points = [];
     for (var iso = start; iso <= end; iso = addDays(iso, 1)) {
       var day = state.data.days[iso];
-      if (metric === "weight") { if (day && number(day.weight)) points.push({ iso: iso, value: number(day.weight) }); continue; }
+      if (metric === "weight") { if (morningWeight(day)) points.push({ iso: iso, value: morningWeight(day) }); continue; }
+      if (metric === "waist") { var waist = waistAverage(day); if (waist != null) points.push({ iso: iso, value: waist }); continue; }
       if (metric === "exercise") {
         var log = day && day.exercises && day.exercises[exerciseIdValue];
         if (log) {
@@ -1192,10 +1302,10 @@
     return Object.keys(groups).sort().map(function (week) { return { iso: week, value: groups[week].reduce(function (sum, value) { return sum + value; }, 0) / groups[week].length }; });
   }
 
-  function metricUnit(metric) { return metric === "weight" || metric === "exercise" ? "lb" : metric === "protein" ? "g" : metric === "calories" ? "cal" : metric === "water" ? "glasses" : "%"; }
+  function metricUnit(metric) { return metric === "waist" ? "in" : metric === "weight" || metric === "exercise" ? "lb" : metric === "protein" ? "g" : metric === "calories" ? "cal" : metric === "water" ? "glasses" : "%"; }
 
   function formatMetricValue(metric, value) {
-    var rounded = metric === "weight" || metric === "exercise" ? Math.round(value * 10) / 10 : Math.round(value);
+    var rounded = metric === "waist" ? Math.round(value * 100) / 100 : metric === "weight" || metric === "exercise" ? Math.round(value * 10) / 10 : Math.round(value);
     return rounded + " " + metricUnit(metric);
   }
 
@@ -1212,7 +1322,7 @@
     var grid = "";
     for (var tick = 0; tick <= 4; tick++) {
       var tickValue = min + (max - min) * tick / 4, tickY = y(tickValue);
-      grid += '<line class="chart-grid" x1="' + padLeft + '" x2="' + (width - padRight) + '" y1="' + tickY.toFixed(1) + '" y2="' + tickY.toFixed(1) + '"></line><text class="chart-label chart-y-label" x="' + (padLeft - 8) + '" y="' + (tickY + 4).toFixed(1) + '" text-anchor="end">' + esc(metric === "weight" || metric === "exercise" ? tickValue.toFixed(1) : Math.round(tickValue)) + '</text>';
+      grid += '<line class="chart-grid" x1="' + padLeft + '" x2="' + (width - padRight) + '" y1="' + tickY.toFixed(1) + '" y2="' + tickY.toFixed(1) + '"></line><text class="chart-label chart-y-label" x="' + (padLeft - 8) + '" y="' + (tickY + 4).toFixed(1) + '" text-anchor="end">' + esc(metric === "waist" ? tickValue.toFixed(2) : metric === "weight" || metric === "exercise" ? tickValue.toFixed(1) : Math.round(tickValue)) + '</text>';
     }
     var targetLine = target ? '<line class="chart-target" x1="' + padLeft + '" x2="' + (width - padRight) + '" y1="' + y(target).toFixed(1) + '" y2="' + y(target).toFixed(1) + '"></line><text class="chart-label" x="' + (width - padRight) + '" y="' + (y(target) - 7).toFixed(1) + '" text-anchor="end">target ' + esc(target) + '</text>' : '';
     var dots = points.map(function (point, index) { return '<circle cx="' + x(index).toFixed(1) + '" cy="' + y(point.value).toFixed(1) + '" r="5" tabindex="0"><title>' + esc(formatDate(point.iso, { month: "short", day: "numeric" })) + ': ' + esc(formatMetricValue(metric, point.value)) + '</title></circle>'; }).join("");
@@ -1222,7 +1332,7 @@
   function renderProgressChart() {
     var windowRange = progressWindow();
     var exercises = progressExercises();
-    var options = [{ value: "weight", label: "Weight" }, { value: "exercise", label: "Exercise performance" }, { value: "workouts", label: "Workout completion" }, { value: "protein", label: "Protein" }, { value: "calories", label: "Calories" }, { value: "water", label: "Water" }];
+    var options = [{ value: "weight", label: "Weight" }, { value: "waist", label: "Waist" }, { value: "exercise", label: "Exercise performance" }, { value: "workouts", label: "Workout completion" }, { value: "protein", label: "Protein" }, { value: "calories", label: "Calories" }, { value: "water", label: "Water" }];
     var points = progressSeries(state.progressMetric, state.progressExercise, windowRange.start, windowRange.end);
     var previous = state.progressRange === "all" ? [] : progressSeries(state.progressMetric, state.progressExercise, addDays(windowRange.start, -windowRange.days), addDays(windowRange.start, -1));
     if (state.progressRange === "all" || Number(state.progressRange) >= 90) { points = weeklyAverages(points); previous = weeklyAverages(previous); }
@@ -1255,6 +1365,7 @@
   function renderPlan() {
     var html = header("The Plan", "September 10 to December 31");
     html += '<section class="card"><div class="notice">Four strength days, two cardio days, and one active recovery day. Progress reps before load; clean form and repeatability matter more than adding exercises.</div></section>';
+    html += '<section class="card"><details class="form-guide"><summary>Why this week’s progression supports fat loss</summary><p>Your logged cardio effort was about 5–5.5/10 Wednesday and 4–4.5/10 Saturday. Try the increased work blocks at about 6/10, with a smooth walk and no leaning on the rails. The 65-minute duration stays the same.</p><p>At about 153 lb, the proposed full-session changes add roughly 20 calories Wednesday and 40 Saturday in a walking-equation estimate. These are estimates from the prescribed settings, not measured burn or a promise of weight loss. Keep the 1,850-calorie anchor; do not eat back treadmill calories.</p><p>Research across 116 trials links greater weekly moderate-to-vigorous aerobic duration with lower weight, waist, and body fat. It does not establish that a specific higher incline guarantees better fat loss. Strength training during dietary weight loss helps preserve lean tissue. We will judge this plan using actual effort, recovery, weight averages, waist, and standardized photos.</p><p><a href="https://jamanetwork.com/journals/jamanetworkopen/fullarticle/2828487" target="_blank" rel="noopener noreferrer">Cardio and fat-loss research ↗</a> · <a href="https://eprints.gla.ac.uk/361857/2/361857.pdf" target="_blank" rel="noopener noreferrer">Strength and muscle-preservation research ↗</a></p></details></section>';
     DAYS.forEach(function (key) {
       var plan = planForDate(addDays(startOfWeek(TODAY), DAYS.indexOf(key)));
       html += '<section class="card"><div class="card-head"><div><p class="eyebrow">' + DAY_NAMES[DAYS.indexOf(key)] + ' · ' + plan.type + '</p><h2>' + esc(plan.title) + '</h2><p>' + esc(plan.subtitle) + '</p></div></div>';
@@ -1278,8 +1389,8 @@
 
   function renderCheckin() {
     var range = selectedCheckinRange(), summary = buildCheckin(range.start, range.end, range.inProgress), checkin = readWeeklyCheckin(range.start);
-    return header("Weekly Check-In", "Current and previous weeks") +
-      '<section class="card goals-card"><div class="card-head"><div><h2>Nutrition goals</h2><p>Targets stay steady this week—improve consistency before lowering calories.</p></div></div><div class="grid two"><label class="field">Daily calories<input id="calorie-target" type="number" inputmode="numeric" min="1200" max="4000" step="25" value="' + esc(state.data.targets.calories) + '"></label><label class="field">Daily protein, g<input id="protein-target" type="number" inputmode="numeric" min="50" max="300" step="5" value="' + esc(state.data.targets.protein) + '"></label></div><p class="notification-status">Calorie zone: ' + esc(state.data.targets.calorieMin) + '–' + esc(state.data.targets.calorieMax) + ' · Aim near 13,300 calories for the full week · Protein zone: ' + esc(state.data.targets.proteinMin) + '–' + esc(state.data.targets.proteinMax) + ' g · Do not subtract treadmill calories.</p></section>' +
+    return header("Check-Ins", "Wednesday review · Sunday full review") + renderMidweekCard() +
+      '<section class="card goals-card"><div class="card-head"><div><h2>Nutrition goals</h2><p>Targets stay steady this week—improve consistency before lowering calories.</p></div></div><div class="grid two"><label class="field">Daily calories<input id="calorie-target" type="number" inputmode="numeric" min="1200" max="4000" step="25" value="' + esc(state.data.targets.calories) + '"></label><label class="field">Daily protein, g<input id="protein-target" type="number" inputmode="numeric" min="50" max="300" step="5" value="' + esc(state.data.targets.protein) + '"></label></div><p class="notification-status">Calorie zone: ' + esc(state.data.targets.calorieMin) + '–' + esc(state.data.targets.calorieMax) + ' · Aim near ' + esc((number(state.data.targets.calories) * 7).toLocaleString()) + ' calories for the full week · Protein zone: ' + esc(state.data.targets.proteinMin) + '–' + esc(state.data.targets.proteinMax) + ' g · Do not subtract treadmill calories.</p></section>' +
       '<section class="card"><label class="field">Week<select id="checkin-week">' + renderCheckinWeekOptions(range.start) + '</select></label><div class="card-head"><div><h2>Weekly recovery</h2><p>' + esc(formatDate(range.start, { month: "short", day: "numeric" })) + ' to ' + esc(formatDate(range.end, { month: "short", day: "numeric" })) + (range.inProgress ? ' · In progress' : '') + '</p></div></div><div class="notice">Complete all four recovery fields before exporting so next week can be adjusted safely.</div><div class="grid two"><label class="field">Hunger, 1–10<input data-weekly-checkin="hunger" type="number" min="1" max="10" value="' + esc(checkin.hunger || "") + '"></label><label class="field">Energy, 1–10<input data-weekly-checkin="energy" type="number" min="1" max="10" value="' + esc(checkin.energy || "") + '"></label><label class="field">Average sleep, hours<input data-weekly-checkin="sleep" type="number" min="0" max="14" step="0.25" value="' + esc(checkin.sleep || "") + '"></label><label class="field">Soreness, 1–10<input data-weekly-checkin="soreness" type="number" min="1" max="10" value="' + esc(checkin.soreness || "") + '"></label></div><label class="field">Recovery notes<textarea data-weekly-checkin="recoveryNotes" placeholder="Include leg soreness before Tuesday and Friday, plus any back tightness">' + esc(checkin.recoveryNotes || "") + '</textarea></label></section>' +
       '<section class="card"><div class="card-head"><div><h2>Export selected week</h2><p>' + (range.inProgress ? 'Includes Sunday through today. Future days are left out.' : 'Includes the full Sunday–Saturday week.') + '</p></div></div>' +
       '<textarea id="checkin-output" class="checkin-output" readonly>' + esc(summary) + '</textarea>' +
@@ -1326,6 +1437,20 @@
     return state.data.weeklyCheckins && state.data.weeklyCheckins[startIso] || {};
   }
 
+  function readMidweekCheckin(startIso) {
+    return state.data.midweekCheckins && state.data.midweekCheckins[startIso] || {};
+  }
+
+  function renderMidweekCard() {
+    var start = startOfWeek(TODAY), checkin = readMidweekCheckin(start);
+    return '<section class="card midweek-card"><div class="card-head"><div><p class="eyebrow">Wednesday · 8 pm Chicago</p><h2>Midweek check-in</h2><p>Review Mon–Wed before the rest of the week. Sunday remains the full review.</p></div></div><p class="notification-status">Log Wednesday morning waist and photos, actual cardio effort, food, and any form issues. If Wednesday leads to a change, use a brief Friday follow-up.</p><details class="form-guide" ' + (dayKey(TODAY) === "Wed" ? 'open' : '') + '><summary>Midweek recovery</summary><div class="grid two">' + [
+      { key: "hunger", label: "Hunger, 1–10", min: 1, max: 10, step: 1 },
+      { key: "energy", label: "Energy, 1–10", min: 1, max: 10, step: 1 },
+      { key: "sleep", label: "Average sleep so far, hours", min: 0, max: 14, step: 0.25 },
+      { key: "soreness", label: "Soreness, 1–10", min: 1, max: 10, step: 1 }
+    ].map(function (field) { return '<label class="field">' + field.label + '<input data-midweek-checkin="' + field.key + '" type="number" min="' + field.min + '" max="' + field.max + '" step="' + field.step + '" value="' + esc(checkin[field.key] == null ? "" : checkin[field.key]) + '"></label>'; }).join("") + '</div><label class="field">What needs adjusting?<textarea data-midweek-checkin="recoveryNotes" placeholder="Actual cardio effort, form, hunger, sleep, or schedule">' + esc(checkin.recoveryNotes || "") + '</textarea></label><p class="notification-status">Saved separately from Sunday’s recovery fields' + (checkin.asOf ? ' · last updated ' + esc(formatDate(checkin.asOf, { month: "short", day: "numeric" })) : '') + '</p></details><button id="copy-midweek" class="primary">Copy current-week update</button><p id="midweek-copy-status" class="notification-status">Includes Sunday through today; compares weights with the same weekdays last week.</p></section>';
+  }
+
   function reminderSettings() { return state.data.preferences.reminders; }
 
   function renderNotificationCard() {
@@ -1333,8 +1458,8 @@
     var paused = reminders.pausedDate === TODAY;
     return '<section class="card notification-card"><div><p class="eyebrow">Smart phone alerts</p><h2>Only nudge me when I’m behind</h2><p class="notification-status">Water and protein reminders compare your logged progress with the time of day. Completed targets stay quiet. Cardio alerts continue while another app is open.</p></div>' +
       '<button id="enable-notifications" class="' + (state.notificationEnabled ? "secondary" : "primary") + '">' + (state.notificationEnabled ? "Notifications enabled" : "Enable notifications") + '</button><p id="notification-message" class="notification-status"></p>' +
-      '<div class="reminder-types"><label><input type="checkbox" data-reminder-toggle="workout" ' + (reminders.workout ? "checked" : "") + '> Workout</label><label><input type="checkbox" data-reminder-toggle="water" ' + (reminders.water ? "checked" : "") + '> Water</label><label><input type="checkbox" data-reminder-toggle="protein" ' + (reminders.protein ? "checked" : "") + '> Protein</label><label><input type="checkbox" data-reminder-toggle="calories" ' + (reminders.calories ? "checked" : "") + '> Calories</label></div>' +
-      '<details class="reminder-settings"><summary>Reminder schedule</summary><div class="grid two"><label class="field">Workout<input type="time" step="600" data-reminder-time="workoutTime" value="' + esc(reminders.workoutTime) + '"></label><label class="field">Morning water<input type="time" step="600" data-reminder-time="waterTimes.0" value="' + esc(reminders.waterTimes[0]) + '"></label><label class="field">Afternoon water<input type="time" step="600" data-reminder-time="waterTimes.1" value="' + esc(reminders.waterTimes[1]) + '"></label><label class="field">Midday protein<input type="time" step="600" data-reminder-time="proteinTimes.0" value="' + esc(reminders.proteinTimes[0]) + '"></label><label class="field">Evening protein<input type="time" step="600" data-reminder-time="proteinTimes.1" value="' + esc(reminders.proteinTimes[1]) + '"></label><label class="field">Calorie pace 1<input type="time" step="600" data-reminder-time="calorieTimes.0" value="' + esc(reminders.calorieTimes[0]) + '"></label><label class="field">Calorie pace 2<input type="time" step="600" data-reminder-time="calorieTimes.1" value="' + esc(reminders.calorieTimes[1]) + '"></label><label class="field">Calorie pace 3<input type="time" step="600" data-reminder-time="calorieTimes.2" value="' + esc(reminders.calorieTimes[2]) + '"></label><label class="field">Calories to reserve for dinner<input type="number" min="300" max="1200" step="50" data-reminder-number="dinnerReserve" value="' + esc(reminders.dinnerReserve) + '"></label><label class="field">Quiet hours start<input type="time" step="600" data-reminder-time="quietStart" value="' + esc(reminders.quietStart) + '"></label><label class="field">Quiet hours end<input type="time" step="600" data-reminder-time="quietEnd" value="' + esc(reminders.quietEnd) + '"></label></div></details>' +
+      '<div class="reminder-types"><label><input type="checkbox" data-reminder-toggle="workout" ' + (reminders.workout ? "checked" : "") + '> Workout</label><label><input type="checkbox" data-reminder-toggle="water" ' + (reminders.water ? "checked" : "") + '> Water</label><label><input type="checkbox" data-reminder-toggle="protein" ' + (reminders.protein ? "checked" : "") + '> Protein</label><label><input type="checkbox" data-reminder-toggle="calories" ' + (reminders.calories ? "checked" : "") + '> Calories</label><label><input type="checkbox" data-reminder-toggle="midweek" ' + (reminders.midweek ? "checked" : "") + '> Wednesday check-in</label></div>' +
+      '<details class="reminder-settings"><summary>Reminder schedule</summary><div class="grid two"><label class="field">Wednesday check-in (Chicago)<input type="time" step="600" data-reminder-time="midweekTime" value="' + esc(reminders.midweekTime) + '"></label><label class="field">Workout<input type="time" step="600" data-reminder-time="workoutTime" value="' + esc(reminders.workoutTime) + '"></label><label class="field">Morning water<input type="time" step="600" data-reminder-time="waterTimes.0" value="' + esc(reminders.waterTimes[0]) + '"></label><label class="field">Afternoon water<input type="time" step="600" data-reminder-time="waterTimes.1" value="' + esc(reminders.waterTimes[1]) + '"></label><label class="field">Midday protein<input type="time" step="600" data-reminder-time="proteinTimes.0" value="' + esc(reminders.proteinTimes[0]) + '"></label><label class="field">Evening protein<input type="time" step="600" data-reminder-time="proteinTimes.1" value="' + esc(reminders.proteinTimes[1]) + '"></label><label class="field">Calorie pace 1<input type="time" step="600" data-reminder-time="calorieTimes.0" value="' + esc(reminders.calorieTimes[0]) + '"></label><label class="field">Calorie pace 2<input type="time" step="600" data-reminder-time="calorieTimes.1" value="' + esc(reminders.calorieTimes[1]) + '"></label><label class="field">Calorie pace 3<input type="time" step="600" data-reminder-time="calorieTimes.2" value="' + esc(reminders.calorieTimes[2]) + '"></label><label class="field">Calories to reserve for dinner<input type="number" min="300" max="1200" step="50" data-reminder-number="dinnerReserve" value="' + esc(reminders.dinnerReserve) + '"></label><label class="field">Quiet hours start<input type="time" step="600" data-reminder-time="quietStart" value="' + esc(reminders.quietStart) + '"></label><label class="field">Quiet hours end<input type="time" step="600" data-reminder-time="quietEnd" value="' + esc(reminders.quietEnd) + '"></label></div></details>' +
       '<button type="button" id="pause-reminders" class="ghost">' + (paused ? "Resume today’s reminders" : "Pause reminders for today") + '</button></section>';
   }
 
@@ -1349,9 +1474,9 @@
       var t = totals(day);
       var hasLog = number(day.weight) || day.meals.length || Object.keys(day.exercises || {}).length || day.workout.notes || day.steps;
       if (hasLog) result.loggedDays++;
-      if (t.protein >= state.data.targets.proteinMin && t.protein <= state.data.targets.proteinMax) result.proteinDays++;
+      if (t.protein >= state.data.targets.proteinMin) result.proteinDays++;
       if (t.calories >= state.data.targets.calorieMin && t.calories <= state.data.targets.calorieMax) result.calorieDays++;
-      if (number(day.weight)) { result.weights.push(number(day.weight)); result.latestWeight = number(day.weight); }
+      if (morningWeight(day)) { result.weights.push(morningWeight(day)); result.latestWeight = morningWeight(day); }
       if (sessionComplete(day, plan)) {
         if (plan.type === "Strength") result.strengthDone++;
         if (plan.type === "Cardio") result.cardioDone++;
@@ -1368,10 +1493,10 @@
     return planned.length > 0 && completed / planned.length >= 0.5;
   }
 
-  function buildCheckin(startIso, endIso, inProgress) {
+  function buildCheckin(startIso, endIso, inProgress, midweek) {
     var stats = periodStats(startIso, endIso);
     var average = stats.weights.length ? stats.weights.reduce(function (a, b) { return a + b; }, 0) / stats.weights.length : 0;
-    var priorStats = periodStats(addDays(startIso, -7), addDays(startIso, -1));
+    var priorStats = periodStats(addDays(startIso, -7), inProgress ? addDays(endIso, -7) : addDays(startIso, -1));
     var priorAverage = priorStats.weights.length ? priorStats.weights.reduce(function (a, b) { return a + b; }, 0) / priorStats.weights.length : 0;
     var notes = [], nutrition = [], calorieTotal = 0, proteinTotal = 0, nutritionDays = 0;
     var training = [];
@@ -1396,17 +1521,18 @@
         training.push(formatDate(iso, { weekday: "short", month: "short", day: "numeric" }) + " · " + plan.title + (day.workout.rating ? " · " + day.workout.rating : "") + "\n" + exerciseLines.join("\n") + resultLine);
       }
     }
-    var checkin = readWeeklyCheckin(startIso);
+    var checkin = midweek ? readMidweekCheckin(startIso) : readWeeklyCheckin(startIso);
     return [
-      "VINNY WORKOUT 2.0 WEEKLY CHECK-IN" + (inProgress ? " · IN PROGRESS" : ""),
+      "VINNY WORKOUT 2.0 " + (midweek ? "MIDWEEK CHECK-IN" : "WEEKLY CHECK-IN") + (inProgress ? " · IN PROGRESS" : ""),
       formatDate(startIso, { month: "short", day: "numeric" }) + " to " + formatDate(endIso, { month: "short", day: "numeric", year: "numeric" }),
       "",
       "Morning weights: " + (stats.weights.length ? stats.weights.map(function (w) { return w.toFixed(1); }).join(", ") + " lb" : "none logged"),
       "Weekly average: " + (average ? average.toFixed(1) + " lb" : "not available"),
       "Week-over-week average change: " + (average && priorAverage ? ((average - priorAverage) > 0 ? "+" : "") + (average - priorAverage).toFixed(1) + " lb" : "not available"),
+      inProgress ? "Weight comparison uses the same weekdays last week; this is not a completed weekly trend." : "Weight comparison uses completed Sunday–Saturday weeks.",
       "Strength sessions: " + stats.strengthDone + " completed",
       "Cardio sessions: " + stats.cardioDone + " completed",
-      "Protein target days: " + stats.proteinDays,
+      "Protein target days (at least " + state.data.targets.proteinMin + " g): " + stats.proteinDays,
       "Calorie target days: " + stats.calorieDays,
       "",
       "Daily summary:",
@@ -1415,7 +1541,9 @@
       "Logged-day averages: " + (nutritionDays ? Math.round(calorieTotal / nutritionDays) + " calories · " + Math.round(proteinTotal / nutritionDays) + " g protein" : "not available"),
       "Current target zones: " + state.data.targets.calorieMin + "–" + state.data.targets.calorieMax + " calories · " + state.data.targets.proteinMin + "–" + state.data.targets.proteinMax + " g protein",
       "",
-      "Recovery check-in:",
+      measurementCheckin(startIso, endIso),
+      "",
+      midweek ? "Midweek recovery (last updated " + (checkin.asOf || "not entered") + "):" : "Recovery check-in:",
       "Hunger: " + (checkin.hunger || "not entered") + (checkin.hunger ? "/10" : ""),
       "Energy: " + (checkin.energy || "not entered") + (checkin.energy ? "/10" : ""),
       "Average sleep: " + (checkin.sleep || "not entered") + (checkin.sleep ? " hours" : ""),
@@ -1431,8 +1559,23 @@
       "Notes:",
       notes.length ? notes.join("\n") : "No notes entered.",
       "",
-      "Please review my trend, adherence, recovery, and exercise logs, then give me any changes for next week."
+      midweek ? "Please retrieve and visually review every available saved progress photo for this week plus baseline and prior comparisons. Review actual Mon–Wed training, cardio effort, waist, nutrition, and recovery. Propose any Thu–Sat changes with reasons; use a Friday follow-up if an adjustment needs checking." : "Please retrieve and visually review every available saved progress photo for this week plus baseline and prior comparisons. Review my weight and waist trends, adherence, recovery, and exercise logs, then give me justified changes for next week."
     ].join("\n");
+  }
+
+  function measurementCheckin(startIso, endIso) {
+    var waistLines = [], photoLines = [], excludedWeights = [];
+    for (var iso = startIso; iso <= endIso; iso = addDays(iso, 1)) {
+      var day = state.data.days[iso];
+      if (!day) continue;
+      var waist = waistAverage(day), label = formatDate(iso, { weekday: "short", month: "short", day: "numeric" });
+      if (number(day.weight) && day.weightTiming === "other") excludedWeights.push(label + ": " + number(day.weight).toFixed(1) + " lb · after food/drinks/exercise; retained in daily log, excluded from morning average");
+      if (waist != null) waistLines.push(label + ": " + waist.toFixed(2) + " in · readings " + day.waist.first + (String(day.waist.second || "").trim() ? " / " + day.waist.second : " (one reading)"));
+      var views = ["front", "side", "back"].filter(function (view) { return day.photos && day.photos[view]; });
+      if (views.length) photoLines.push(label + ": " + views.join(", "));
+    }
+    var prior = Object.keys(state.data.days || {}).filter(function (iso) { return iso < startIso && waistAverage(state.data.days[iso]) != null; }).sort().pop();
+    return "Morning-trend exclusions:\n" + (excludedWeights.length ? excludedWeights.join("\n") : "None marked.") + "\n\nWaist measurements (inches; same location just above hip bones, normal exhale):\n" + (waistLines.length ? waistLines.join("\n") : "None logged; baseline still needed.") + (prior ? "\nPrevious reading: " + formatDate(prior, { month: "short", day: "numeric" }) + " · " + waistAverage(state.data.days[prior]).toFixed(2) + " in" : "") + "\n\nSaved progress photos:\n" + (photoLines.length ? photoLines.join("\n") : "None saved in this period.") + "\nPhoto originals are stored privately in the dashboard. This text export lists available views, not image attachments; retrieve originals for visual analysis.";
   }
 
   function summarizeCardioTiming(day) {
@@ -1545,6 +1688,8 @@
       if (checkinWeek) { refreshCardioTiming(); checkinWeek.addEventListener("change", function () { state.checkinWeekStart = checkinWeek.value; render(); }); }
       var copy = document.getElementById("copy-checkin");
       if (copy) copy.addEventListener("click", copyCheckin);
+      var midweekCopy = document.getElementById("copy-midweek");
+      if (midweekCopy) midweekCopy.addEventListener("click", copyMidweekCheckin);
       var backup = document.getElementById("download-backup");
       if (backup) backup.addEventListener("click", downloadBackup);
       var lock = document.getElementById("lock-tracker");
@@ -1564,11 +1709,33 @@
       var pauseReminders = document.getElementById("pause-reminders");
       if (pauseReminders) pauseReminders.addEventListener("click", function () { reminderSettings().pausedDate = reminderSettings().pausedDate === TODAY ? "" : TODAY; queueSave(true); });
       document.querySelectorAll("[data-weekly-checkin]").forEach(function (input) { input.addEventListener("change", function () { var range = selectedCheckinRange(); weeklyCheckin(range.start)[input.dataset.weeklyCheckin] = input.value.trim(); queueSave(true); }); });
+      document.querySelectorAll("[data-midweek-checkin]").forEach(function (input) { input.addEventListener("change", function () {
+        if (input.reportValidity && !input.reportValidity()) return;
+        var start = startOfWeek(TODAY);
+        state.data.midweekCheckins = state.data.midweekCheckins || {};
+        if (!state.data.midweekCheckins[start]) state.data.midweekCheckins[start] = {};
+        state.data.midweekCheckins[start][input.dataset.midweekCheckin] = input.value.trim();
+        state.data.midweekCheckins[start].asOf = TODAY;
+        queueSave(false);
+      }); });
       return;
     }
 
     ["weight", "water"].forEach(function (id) {
       document.getElementById(id).addEventListener("change", function (event) { getDay(state.selectedDate)[id] = event.target.value; queueSave(); });
+    });
+    document.getElementById("weight-standard").addEventListener("change", function (event) { getDay(state.selectedDate).weightTiming = event.target.checked ? "morning" : "other"; queueSave(false); });
+    ["waist-first", "waist-second"].forEach(function (id) {
+      document.getElementById(id).addEventListener("change", function () {
+        var first = document.getElementById("waist-first"), second = document.getElementById("waist-second");
+        first.setCustomValidity(second.value.trim() && !first.value.trim() ? "Enter the first reading before a second reading." : "");
+        if (!first.reportValidity() || !second.reportValidity()) return;
+        var day = getDay(state.selectedDate);
+        day.waist = { first: first.value.trim(), second: second.value.trim() };
+        var average = waistAverage(day);
+        document.getElementById("waist-average").textContent = average == null ? "No waist baseline logged yet." : "Recorded measurement: " + average.toFixed(2) + " in" + (second.value.trim() ? " · average of two readings" : " · one reading");
+        queueSave(false);
+      });
     });
     document.querySelectorAll("[data-water-step]").forEach(function (button) { button.addEventListener("click", function () { var day = getDay(state.selectedDate); day.water = clamp(number(day.water) + Number(button.dataset.waterStep), 0, 30); queueSave(true); }); });
     document.getElementById("day-note").addEventListener("change", function (event) { getDay(state.selectedDate).workout.notes = event.target.value; queueSave(); });
@@ -2693,6 +2860,7 @@
       return favorite;
     }) : [];
     data.weeklyCheckins = data.weeklyCheckins || {};
+    data.midweekCheckins = data.midweekCheckins || {};
     delete data.targets.steps;
     data.preferences = Object.assign({ notifications: true }, data.preferences || {});
     data.preferences.reminders = Object.assign({}, defaultData().preferences.reminders, data.preferences.reminders || {});
@@ -2703,9 +2871,10 @@
     while (data.preferences.reminders.proteinTimes.length < 2) data.preferences.reminders.proteinTimes.push(defaultData().preferences.reminders.proteinTimes[data.preferences.reminders.proteinTimes.length]);
     while (data.preferences.reminders.calorieTimes.length < 3) data.preferences.reminders.calorieTimes.push(defaultData().preferences.reminders.calorieTimes[data.preferences.reminders.calorieTimes.length]);
     delete data.reward;
-    data.meta = Object.assign({}, data.meta || {}, { planVersion: "workout-2.11-2026-10-04" });
+    data.meta = Object.assign({}, data.meta || {}, { planVersion: "workout-2.12-2026-10-11" });
     Object.keys(data.days || {}).forEach(function (iso) {
       var day = data.days[iso];
+      day.waist = Object.assign({ first: "", second: "" }, day.waist || {});
       day.meals = Array.isArray(day.meals) ? day.meals : [];
       day.meals.forEach(function (meal) { meal.quantity = Math.max(0.25, number(meal.quantity) || 1); meal.perServing = meal.perServing || nutritionSnapshot(meal, meal.quantity); });
       day.exercises = day.exercises || {};
@@ -2715,6 +2884,7 @@
         if (!Array.isArray(log.sets) && log.reps) log.sets = String(log.reps).split(/[,/]+/).map(function (value) { return value.trim(); }).filter(Boolean);
       });
       day.workout = Object.assign({ completed: false, rating: "", notes: "" }, day.workout || {});
+      if (!day.weightTiming) day.weightTiming = iso === "2026-10-07" && /after workout and protein shake/i.test(day.workout.notes) ? "other" : "morning";
       day.cardio = Object.assign({ sessionId: "", startedAt: "", status: "", durationMinutes: 0, completedAt: "", result: null }, day.cardio || {});
       day.photos = Object.assign({ front: null, side: null, back: null, treadmill: null }, day.photos || {});
     });
@@ -2784,6 +2954,19 @@
     var button = document.getElementById("copy-checkin");
     button.textContent = "Copied";
     setTimeout(function () { button.textContent = "Copy check-in"; }, 1500);
+  }
+
+  async function copyMidweekCheckin() {
+    var range = { start: startOfWeek(TODAY), end: TODAY, inProgress: true };
+    var summary = (async function () { await refreshCardioTiming(true, range); return buildCheckin(range.start, range.end, true, true); })();
+    try {
+      if (typeof ClipboardItem !== "undefined" && navigator.clipboard.write) {
+        await navigator.clipboard.write([new ClipboardItem({ "text/plain": summary.then(function (text) { return new Blob([text], { type: "text/plain" }); }) })]);
+      } else await navigator.clipboard.writeText(await summary);
+      document.getElementById("midweek-copy-status").textContent = "Copied current week through today, including waist, saved photo dates, training, and midweek recovery.";
+    } catch (error) {
+      document.getElementById("midweek-copy-status").textContent = "Copy could not finish. Use the selected-week export below or try again.";
+    }
   }
 
   function downloadBackup() {
