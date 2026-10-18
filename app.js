@@ -19,6 +19,7 @@
   var WEEK_THREE_START = "2026-09-27";
   var WEEK_FOUR_START = "2026-10-04";
   var WEEK_FIVE_START = "2026-10-11";
+  var WEEK_SIX_START = "2026-10-18";
   var EFFORT_OPTIONS = [
     { value: "much-too-easy", label: "Much too easy" },
     { value: "slightly-easy", label: "Slightly easy" },
@@ -438,6 +439,46 @@
     return progressedStrengthPlan(plan, updates[key]);
   }
 
+  function weekSixStrengthPlan(key) {
+    var plan = weekFiveStrengthPlan(key);
+    if (!plan) return null;
+    var updates = {
+      Mon: {
+        "Dumbbell Flat Bench Press": { prescription: "3 sets of 8 to 10", weeklyLoad: 26, coachingNote: "Trial 26 lb each after three slightly easy sets of 12 at 23. The next available setup is a 13% jump, so start at 8 controlled reps with about two good reps left. If form changes, use 23 and build toward 13–15 reps." },
+        "One Arm Dumbbell Row": { prescription: "3 sets of 8 to 10 each side", weeklyLoad: 26, coachingNote: "Trial one 26 lb dumbbell after three slightly easy sets of 12 at 23. Start at 8 each side; brace and avoid rotating. Use 23 and build reps if eight clean reps at 26 are not there today." },
+        "Seated Dumbbell Shoulder Press": { prescription: "3 sets of 10 to 12", weeklyLoad: 17, coachingNote: "Keep 17 lb each. Last week reached three smooth sets of 10; aim for 11 first, then 12. Progress reps before the next load and avoid leaning back." },
+        "Dumbbell Lateral Raise": { coachingNote: "Hold 10 lb each for three sets of 20. Last week's late reps were already challenging. Keep the same controlled path without swinging or shrugging." },
+        "Overhead Dumbbell Triceps Extension": { coachingNote: "Hold one 17 lb dumbbell for three sets of 12–15. Last week's 15s felt right; keep elbows steady and ribs down." },
+        "Alternating Dumbbell Curl": { coachingNote: "Hold 14 lb each for three strict sets of 12–15. Last week you did four sets and the final reps challenged you. A fourth remains optional if recovery and time permit." }
+      },
+      Tue: {
+        "Goblet Squat": { coachingNote: "Carry forward one 21 lb dumbbell for three sets of 12–15. Last Tuesday was intentionally skipped, so this increase has not been tested. Keep the weight close and depth controlled." },
+        "Dumbbell Romanian Deadlift": { coachingNote: "Carry forward 21 lb each for three sets of 10–12. Tuesday was skipped; the earlier hinge correction still needs a clean session. Soft knees, hips back, weights close, neutral spine." },
+        "Dumbbell Reverse Lunge": { coachingNote: "Carry forward two 8s for two sets of 8–12 each side. This setup was not tested last Tuesday. Stay balanced; use one 13 with bench support if needed." },
+        "Standing Calf Raise": { coachingNote: "Carry forward one 19 lb dumbbell for three sets of 12–15 each leg. Friday's same load felt right. Use support, pause high and lower fully." },
+        "Dead Bug": { coachingNote: "Carry forward three sets of 12 each side after the skipped Tuesday. Extend slowly, exhale and keep your lower back controlled." },
+        "Forearm Plank": { coachingNote: "Carry forward three sets of 50 seconds. Keep breathing and stop the hold if your bracing or position changes." }
+      },
+      Thu: {
+        "Incline Dumbbell Bench Press": { coachingNote: "Hold 26 lb each for three sets of 10–12. Last week's three sets of 12 felt right. Use a modest incline and controlled lowering." },
+        "Chest Supported Dumbbell Row": { coachingNote: "Hold 21 lb each for three sets of 10–12. Last week's 12s were smooth and rated right. Keep your chest supported and avoid jerking." },
+        "Push Up": { coachingNote: "Keep three sets of 12–15 floor push-ups. Last week's 15s were quick and smooth; lower for about two seconds and keep your body in one line." },
+        "Incline Rear Delt Raise": { coachingNote: "Hold 8 lb each for two sets of 15–20. Last week's 20s became challenging late in each set. Avoid swinging and shrugging." },
+        "Dumbbell Hammer Curl": { coachingNote: "Hold 17 lb each for three sets of 12–15. Last week's 15s felt right; keep elbows still and finish under control." },
+        "Lying Dumbbell Triceps Extension": { coachingNote: "Keep the existing 14 lb each prescription, up to three sets of 12. Last week only two sets were saved and no load was entered. Confirm the actual load and log each set; do not treat the missing third set as completed." }
+      },
+      Fri: {
+        "Bulgarian Split Squat": { coachingNote: "Hold one 10 lb dumbbell for three sets of 10 each side. All three sets stay. Last week felt right; use support and consistent depth before adding load." },
+        "Dumbbell Hip Thrust": { coachingNote: "Hold one 21 lb dumbbell for three sets of 15. Last week's corrected setup felt right. Stable bench, upper-back support, padded hip crease, dumbbell crosswise in both hands; ribs down and pause without arching." },
+        "Dumbbell Sumo Squat": { coachingNote: "Hold one 23 lb dumbbell for three sets of 12–15. Last week's 15s felt right. Keep depth controlled and knees tracking over toes." },
+        "Standing Calf Raise": { coachingNote: "Hold one 19 lb dumbbell for three sets of 12–15 each leg. Last week was already a little challenging. Use support and a full controlled range." },
+        "Reverse Crunch": { coachingNote: "Hold three sets of 15. Last week was slightly challenging. Curl your pelvis without swinging and lower slowly." },
+        "Side Plank": { coachingNote: "Hold two sets of 45 seconds each side, four holds total. Last week felt right. Stack your hips and keep breathing." }
+      }
+    };
+    return progressedStrengthPlan(plan, updates[key]);
+  }
+
   function weekFiveCardio(segments, firstWorkMinute, lastWorkMinute, inclineIncrease) {
     return segments.map(function (segment) {
       if (segment.automatic || segment.start < firstWorkMinute || segment.end > lastWorkMinute) return segment;
@@ -519,7 +560,7 @@
       },
       weeklyCheckins: {},
       midweekCheckins: {},
-      meta: { planVersion: "workout-2.12-2026-10-11", createdAt: new Date().toISOString() }
+      meta: { planVersion: "workout-2.13-2026-10-18", createdAt: new Date().toISOString() }
     };
   }
 
@@ -701,6 +742,7 @@
     // The check-in sets this week's starting loads; effort-based changes resume afterward.
     if (exercise.weeklyLoad && state.selectedDate >= WEEK_FOUR_START && state.selectedDate < addDays(WEEK_FOUR_START, 7)) return exercise.weeklyLoad;
     if (exercise.weeklyLoad && state.selectedDate >= WEEK_FIVE_START && state.selectedDate < addDays(WEEK_FIVE_START, 7)) return exercise.weeklyLoad;
+    if (exercise.weeklyLoad && state.selectedDate >= WEEK_SIX_START && state.selectedDate < addDays(WEEK_SIX_START, 7)) return exercise.weeklyLoad;
     var previous = previousExerciseLog(id, state.selectedDate, true);
     if (!previous) return exercise.weeklyLoad || exercise.equipment.start;
     if (exercise.weeklyLoad && previous.iso < WEEK_THREE_START && state.selectedDate >= WEEK_THREE_START) return exercise.weeklyLoad;
@@ -778,6 +820,24 @@
   function planForDate(iso) {
     if (SPECIAL_DAYS[iso]) return SPECIAL_DAYS[iso];
     var key = dayKey(iso), plan = PLAN[key];
+    if (iso >= WEEK_SIX_START) {
+      var reviewedStrength = weekSixStrengthPlan(key);
+      if (reviewedStrength) return reviewedStrength;
+      if (key === "Wed" || key === "Sat") {
+        var workStart = key === "Wed" ? 20 : 15, workEnd = key === "Wed" ? 50 : 45;
+        var heldCardio = weekFiveCardio(weekFourCardio(weekThreeCardio(key === "Wed" ? cardioOneProgressed() : cardioTwoProgressed(), workStart, workEnd, 6), workStart, workEnd), workStart, workEnd, key === "Wed" ? 1 : 2);
+        var savedDay = state.data.days && state.data.days[iso];
+        var speedTrial = key === "Sat" && Boolean(savedDay && savedDay.cardio && savedDay.cardio.workSpeedTrial);
+        return Object.assign({}, plan, {
+          subtitle: "60 minutes programmed work · 5-minute automatic cooldown · target about 6/10",
+          speedTrialAvailable: key === "Sat", speedTrialEnabled: speedTrial,
+          cardioSegments: speedTrial ? weekFiveCardio(heldCardio, 15, 45, 0) : heldCardio,
+          sections: [{ label: "Treadmill", exercises: [Object.assign({}, plan.sections[0].exercises[0], {
+            coachingNote: key === "Wed" ? "Hold the current 65-minute plan after last week's 5.5–6/10 session. Middle blocks peak at 3.2 mph and incline setting 9. Keep a smooth walk, stay off the rails and log actual effort for Wednesday's review." : "Last week felt 5.5–6/10. Keep the current plan if already at about 6/10. After Wednesday's review, the optional +0.1 mph work-block trial peaks at 3.4 mph; incline, warmup and cooldown stay the same. Reduce speed if your walking form changes."
+          })] }]
+        });
+      }
+    }
     if (iso < WEEK_TWO_START) return plan;
     if (iso >= WEEK_FIVE_START) {
       var nextStrength = weekFiveStrengthPlan(key);
@@ -1086,6 +1146,10 @@
     var fullDuration = plan.cardioSegments && plan.cardioSegments.length ? plan.cardioSegments[plan.cardioSegments.length - 1].end : duration;
     var expressDuration = plan.expressSegments && plan.expressSegments.length ? plan.expressSegments[plan.expressSegments.length - 1].end : 0;
     var html = plan.expressSegments ? '<div class="cardio-mode"><button type="button" data-cardio-mode="full" class="' + (state.cardioMode === "full" ? "active" : "") + '">Full · ' + fullDuration + ' min</button><button type="button" data-cardio-mode="express" class="' + (state.cardioMode === "express" ? "active" : "") + '">Express · ' + expressDuration + ' min</button></div>' : '';
+    if (plan.speedTrialAvailable && state.cardioMode !== "express") {
+      var trialLocked = active || complete || Boolean(state.cardioCountdown && state.cardioCountdown.date === state.selectedDate);
+      html += '<details class="form-guide cardio-speed-option"><summary>Saturday speed option · ' + (plan.speedTrialEnabled ? '+0.1 mph selected' : 'standard plan') + '</summary><p>Use the extra speed only after Wednesday’s review, with acceptable recovery and work blocks still below about 6/10 without holding the rails. Incline and the 65-minute duration stay the same. Choose before starting; your interval alerts will match.</p><label class="check-row"><input id="cardio-speed-trial" type="checkbox" ' + (plan.speedTrialEnabled ? 'checked ' : '') + (trialLocked ? 'disabled ' : '') + '> Add 0.1 mph during minutes 15–45</label></details>';
+    }
     html += '<div class="cardio-timeline">';
     cardioSegmentsFor(plan).forEach(function (segment) {
       html += '<div class="cardio-step' + (segment.automatic ? ' automatic' : '') + '"><time>' + segment.start + '–' + segment.end + ' min</time><div><strong>' + esc(cardioSettingLabel(segment)) + '</strong><span>' + esc(segment.cue) + '</span></div></div>';
@@ -1243,6 +1307,7 @@
   }
 
   function renderReviewCheckpoints() {
+    if (TODAY >= WEEK_SIX_START) return '<section class="card"><div class="card-head"><div><h2>Next checkpoints</h2><p>Use completed-week weight averages, waist, photos and recovery together.</p></div></div><ul class="checkpoint-list"><li><strong>October 21 · 8 pm Chicago</strong><span>Review Mon–Wed food, protein, sleep, training and any waist baseline. Decide whether Saturday’s optional speed step fits your recovery.</span></li><li><strong>October 25 · Weekly review</strong><span>Check the full week near the 1,850-calorie anchor. If verified intake, repeated waist readings and the weight trend support a change, choose one small adjustment. Collect another week if the picture is unclear.</span></li><li><strong>November 1 · Two-week direction</strong><span>Reassess the trend if October 25 was inconclusive. Avoid reacting to one morning’s number.</span></li><li><strong>November 4 · Photo checkpoint</strong><span>Repeat front, side and back photos with matching camera position, lighting, distance and waistband.</span></li></ul><p class="notification-status">First milestone: a sustained 150 lb weekly average. Reassess waist, photos, strength and the next target from there.</p></section>';
     return '<section class="card"><div class="card-head"><div><h2>Next checkpoints</h2><p>Judge the plan using weight averages, waist, photos, and recovery together.</p></div></div><ul class="checkpoint-list"><li><strong>Wednesday · 8 pm Chicago</strong><span>Review Mon–Wed logs, actual cardio effort, waist, photos, hunger, energy, and sleep. Adjust Thu–Sat if needed.</span></li><li><strong>October 18 · Process check</strong><span>Review consistent morning weights, the 1,850-calorie anchor, protein minimum, form, and recovery.</span></li><li><strong>October 25 · Results decision</strong><span>Assess two full weeks and waist change. Working weight-average range: 151.9–152.4 lb; a planning target, not a promised result. If weight and waist stay flat, review intake accuracy and activity before changing the plan.</span></li><li><strong>November 4 · Photo checkpoint</strong><span>Repeat front, side, and back photos with matching position, lighting, camera distance, and waistband.</span></li></ul><p class="notification-status">First milestone: a 150 lb weekly average. Reassess appearance, waist, strength, and recovery before deciding on 145 or 140.</p></section>';
   }
 
@@ -1350,6 +1415,15 @@
     var stats = periodStats(state.data.profile.startDate || "2026-09-10", TODAY);
     var start = state.data.profile.baselineWeight;
     var latest = stats.latestWeight || start;
+    if (TODAY >= WEEK_SIX_START) {
+      var completed = periodStats(addDays(startOfWeek(TODAY), -7), addDays(startOfWeek(TODAY), -1));
+      var average = completed.weights.length ? completed.weights.reduce(function (sum, value) { return sum + value; }, 0) / completed.weights.length : null;
+      return '<section class="card"><div class="card-head"><div><p class="eyebrow">First milestone</p><h2>150 lb weekly average</h2><p>' + (average == null ? 'Build a consistent morning-weight trend, then reassess waist, photos and strength.' : 'Last completed week: ' + average.toFixed(1) + ' lb from ' + completed.weights.length + ' morning readings. Reassess waist, photos and strength at the milestone.') + '</p></div></div>' +
+        metric("Strength sessions through today", pct(stats.strengthDone, stats.strengthPlanned), stats.strengthDone + " of " + stats.strengthPlanned + " planned") +
+        metric("Cardio sessions through today", pct(stats.cardioDone, stats.cardioPlanned), stats.cardioDone + " of " + stats.cardioPlanned + " planned") +
+        metric("Protein days", pct(stats.proteinDays, stats.loggedDays || 1), stats.proteinDays + " / " + stats.loggedDays + " logged days") +
+        '<details class="form-guide"><summary>Original longer-term goal</summary><p>Your original saved goal is ' + esc(state.data.targets.checkpointWeight) + ' lb by ' + esc(formatDate(state.data.targets.deadline, { month: "long", day: "numeric", year: "numeric" })) + '. The recent trend does not support forecasting that deadline. Establish a sustainable downward trend before setting the next date.</p></details></section>';
+    }
     var weightProgress = pct(start - latest, start - state.data.targets.checkpointWeight);
     return '<section class="card"><div class="card-head"><div><p class="eyebrow">December 31 goal</p><h2>Lean and visibly defined</h2><p>Progress from ' + esc(formatDate(state.data.profile.startDate, { month: "short", day: "numeric" })) + ' through today. Planned totals grow as workout days arrive.</p></div></div>' +
       metric("Weight checkpoint", weightProgress, latest.toFixed(1) + " / " + state.data.targets.checkpointWeight + " lb") +
@@ -1365,7 +1439,8 @@
   function renderPlan() {
     var html = header("The Plan", "September 10 to December 31");
     html += '<section class="card"><div class="notice">Four strength days, two cardio days, and one active recovery day. Progress reps before load; clean form and repeatability matter more than adding exercises.</div></section>';
-    html += '<section class="card"><details class="form-guide"><summary>Why this week’s progression supports fat loss</summary><p>Your logged cardio effort was about 5–5.5/10 Wednesday and 4–4.5/10 Saturday. Try the increased work blocks at about 6/10, with a smooth walk and no leaning on the rails. The 65-minute duration stays the same.</p><p>At about 153 lb, the proposed full-session changes add roughly 20 calories Wednesday and 40 Saturday in a walking-equation estimate. These are estimates from the prescribed settings, not measured burn or a promise of weight loss. Keep the 1,850-calorie anchor; do not eat back treadmill calories.</p><p>Research across 116 trials links greater weekly moderate-to-vigorous aerobic duration with lower weight, waist, and body fat. It does not establish that a specific higher incline guarantees better fat loss. Strength training during dietary weight loss helps preserve lean tissue. We will judge this plan using actual effort, recovery, weight averages, waist, and standardized photos.</p><p><a href="https://jamanetwork.com/journals/jamanetworkopen/fullarticle/2828487" target="_blank" rel="noopener noreferrer">Cardio and fat-loss research ↗</a> · <a href="https://eprints.gla.ac.uk/361857/2/361857.pdf" target="_blank" rel="noopener noreferrer">Strength and muscle-preservation research ↗</a></p></details></section>';
+    if (TODAY >= WEEK_SIX_START) html += renderWeekSixGuidance();
+    else html += '<section class="card"><details class="form-guide"><summary>Why this week’s progression supports fat loss</summary><p>Your logged cardio effort was about 5–5.5/10 Wednesday and 4–4.5/10 Saturday. Try the increased work blocks at about 6/10, with a smooth walk and no leaning on the rails. The 65-minute duration stays the same.</p><p>At about 153 lb, the proposed full-session changes add roughly 20 calories Wednesday and 40 Saturday in a walking-equation estimate. These are estimates from the prescribed settings, not measured burn or a promise of weight loss. Keep the 1,850-calorie anchor; do not eat back treadmill calories.</p><p>Research across 116 trials links greater weekly moderate-to-vigorous aerobic duration with lower weight, waist, and body fat. It does not establish that a specific higher incline guarantees better fat loss. Strength training during dietary weight loss helps preserve lean tissue. We will judge this plan using actual effort, recovery, weight averages, waist, and standardized photos.</p><p><a href="https://jamanetwork.com/journals/jamanetworkopen/fullarticle/2828487" target="_blank" rel="noopener noreferrer">Cardio and fat-loss research ↗</a> · <a href="https://eprints.gla.ac.uk/361857/2/361857.pdf" target="_blank" rel="noopener noreferrer">Strength and muscle-preservation research ↗</a></p></details></section>';
     DAYS.forEach(function (key) {
       var plan = planForDate(addDays(startOfWeek(TODAY), DAYS.indexOf(key)));
       html += '<section class="card"><div class="card-head"><div><p class="eyebrow">' + DAY_NAMES[DAYS.indexOf(key)] + ' · ' + plan.type + '</p><h2>' + esc(plan.title) + '</h2><p>' + esc(plan.subtitle) + '</p></div></div>';
@@ -1387,9 +1462,13 @@
     return html;
   }
 
+  function renderWeekSixGuidance() {
+    return '<section class="card"><details class="form-guide"><summary>This week’s focus · food, recovery and progression</summary><p>Aim near the existing 1,850-calorie anchor within the 1,750–1,950 zone, with at least 135 g protein. Plan protein into regular meals; three meals around 40 g plus a 15–25 g protein snack is one way to reach the minimum. Keep lobby-machine coffee explicitly estimated and do not subtract treadmill calories.</p><p><strong>Verified shake:</strong> one 32 g scoop of your whey powder provides 120 calories and 24 g protein. Your saved 1.5-scoop portion provides 180 calories and 36 g protein. Use the corrected favorites for new logs.</p><p>Give bedtime 30 minutes more room where feasible, working toward seven or more hours. Record two consistent morning waist readings when ready. Tuesday’s missed session needs no catch-up workout.</p><p>Bench and row use a 26 lb trial with fewer reps and a 23 lb fallback. Shoulder press builds reps at 17 lb. Cardio already reached about 5.5–6/10; Wednesday holds, and Saturday’s +0.1 mph work-block option depends on the midweek review and recovery.</p><p>Strength training during dietary weight loss supports lean-tissue preservation. Research supports regular aerobic activity, but does not establish that continually raising intensity guarantees better fat loss. Judge the plan using weight averages, waist, photos and recovery.</p><p><a href="https://jamanetwork.com/journals/jamanetworkopen/fullarticle/2828487" target="_blank" rel="noopener noreferrer">Cardio research ↗</a> · <a href="https://bmjopensem.bmj.com/content/11/3/e002363" target="_blank" rel="noopener noreferrer">Strength research ↗</a> · <a href="https://jamanetwork.com/journals/jamainternalmedicine/fullarticle/2788694" target="_blank" rel="noopener noreferrer">Sleep research ↗</a></p></details></section>';
+  }
+
   function renderCheckin() {
     var range = selectedCheckinRange(), summary = buildCheckin(range.start, range.end, range.inProgress), checkin = readWeeklyCheckin(range.start);
-    return header("Check-Ins", "Wednesday review · Sunday full review") + renderMidweekCard() +
+    return header("Check-Ins", "Wednesday review · Sunday full review") + renderMidweekCard() + (TODAY >= WEEK_SIX_START ? renderWeekSixGuidance() : "") +
       '<section class="card goals-card"><div class="card-head"><div><h2>Nutrition goals</h2><p>Targets stay steady this week—improve consistency before lowering calories.</p></div></div><div class="grid two"><label class="field">Daily calories<input id="calorie-target" type="number" inputmode="numeric" min="1200" max="4000" step="25" value="' + esc(state.data.targets.calories) + '"></label><label class="field">Daily protein, g<input id="protein-target" type="number" inputmode="numeric" min="50" max="300" step="5" value="' + esc(state.data.targets.protein) + '"></label></div><p class="notification-status">Calorie zone: ' + esc(state.data.targets.calorieMin) + '–' + esc(state.data.targets.calorieMax) + ' · Aim near ' + esc((number(state.data.targets.calories) * 7).toLocaleString()) + ' calories for the full week · Protein zone: ' + esc(state.data.targets.proteinMin) + '–' + esc(state.data.targets.proteinMax) + ' g · Do not subtract treadmill calories.</p></section>' +
       '<section class="card"><label class="field">Week<select id="checkin-week">' + renderCheckinWeekOptions(range.start) + '</select></label><div class="card-head"><div><h2>Weekly recovery</h2><p>' + esc(formatDate(range.start, { month: "short", day: "numeric" })) + ' to ' + esc(formatDate(range.end, { month: "short", day: "numeric" })) + (range.inProgress ? ' · In progress' : '') + '</p></div></div><div class="notice">Complete all four recovery fields before exporting so next week can be adjusted safely.</div><div class="grid two"><label class="field">Hunger, 1–10<input data-weekly-checkin="hunger" type="number" min="1" max="10" value="' + esc(checkin.hunger || "") + '"></label><label class="field">Energy, 1–10<input data-weekly-checkin="energy" type="number" min="1" max="10" value="' + esc(checkin.energy || "") + '"></label><label class="field">Average sleep, hours<input data-weekly-checkin="sleep" type="number" min="0" max="14" step="0.25" value="' + esc(checkin.sleep || "") + '"></label><label class="field">Soreness, 1–10<input data-weekly-checkin="soreness" type="number" min="1" max="10" value="' + esc(checkin.soreness || "") + '"></label></div><label class="field">Recovery notes<textarea data-weekly-checkin="recoveryNotes" placeholder="Include leg soreness before Tuesday and Friday, plus any back tightness">' + esc(checkin.recoveryNotes || "") + '</textarea></label></section>' +
       '<section class="card"><div class="card-head"><div><h2>Export selected week</h2><p>' + (range.inProgress ? 'Includes Sunday through today. Future days are left out.' : 'Includes the full Sunday–Saturday week.') + '</p></div></div>' +
@@ -1515,10 +1594,11 @@
         if (!log || (!log.done && !log.load && !log.reps)) return;
         exerciseLines.push("  " + (log.done ? "✓ " : "• ") + exercise.name + (log.load ? " | " + log.load : "") + (log.reps ? " | " + log.reps : ""));
       });
-      if (exerciseLines.length || (day.workout && day.workout.rating)) {
+      if (exerciseLines.length || (day.workout && day.workout.rating) || plan.type === "Cardio" && day.cardio && day.cardio.mode) {
         var cardioResult = day.cardio && day.cardio.result;
         var resultLine = cardioResult ? "\n  Treadmill result: " + [cardioResult.durationMinutes != null ? cardioResult.durationMinutes + " min" : "", cardioResult.distanceMiles != null ? cardioResult.distanceMiles + " mi" : "", cardioResult.calories != null ? cardioResult.calories + " screen cal" : "", cardioResult.averageSpeedMph != null ? cardioResult.averageSpeedMph + " mph avg" : ""].filter(Boolean).join(" · ") : "";
-        training.push(formatDate(iso, { weekday: "short", month: "short", day: "numeric" }) + " · " + plan.title + (day.workout.rating ? " · " + day.workout.rating : "") + "\n" + exerciseLines.join("\n") + resultLine);
+        var cardioChoiceLine = plan.speedTrialAvailable && day.cardio && (day.cardio.mode || day.cardio.workSpeedTrial) ? "\n  Cardio plan selected: " + (day.cardio.mode === "express" ? "Express · full-session speed option not used" : day.cardio.workSpeedTrial ? "Full · optional +0.1 mph during minutes 15–45; incline unchanged" : "Full · standard work-block speeds") : "";
+        training.push(formatDate(iso, { weekday: "short", month: "short", day: "numeric" }) + " · " + plan.title + (day.workout.rating ? " · " + day.workout.rating : "") + "\n" + exerciseLines.join("\n") + resultLine + cardioChoiceLine);
       }
     }
     var checkin = midweek ? readMidweekCheckin(startIso) : readWeeklyCheckin(startIso);
@@ -1772,6 +1852,14 @@
     var cancelCardioCountdown = document.getElementById("cancel-cardio-countdown");
     if (cancelCardioCountdown) cancelCardioCountdown.addEventListener("click", cancelCardioSession);
     document.querySelectorAll("[data-cardio-mode]").forEach(function (button) { button.addEventListener("click", function () { state.cardioMode = button.dataset.cardioMode; render(); }); });
+    var speedTrial = document.getElementById("cardio-speed-trial");
+    if (speedTrial) speedTrial.addEventListener("change", function () {
+      var plan = planForDate(state.selectedDate), day = state.data.days[state.selectedDate];
+      if (!plan.speedTrialAvailable || state.cardioMode === "express" || day && day.cardio && (day.cardio.status === "active" || day.cardio.status === "complete") || state.cardioCountdown && state.cardioCountdown.date === state.selectedDate) { render(); return; }
+      day = getDay(state.selectedDate);
+      day.cardio.workSpeedTrial = speedTrial.checked;
+      queueSave(true);
+    });
     document.querySelectorAll("[data-cardio-result]").forEach(function (input) { input.addEventListener("change", function () { var day = getDay(state.selectedDate); day.cardio.result = day.cardio.result || {}; day.cardio.result[input.dataset.cardioResult] = optionalNumber(input.value); queueSave(false); }); });
   }
 
@@ -2653,7 +2741,7 @@
       var response = await apiFetch("/notifications/cardio/start", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date: state.selectedDate, title: plan.title, durationMinutes: duration, countdownSeconds: 5, alerts: alerts, startAlert: startAlert }) });
       var result = await response.json();
       var day = getDay(state.selectedDate);
-      day.cardio = { sessionId: result.id, startedAt: result.startedAt, status: "active", durationMinutes: duration, completedAt: "", result: day.cardio && day.cardio.result || null };
+      day.cardio = { sessionId: result.id, startedAt: result.startedAt, status: "active", durationMinutes: duration, completedAt: "", result: day.cardio && day.cardio.result || null, workSpeedTrial: Boolean(day.cardio && day.cardio.workSpeedTrial), mode: state.cardioMode };
       state.cardioCountdown = { date: state.selectedDate, startedAt: result.startedAt, first: first, remaining: number(result.countdownSeconds) || 5, go: false };
       startCardioStatusPolling();
       queueSave(true);
@@ -2707,7 +2795,7 @@
     var day = getDay(state.selectedDate);
     try { if (day.cardio && day.cardio.sessionId) await apiFetch("/notifications/cardio/" + encodeURIComponent(day.cardio.sessionId), { method: "DELETE" }); } catch (ignore) {}
     clearCardioCountdown();
-    day.cardio = { sessionId: "", startedAt: "", status: "cancelled", durationMinutes: 0, completedAt: "", result: day.cardio && day.cardio.result || null };
+    day.cardio = { sessionId: "", startedAt: "", status: "cancelled", durationMinutes: 0, completedAt: "", result: day.cardio && day.cardio.result || null, workSpeedTrial: Boolean(day.cardio && day.cardio.workSpeedTrial), mode: day.cardio && day.cardio.mode || state.cardioMode };
     queueSave(true);
   }
 
@@ -2871,7 +2959,7 @@
     while (data.preferences.reminders.proteinTimes.length < 2) data.preferences.reminders.proteinTimes.push(defaultData().preferences.reminders.proteinTimes[data.preferences.reminders.proteinTimes.length]);
     while (data.preferences.reminders.calorieTimes.length < 3) data.preferences.reminders.calorieTimes.push(defaultData().preferences.reminders.calorieTimes[data.preferences.reminders.calorieTimes.length]);
     delete data.reward;
-    data.meta = Object.assign({}, data.meta || {}, { planVersion: "workout-2.12-2026-10-11" });
+    data.meta = Object.assign({}, data.meta || {}, { planVersion: "workout-2.13-2026-10-18" });
     Object.keys(data.days || {}).forEach(function (iso) {
       var day = data.days[iso];
       day.waist = Object.assign({ first: "", second: "" }, day.waist || {});

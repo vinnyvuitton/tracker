@@ -39,6 +39,8 @@ h3 { font-size: 14px; margin: 0; }
 .waist-history li, .checkpoint-list li { display: grid; gap: 5px; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .waist-history li:last-child, .checkpoint-list li:last-child { border-bottom: 0; }
 .waist-history span, .checkpoint-list span { color: var(--muted); font-size: 13px; line-height: 1.5; }
+.cardio-speed-option .check-row { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; line-height: 1.5; }
+.cardio-speed-option input[type="checkbox"] { flex: 0 0 20px; width: 20px; height: 20px; margin-top: 1px; padding: 0; }
 .midweek-card .form-guide { margin-bottom: 16px; }
 .midweek-card .form-guide .grid { margin-top: 14px; }
 p { color: var(--muted); line-height: 1.45; }

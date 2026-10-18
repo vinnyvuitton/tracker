@@ -99,6 +99,14 @@ This is the protected replacement for the original tracker. The original live da
 - Progressed incline by one level in the middle working intervals of each full cardio session while keeping speed and the 65-minute duration.
 - Preserved the prior week's exact prescriptions and labeled prior calf-raise history with the dumbbell count used on that date.
 
+## Workout 2.13 October 18 review
+
+- Dates the reviewed plan from October 18 onward, preserving earlier prescriptions and last-week summaries. Monday bench and one-arm row trial 26 lb for 8–10 reps with a 23 lb fallback; shoulder press holds 17 lb and builds toward 10–12 reps. Holds the other reviewed loads and keeps three Bulgarian split-squat sets and stable hip-thrust guidance.
+- Refreshes each movement’s coaching from the completed review. The skipped Tuesday prescriptions carry forward; the incomplete Thursday triceps record is described accurately.
+- Holds Wednesday cardio and Saturday’s default plan. Adds a persisted, optional Saturday +0.1 mph choice for the middle 30 minutes after the midweek review. Full-session cues and queued push payloads use the selected option; express cardio, incline and duration are retained. The choice locks during an active/completed session and is included in check-in exports.
+- Shows the 150 lb weekly-average milestone and updated October 21/25 and November checkpoints. Retains the original longer-term saved goal in a collapsed explanation. Updates food, verified shake-label and recovery guidance without rewriting historical meals.
+- Keeps the existing reminder service and cardio timing diagnostics. Private saved data, photo originals, review artifacts, maintenance backups and local previews are excluded from the public deployment checkout.
+
 ## Data safety
 
 The access code is never committed to source control. It is stored as a Cloudflare Worker secret and entered once on each device. The browser keeps it locally on that device.
