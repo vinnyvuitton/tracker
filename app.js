@@ -20,6 +20,7 @@
   var WEEK_FOUR_START = "2026-10-04";
   var WEEK_FIVE_START = "2026-10-11";
   var WEEK_SIX_START = "2026-10-18";
+  var SHORT_CARDIO_TRIAL_DATE = "2026-10-24";
   var EFFORT_OPTIONS = [
     { value: "much-too-easy", label: "Much too easy" },
     { value: "slightly-easy", label: "Slightly easy" },
@@ -560,7 +561,7 @@
       },
       weeklyCheckins: {},
       midweekCheckins: {},
-      meta: { planVersion: "workout-2.13-2026-10-18", createdAt: new Date().toISOString() }
+      meta: { planVersion: "workout-2.14-2026-10-22", createdAt: new Date().toISOString() }
     };
   }
 
@@ -827,13 +828,21 @@
         var workStart = key === "Wed" ? 20 : 15, workEnd = key === "Wed" ? 50 : 45;
         var heldCardio = weekFiveCardio(weekFourCardio(weekThreeCardio(key === "Wed" ? cardioOneProgressed() : cardioTwoProgressed(), workStart, workEnd, 6), workStart, workEnd), workStart, workEnd, key === "Wed" ? 1 : 2);
         var savedDay = state.data.days && state.data.days[iso];
-        var speedTrial = key === "Sat" && Boolean(savedDay && savedDay.cardio && savedDay.cardio.workSpeedTrial);
+        var savedCardio = savedDay && savedDay.cardio;
+        var legacySession = savedCardio && (savedCardio.status === "active" || savedCardio.status === "complete") && typeof savedCardio.shortSpeedInclineTrial !== "boolean";
+        var shortTrialAvailable = iso === SHORT_CARDIO_TRIAL_DATE && !legacySession;
+        var shortTrial = shortTrialAvailable && (savedCardio && typeof savedCardio.shortSpeedInclineTrial === "boolean" ? savedCardio.shortSpeedInclineTrial : !(savedCardio && (savedCardio.status === "active" || savedCardio.status === "complete")));
+        var speedTrial = key === "Sat" && !shortTrialAvailable && Boolean(savedCardio && savedCardio.workSpeedTrial);
+        var reviewedCardio = shortTrial ? heldCardio.map(function (segment) {
+          return segment.start === 25 && segment.end === 30 ? Object.assign({}, segment, { speed: 3.5, incline: 8, cue: "Five-minute trial: keep a smooth walk at about 6/10 effort. At minute 30 return to the standard block. This tests comfort and effort, not extra fat burn." }) : segment;
+        }) : speedTrial ? weekFiveCardio(heldCardio, 15, 45, 0) : heldCardio;
         return Object.assign({}, plan, {
           subtitle: "60 minutes programmed work · 5-minute automatic cooldown · target about 6/10",
-          speedTrialAvailable: key === "Sat", speedTrialEnabled: speedTrial,
-          cardioSegments: speedTrial ? weekFiveCardio(heldCardio, 15, 45, 0) : heldCardio,
+          speedTrialAvailable: key === "Sat" && !shortTrialAvailable, speedTrialEnabled: speedTrial,
+          shortTrialAvailable: shortTrialAvailable, shortTrialEnabled: shortTrial,
+          cardioSegments: reviewedCardio,
           sections: [{ label: "Treadmill", exercises: [Object.assign({}, plan.sections[0].exercises[0], {
-            coachingNote: key === "Wed" ? "Hold the current 65-minute plan after last week's 5.5–6/10 session. Middle blocks peak at 3.2 mph and incline setting 9. Keep a smooth walk, stay off the rails and log actual effort for Wednesday's review." : "Last week felt 5.5–6/10. Keep the current plan if already at about 6/10. After Wednesday's review, the optional +0.1 mph work-block trial peaks at 3.4 mph; incline, warmup and cooldown stay the same. Reduce speed if your walking form changes."
+            coachingNote: shortTrialAvailable ? "The October 21 review recommends changing only minutes 25–30 from 3.3 mph / setting 9 to 3.5 mph / setting 8. Resume the standard 3.3 / 9 block at minute 30 and keep all other work steady. Aim for about 6/10 with a smooth walking stride. This tests a different stride at similar intended effort; it does not promise extra fat loss. Use the standard option if readiness is poor." : key === "Wed" ? "Hold the current 65-minute plan after last week's 5.5–6/10 session. Middle blocks peak at 3.2 mph and incline setting 9. Keep a smooth walk, stay off the rails and log actual effort for Wednesday's review." : "Last week felt 5.5–6/10. Keep the current plan if already at about 6/10. After Wednesday's review, the optional +0.1 mph work-block trial peaks at 3.4 mph; incline, warmup and cooldown stay the same. Reduce speed if your walking form changes."
           })] }]
         });
       }
@@ -1146,6 +1155,10 @@
     var fullDuration = plan.cardioSegments && plan.cardioSegments.length ? plan.cardioSegments[plan.cardioSegments.length - 1].end : duration;
     var expressDuration = plan.expressSegments && plan.expressSegments.length ? plan.expressSegments[plan.expressSegments.length - 1].end : 0;
     var html = plan.expressSegments ? '<div class="cardio-mode"><button type="button" data-cardio-mode="full" class="' + (state.cardioMode === "full" ? "active" : "") + '">Full · ' + fullDuration + ' min</button><button type="button" data-cardio-mode="express" class="' + (state.cardioMode === "express" ? "active" : "") + '">Express · ' + expressDuration + ' min</button></div>' : '';
+    if (plan.shortTrialAvailable && state.cardioMode !== "express") {
+      var shortTrialLocked = active || complete || Boolean(state.cardioCountdown && state.cardioCountdown.date === state.selectedDate);
+      html += '<details class="form-guide cardio-speed-option"><summary>Saturday five-minute trial · ' + (plan.shortTrialEnabled ? 'recommended plan' : 'standard plan') + '</summary><p>October 21 review: try 3.5 mph at incline setting 8 only during minutes 25–30, then return to 3.3 mph at setting 9. All other blocks and the 65-minute duration stay steady. Aim for about 6/10 effort with a smooth walk; reduce settings if form changes. Before starting, uncheck to use the standard plan if readiness is poor. Your interval alerts will match the choice.</p><label class="check-row"><input id="cardio-short-trial" type="checkbox" ' + (plan.shortTrialEnabled ? 'checked ' : '') + (shortTrialLocked ? 'disabled ' : '') + '> Use the five-minute trial · October 24 only</label></details>';
+    }
     if (plan.speedTrialAvailable && state.cardioMode !== "express") {
       var trialLocked = active || complete || Boolean(state.cardioCountdown && state.cardioCountdown.date === state.selectedDate);
       html += '<details class="form-guide cardio-speed-option"><summary>Saturday speed option · ' + (plan.speedTrialEnabled ? '+0.1 mph selected' : 'standard plan') + '</summary><p>Use the extra speed only after Wednesday’s review, with acceptable recovery and work blocks still below about 6/10 without holding the rails. Incline and the 65-minute duration stay the same. Choose before starting; your interval alerts will match.</p><label class="check-row"><input id="cardio-speed-trial" type="checkbox" ' + (plan.speedTrialEnabled ? 'checked ' : '') + (trialLocked ? 'disabled ' : '') + '> Add 0.1 mph during minutes 15–45</label></details>';
@@ -1463,7 +1476,7 @@
   }
 
   function renderWeekSixGuidance() {
-    return '<section class="card"><details class="form-guide"><summary>This week’s focus · food, recovery and progression</summary><p>Aim near the existing 1,850-calorie anchor within the 1,750–1,950 zone, with at least 135 g protein. Plan protein into regular meals; three meals around 40 g plus a 15–25 g protein snack is one way to reach the minimum. Keep lobby-machine coffee explicitly estimated and do not subtract treadmill calories.</p><p><strong>Verified shake:</strong> one 32 g scoop of your whey powder provides 120 calories and 24 g protein. Your saved 1.5-scoop portion provides 180 calories and 36 g protein. Use the corrected favorites for new logs.</p><p>Give bedtime 30 minutes more room where feasible, working toward seven or more hours. Record two consistent morning waist readings when ready. Tuesday’s missed session needs no catch-up workout.</p><p>Bench and row use a 26 lb trial with fewer reps and a 23 lb fallback. Shoulder press builds reps at 17 lb. Cardio already reached about 5.5–6/10; Wednesday holds, and Saturday’s +0.1 mph work-block option depends on the midweek review and recovery.</p><p>Strength training during dietary weight loss supports lean-tissue preservation. Research supports regular aerobic activity, but does not establish that continually raising intensity guarantees better fat loss. Judge the plan using weight averages, waist, photos and recovery.</p><p><a href="https://jamanetwork.com/journals/jamanetworkopen/fullarticle/2828487" target="_blank" rel="noopener noreferrer">Cardio research ↗</a> · <a href="https://bmjopensem.bmj.com/content/11/3/e002363" target="_blank" rel="noopener noreferrer">Strength research ↗</a> · <a href="https://jamanetwork.com/journals/jamainternalmedicine/fullarticle/2788694" target="_blank" rel="noopener noreferrer">Sleep research ↗</a></p></details></section>';
+    return '<section class="card"><details class="form-guide"><summary>This week’s focus · food, recovery and progression</summary><p>Aim near the existing 1,850-calorie anchor within the 1,750–1,950 zone, with at least 135 g protein. Plan protein into regular meals; three meals around 40 g plus a 15–25 g protein snack is one way to reach the minimum. Keep lobby-machine coffee explicitly estimated and do not subtract treadmill calories.</p><p><strong>Verified shake:</strong> one 32 g scoop of your whey powder provides 120 calories and 24 g protein. Your saved 1.5-scoop portion provides 180 calories and 36 g protein. Use the corrected favorites for new logs.</p><p>Give bedtime 30 minutes more room where feasible, working toward seven or more hours. Record two consistent morning waist readings when ready. Tuesday’s missed session needs no catch-up workout.</p><p>Bench and row use a 26 lb trial with fewer reps and a 23 lb fallback. Shoulder press builds reps at 17 lb. For October 24, the recommended full-session trial changes only minutes 25–30 to 3.5 mph at incline setting 8, then returns to the standard plan. Keep all other work steady while prioritizing food consistency and sleep. Use the standard fallback before starting if readiness is poor. The express plan stays the same.</p><p>Strength training during dietary weight loss supports lean-tissue preservation. Research supports regular aerobic activity, but does not establish that continually raising intensity guarantees better fat loss. Judge the plan using weight averages, waist, photos and recovery.</p><p><a href="https://jamanetwork.com/journals/jamanetworkopen/fullarticle/2828487" target="_blank" rel="noopener noreferrer">Cardio research ↗</a> · <a href="https://bmjopensem.bmj.com/content/11/3/e002363" target="_blank" rel="noopener noreferrer">Strength research ↗</a> · <a href="https://jamanetwork.com/journals/jamainternalmedicine/fullarticle/2788694" target="_blank" rel="noopener noreferrer">Sleep research ↗</a></p></details></section>';
   }
 
   function renderCheckin() {
@@ -1597,7 +1610,7 @@
       if (exerciseLines.length || (day.workout && day.workout.rating) || plan.type === "Cardio" && day.cardio && day.cardio.mode) {
         var cardioResult = day.cardio && day.cardio.result;
         var resultLine = cardioResult ? "\n  Treadmill result: " + [cardioResult.durationMinutes != null ? cardioResult.durationMinutes + " min" : "", cardioResult.distanceMiles != null ? cardioResult.distanceMiles + " mi" : "", cardioResult.calories != null ? cardioResult.calories + " screen cal" : "", cardioResult.averageSpeedMph != null ? cardioResult.averageSpeedMph + " mph avg" : ""].filter(Boolean).join(" · ") : "";
-        var cardioChoiceLine = plan.speedTrialAvailable && day.cardio && (day.cardio.mode || day.cardio.workSpeedTrial) ? "\n  Cardio plan selected: " + (day.cardio.mode === "express" ? "Express · full-session speed option not used" : day.cardio.workSpeedTrial ? "Full · optional +0.1 mph during minutes 15–45; incline unchanged" : "Full · standard work-block speeds") : "";
+        var cardioChoiceLine = (plan.speedTrialAvailable || plan.shortTrialAvailable) && day.cardio && (day.cardio.mode || day.cardio.workSpeedTrial || typeof day.cardio.shortSpeedInclineTrial === "boolean") ? "\n  Cardio plan selected: " + (day.cardio.mode === "express" ? plan.shortTrialAvailable ? "Express · five-minute trial not used" : "Express · full-session speed option not used" : plan.shortTrialAvailable ? day.cardio.shortSpeedInclineTrial ? "Full · five-minute trial at minutes 25–30: 3.5 mph / incline setting 8; other blocks standard" : "Full · standard work-block speeds" : day.cardio.workSpeedTrial ? "Full · optional +0.1 mph during minutes 15–45; incline unchanged" : "Full · standard work-block speeds") : "";
         training.push(formatDate(iso, { weekday: "short", month: "short", day: "numeric" }) + " · " + plan.title + (day.workout.rating ? " · " + day.workout.rating : "") + "\n" + exerciseLines.join("\n") + resultLine + cardioChoiceLine);
       }
     }
@@ -1858,6 +1871,15 @@
       if (!plan.speedTrialAvailable || state.cardioMode === "express" || day && day.cardio && (day.cardio.status === "active" || day.cardio.status === "complete") || state.cardioCountdown && state.cardioCountdown.date === state.selectedDate) { render(); return; }
       day = getDay(state.selectedDate);
       day.cardio.workSpeedTrial = speedTrial.checked;
+      queueSave(true);
+    });
+    var shortTrial = document.getElementById("cardio-short-trial");
+    if (shortTrial) shortTrial.addEventListener("change", function () {
+      var plan = planForDate(state.selectedDate), day = state.data.days[state.selectedDate];
+      if (!plan.shortTrialAvailable || state.cardioMode === "express" || day && day.cardio && (day.cardio.status === "active" || day.cardio.status === "complete") || state.cardioCountdown && state.cardioCountdown.date === state.selectedDate) { render(); return; }
+      day = getDay(state.selectedDate);
+      day.cardio.shortSpeedInclineTrial = shortTrial.checked;
+      day.cardio.workSpeedTrial = false;
       queueSave(true);
     });
     document.querySelectorAll("[data-cardio-result]").forEach(function (input) { input.addEventListener("change", function () { var day = getDay(state.selectedDate); day.cardio.result = day.cardio.result || {}; day.cardio.result[input.dataset.cardioResult] = optionalNumber(input.value); queueSave(false); }); });
@@ -2741,7 +2763,7 @@
       var response = await apiFetch("/notifications/cardio/start", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date: state.selectedDate, title: plan.title, durationMinutes: duration, countdownSeconds: 5, alerts: alerts, startAlert: startAlert }) });
       var result = await response.json();
       var day = getDay(state.selectedDate);
-      day.cardio = { sessionId: result.id, startedAt: result.startedAt, status: "active", durationMinutes: duration, completedAt: "", result: day.cardio && day.cardio.result || null, workSpeedTrial: Boolean(day.cardio && day.cardio.workSpeedTrial), mode: state.cardioMode };
+      day.cardio = { sessionId: result.id, startedAt: result.startedAt, status: "active", durationMinutes: duration, completedAt: "", result: day.cardio && day.cardio.result || null, workSpeedTrial: Boolean(plan.speedTrialAvailable && day.cardio && day.cardio.workSpeedTrial), shortSpeedInclineTrial: Boolean(plan.shortTrialAvailable && plan.shortTrialEnabled && state.cardioMode !== "express"), mode: state.cardioMode };
       state.cardioCountdown = { date: state.selectedDate, startedAt: result.startedAt, first: first, remaining: number(result.countdownSeconds) || 5, go: false };
       startCardioStatusPolling();
       queueSave(true);
@@ -2795,7 +2817,7 @@
     var day = getDay(state.selectedDate);
     try { if (day.cardio && day.cardio.sessionId) await apiFetch("/notifications/cardio/" + encodeURIComponent(day.cardio.sessionId), { method: "DELETE" }); } catch (ignore) {}
     clearCardioCountdown();
-    day.cardio = { sessionId: "", startedAt: "", status: "cancelled", durationMinutes: 0, completedAt: "", result: day.cardio && day.cardio.result || null, workSpeedTrial: Boolean(day.cardio && day.cardio.workSpeedTrial), mode: day.cardio && day.cardio.mode || state.cardioMode };
+    day.cardio = { sessionId: "", startedAt: "", status: "cancelled", durationMinutes: 0, completedAt: "", result: day.cardio && day.cardio.result || null, workSpeedTrial: Boolean(day.cardio && day.cardio.workSpeedTrial), shortSpeedInclineTrial: Boolean(day.cardio && day.cardio.shortSpeedInclineTrial), mode: day.cardio && day.cardio.mode || state.cardioMode };
     queueSave(true);
   }
 
@@ -2959,7 +2981,7 @@
     while (data.preferences.reminders.proteinTimes.length < 2) data.preferences.reminders.proteinTimes.push(defaultData().preferences.reminders.proteinTimes[data.preferences.reminders.proteinTimes.length]);
     while (data.preferences.reminders.calorieTimes.length < 3) data.preferences.reminders.calorieTimes.push(defaultData().preferences.reminders.calorieTimes[data.preferences.reminders.calorieTimes.length]);
     delete data.reward;
-    data.meta = Object.assign({}, data.meta || {}, { planVersion: "workout-2.13-2026-10-18" });
+    data.meta = Object.assign({}, data.meta || {}, { planVersion: "workout-2.14-2026-10-22" });
     Object.keys(data.days || {}).forEach(function (iso) {
       var day = data.days[iso];
       day.waist = Object.assign({ first: "", second: "" }, day.waist || {});

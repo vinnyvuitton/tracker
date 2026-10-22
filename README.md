@@ -99,6 +99,15 @@ This is the protected replacement for the original tracker. The original live da
 - Progressed incline by one level in the middle working intervals of each full cardio session while keeping speed and the 65-minute duration.
 - Preserved the prior week's exact prescriptions and labeled prior calf-raise history with the dumbbell count used on that date.
 
+## Workout 2.12 October 11 review
+
+- Progresses Monday bench, row, and shoulder press; Tuesday goblet squat and calf raise. Reverse lunges use two 8 lb dumbbells (16 lb total), with a supported one-13 fallback. Holds technique-sensitive and already challenging movements, including the 21 lb RDL and hip thrust and three Bulgarian split-squat sets.
+- Full cardio working blocks add 0.1 mph plus one incline setting Wednesday and two Saturday. Every five-minute boundary, the warmup/tail, and the automatic cooldown are retained. Express cardio remains the existing shorter option.
+- Adds optional waist readings to Morning check, averaging two readings; dated history, a graph, and exports preserve both raw readings. Missing readings stay missing.
+- Adds Wednesday recovery fields saved separately from Sunday, a one-tap partial-week export, matching-weekday weight comparisons, and a Chicago-time Wednesday phone reminder respecting quiet hours, pause, toggle, and duplicate suppression.
+- Retains nonstandard weights in the daily log and excludes them from morning trends. October 7 is initially marked from its explicit saved note; its raw weight remains unchanged. Protein values above the reference zone count toward the minimum. The weekly calorie anchor correctly follows the daily target (1,850 × 7 = 12,950).
+- Cardio push timing collection and retention continue unchanged. Private photos, raw snapshots, local preview output, and personal reports must stay outside the public deployment repository.
+
 ## Workout 2.13 October 18 review
 
 - Dates the reviewed plan from October 18 onward, preserving earlier prescriptions and last-week summaries. Monday bench and one-arm row trial 26 lb for 8–10 reps with a 23 lb fallback; shoulder press holds 17 lb and builds toward 10–12 reps. Holds the other reviewed loads and keeps three Bulgarian split-squat sets and stable hip-thrust guidance.
@@ -106,6 +115,12 @@ This is the protected replacement for the original tracker. The original live da
 - Holds Wednesday cardio and Saturday’s default plan. Adds a persisted, optional Saturday +0.1 mph choice for the middle 30 minutes after the midweek review. Full-session cues and queued push payloads use the selected option; express cardio, incline and duration are retained. The choice locks during an active/completed session and is included in check-in exports.
 - Shows the 150 lb weekly-average milestone and updated October 21/25 and November checkpoints. Retains the original longer-term saved goal in a collapsed explanation. Updates food, verified shake-label and recovery guidance without rewriting historical meals.
 - Keeps the existing reminder service and cardio timing diagnostics. Private saved data, photo originals, review artifacts, maintenance backups and local previews are excluded from the public deployment checkout.
+
+## Workout 2.14 October 22 midweek update
+
+- Recommends a five-minute trial only on October 24: minutes 25–30 use 3.5 mph at incline setting 8, then return to the standard 3.3 mph / setting 9 block at minute 30. Other intervals, warmup, cooldown, duration and the express plan are retained.
+- Includes a persisted standard-plan fallback before starting. The trial cannot stack with the separate speed-only option, locks during active/completed sessions, and is reflected in both interval notifications and check-in exports. Older completed sessions keep their recorded option.
+- Retains strength targets, saved nutrition targets, prior workout history and cardio delivery diagnostics. Recovery answers and private reviews remain outside this public repository.
 
 ## Data safety
 
@@ -128,12 +143,3 @@ The Worker retains 30 rotating daily tracker snapshots in KV. The Check-in scree
 7. Download a fresh backup.
 
 Do not replace the live frontend before the protected Worker is deployed. The new frontend intentionally requires the protected API.
-
-## Workout 2.12 October 11 review
-
-- Progresses Monday bench, row, and shoulder press; Tuesday goblet squat and calf raise. Reverse lunges use two 8 lb dumbbells (16 lb total), with a supported one-13 fallback. Holds technique-sensitive and already challenging movements, including the 21 lb RDL and hip thrust and three Bulgarian split-squat sets.
-- Full cardio working blocks add 0.1 mph plus one incline setting Wednesday and two Saturday. Every five-minute boundary, the warmup/tail, and the automatic cooldown are retained. Express cardio remains the existing shorter option.
-- Adds optional waist readings to Morning check, averaging two readings; dated history, a graph, and exports preserve both raw readings. Missing readings stay missing.
-- Adds Wednesday recovery fields saved separately from Sunday, a one-tap partial-week export, matching-weekday weight comparisons, and a Chicago-time Wednesday phone reminder respecting quiet hours, pause, toggle, and duplicate suppression.
-- Retains nonstandard weights in the daily log and excludes them from morning trends. October 7 is initially marked from its explicit saved note; its raw weight remains unchanged. Protein values above the reference zone count toward the minimum. The weekly calorie anchor correctly follows the daily target (1,850 × 7 = 12,950).
-- Cardio push timing collection and retention continue unchanged. Private photos, raw snapshots, local preview output, and personal reports must stay outside the public deployment repository.
