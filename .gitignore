@@ -1,3 +1,10 @@
 worker/wrangler.toml
 .wrangler/
 node_modules/
+
+.env*
+.dev.vars*
+review-artifacts/
+COACHING_PLAN.md
+CHECKIN_REVIEW.md
+.review-preview/

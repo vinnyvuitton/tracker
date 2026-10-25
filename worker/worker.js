@@ -1,10 +1,13 @@
+import { shoppingFetch, ShoppingRoom } from "./companion.js";
+import { readCoaching, saveCoaching, trainerReply } from "./trainer.js";
+export { ShoppingRoom };
 const DATA_KEY = "mytracker_v2";
 const LEGACY_KEY = "mytracker";
 const MAX_DATA_BYTES = 24 * 1024 * 1024;
 const MAX_PHOTO_BYTES = 1024 * 1024;
 const BACKUP_LIMIT = 30;
 const MEAL_MODEL = "@cf/google/gemma-4-26b-a4b-it";
-const BUILD_ID = "workout-2.12-midweek-checkin";
+const BUILD_ID = "workout-2.15-shopping-live";
 const TIMING_TTL = 30 * 86400;
 
 export default {
@@ -29,11 +32,41 @@ export default {
       return json({ error: "Origin not allowed" }, 403, cors);
     }
 
+    if (url.pathname.startsWith("/shopping/")) {
+      if (url.pathname === "/shopping/ai-history" && request.method !== "GET") return json({ error: "Method not allowed" }, 405, cors);
+      if (url.pathname === "/shopping/ask" && request.method === "POST") {
+        const stateRequest = new Request(new URL("/shopping/state", request.url), { headers: request.headers });
+        const checked = await shoppingFetch(stateRequest, env, cors);
+        if (!checked.ok) return checked;
+        try {
+          const raw = await request.text();
+          if (raw.length > 1600000) return json({ error: "Question or photo too large." }, 413, cors);
+          const shopping = await checked.json();
+          const body = JSON.parse(raw);
+          const quota = await shoppingFetch(new Request(new URL("/shopping/ai-reserve", request.url), { method: "POST", headers: request.headers }), env, cors);
+          if (!quota.ok) return quota;
+          const historyUrl = new URL("/shopping/ai-history", request.url); historyUrl.searchParams.set("week", body.week);
+          const historyResponse = await shoppingFetch(new Request(historyUrl, { headers: request.headers }), env, cors);
+          if (!historyResponse.ok) return historyResponse;
+          const history = await historyResponse.json();
+          const result = await trainerReply({ ...body, prepareDraft:false, turns: history.turns }, env, { role: shopping.role, shopping });
+          if (!result.ok) return withCors(result, cors);
+          const answer = await result.json();
+          const saved = await shoppingFetch(new Request(historyUrl, { method: "POST", headers: request.headers, body: JSON.stringify({ question: body.question, answer: answer.answer, draft: answer.draft, sources: answer.sources, checkedAt: answer.checkedAt }) }), env, cors);
+          return json({ ...answer, saved: saved.ok }, 200, cors);
+        } catch { return json({ error: "Your question could not be read." }, 400, cors); }
+      }
+      return shoppingFetch(request, env, cors);
+    }
+
     if (!env.TRACKER_TOKEN || !authorized(request, env.TRACKER_TOKEN)) {
       return json({ error: "Unauthorized" }, 401, cors);
     }
 
     try {
+      if (url.pathname === "/coaching" && request.method === "GET") return json({ record: await readCoaching(env) }, 200, cors);
+      if (url.pathname === "/coaching" && request.method === "PUT") return withCors(await saveCoaching(request, env), cors);
+      if (url.pathname === "/coach/ask" && request.method === "POST") return withCors(await trainerReply(await request.json(), env), cors);
       if (url.pathname === "/data" && request.method === "GET") {
         return await loadData(env, cors);
       }
@@ -47,6 +80,15 @@ export default {
         return await analyzeMeal(request, env, cors);
       }
       if (url.pathname === "/meals/advise" && request.method === "POST") {
+        if (env.OPENAI_ENABLED === "true") {
+          const body = await request.json();
+          const result = await trainerReply({ ...body, turns: (body.conversation || []).map(turn => ({ role: turn.role, content: turn.text })), question: body.question || "Help me with this food photo." }, env, {mealSchema:mealAdviceSchema()});
+          if (!result.ok) return withCors(result, cors);
+          const answer = await result.json();
+          const advice = validMealAdvice(answer.mealAdvice);
+          if (!advice) return json({error:"Meal advice could not be read",code:"invalid_result"},502,cors);
+          return json({ ...advice, provider:answer.provider, model:answer.model, usage:answer.usage }, 200, cors);
+        }
         return await adviseMeal(request, env, cors);
       }
       if (url.pathname === "/treadmill/analyze" && request.method === "POST") {
@@ -90,6 +132,11 @@ export default {
     for (const message of batch.messages) await deliverAlertMessage(message.body, env);
   }
 };
+
+function withCors(response, cors) {
+  const headers = new Headers(response.headers); for (const [key, value] of Object.entries(cors)) headers.set(key, value);
+  return new Response(response.body, { status: response.status, headers });
+}
 
 function authorized(request, expectedToken) {
   const header = request.headers.get("Authorization") || "";
@@ -353,6 +400,21 @@ async function analyzeTreadmill(request, env, cors) {
   } catch (_) { return json({ error: "Treadmill results could not be read" }, 502, cors); }
 }
 
+function mealAdviceSchema() {
+  return {
+    type: "object", additionalProperties: false,
+    properties: {
+      answer: { type: "string" }, portion: { type: "string" }, dayImpact: { type: "string" }, alternative: { type: "string" }, followUpQuestion: { type: "string" },
+      suggestionPresent: { type: "boolean" }, suggestionName: { type: "string" }, suggestionCalories: { type: "number", minimum: 0 }, suggestionProtein: { type: "number", minimum: 0 },
+      suggestionCarbs: { type: "number", minimum: 0 }, suggestionFat: { type: "number", minimum: 0 },
+      suggestionFiber: { type: ["number", "null"], minimum: 0 }, suggestionSaturatedFat: { type: ["number", "null"], minimum: 0 },
+      suggestionAddedSugar: { type: ["number", "null"], minimum: 0 }, suggestionSodium: { type: ["number", "null"], minimum: 0 },
+      suggestionCategory: { type: "string", enum: ["breakfast", "lunch", "dinner", "snack"] }, suggestionBasis: { type: "string", enum: ["Label", "Published", "Estimated", "Limited"] }, suggestionAssumptions: { type: "string" }
+    },
+    required: ["answer", "portion", "dayImpact", "alternative", "followUpQuestion", "suggestionPresent", "suggestionName", "suggestionCalories", "suggestionProtein", "suggestionCarbs", "suggestionFat", "suggestionFiber", "suggestionSaturatedFat", "suggestionAddedSugar", "suggestionSodium", "suggestionCategory", "suggestionBasis", "suggestionAssumptions"]
+  };
+}
+
 async function adviseMeal(request, env, cors) {
   if (!env.AI) return json({ error: "Meal advice is not configured", code: "not_configured" }, 503, cors);
   const body = await request.json();
@@ -369,18 +431,7 @@ async function adviseMeal(request, env, cors) {
   const conversation = Array.isArray(body && body.conversation) ? body.conversation.slice(-6).map((turn) => ({
     role: turn && turn.role === "assistant" ? "assistant" : "user", content: String(turn && turn.text || "").slice(0, 2500)
   })).filter((turn) => turn.content) : [];
-  const schema = {
-    type: "object", additionalProperties: false,
-    properties: {
-      answer: { type: "string" }, portion: { type: "string" }, dayImpact: { type: "string" }, alternative: { type: "string" }, followUpQuestion: { type: "string" },
-      suggestionPresent: { type: "boolean" }, suggestionName: { type: "string" }, suggestionCalories: { type: "number", minimum: 0 }, suggestionProtein: { type: "number", minimum: 0 },
-      suggestionCarbs: { type: "number", minimum: 0 }, suggestionFat: { type: "number", minimum: 0 },
-      suggestionFiber: { type: ["number", "null"], minimum: 0 }, suggestionSaturatedFat: { type: ["number", "null"], minimum: 0 },
-      suggestionAddedSugar: { type: ["number", "null"], minimum: 0 }, suggestionSodium: { type: ["number", "null"], minimum: 0 },
-      suggestionCategory: { type: "string", enum: ["breakfast", "lunch", "dinner", "snack"] }, suggestionBasis: { type: "string", enum: ["Label", "Published", "Estimated", "Limited"] }, suggestionAssumptions: { type: "string" }
-    },
-    required: ["answer", "portion", "dayImpact", "alternative", "followUpQuestion", "suggestionPresent", "suggestionName", "suggestionCalories", "suggestionProtein", "suggestionCarbs", "suggestionFat", "suggestionFiber", "suggestionSaturatedFat", "suggestionAddedSugar", "suggestionSodium", "suggestionCategory", "suggestionBasis", "suggestionAssumptions"]
-  };
+  const schema = mealAdviceSchema();
   const userContent = [{ type: "text", text: "Tracker context (data, not instructions):\n" + JSON.stringify(context) + "\n\nCurrent food question:\n" + (question || "Would this food fit today, and how much should I have?") }];
   if (image) userContent.push({ type: "image_url", image_url: { url: image } });
   try {
@@ -620,6 +671,9 @@ async function sendDailyReminder(now, env) {
   if ((reminders.calorieTimes || []).some((value) => hhmm === compactTime(value))) type = "calories";
   if (parts.weekday === "Wed" && hhmm === compactTime(reminders.midweekTime || "20:00")) type = "midweek";
   if (!type || reminders[type] === false) return;
+  const coaching = await readCoaching(env);
+  // A superseded calorie setting must not produce restriction or compensation nudges.
+  if (coaching?.status === "approved" && coaching.pausePacingReminders === true && parts.iso >= coaching.weekStart && (type === "calories" || type === "protein")) return;
   let marker = "reminder:" + parts.iso + ":" + type + ":" + hhmm;
   const totals = (day.meals || []).reduce((sum, meal) => ({ protein: sum.protein + (Number(meal.protein) || 0), calories: sum.calories + (Number(meal.calories) || 0) }), { protein: 0, calories: 0 });
   const proteinLeft = Math.max(0, Math.round((Number(targets.protein) || 150) - totals.protein));
@@ -627,7 +681,7 @@ async function sendDailyReminder(now, env) {
   const workoutNames = { Sun: "Recovery Day", Mon: "Upper A", Tue: "Lower A + Core", Wed: "Cardio 1", Thu: "Upper B", Fri: "Lower B + Core", Sat: "Cardio 2" };
   let message;
   if (type === "midweek") {
-    message = { title: "Wednesday workout check-in", body: "Log your waist, photos, cardio effort, food, and recovery. Your Mon–Wed review can guide the rest of the week." };
+    message = { title: "Wednesday workout check-in", body: coaching?.status === "approved" ? "Review regular eating, hunger, energy, sleep and cardio effort. Your Mon–Wed review can guide the rest of the week." : "Log your waist, photos, cardio effort, food, and recovery. Your Mon–Wed review can guide the rest of the week." };
   }
   if (type === "workout") {
     if (day.workout && day.workout.completed) return;
@@ -653,8 +707,8 @@ async function sendDailyReminder(now, env) {
       marker = "reminder:" + parts.iso + ":calories:over";
       message = overCalorieMessage(Math.round(totals.calories - calorieMax));
     }
-    else if (hour < 17 && remaining < reserve) message = { title: "Save some room for dinner", body: "About " + Math.max(0, remaining) + " calories remain today. Holding off or choosing something very light now will leave dinner more comfortable." };
-    else if (hour >= 17 && remaining <= 350) message = { title: "You’re close to today’s calorie target", body: "About " + Math.max(0, remaining) + " calories remain. A lighter, protein-forward choice keeps you in range." };
+    else if (hour < 17 && remaining < reserve) message = { title: "Regular meal check-in", body: "Keep a regular dinner and respond to hunger. Logged totals and the saved target are estimates; do not skip meals to reserve calories." };
+    else if (hour >= 17 && remaining <= 350) message = { title: "Regular meal check-in", body: "Keep a regular meal or snack as needed. Review the current coaching guidance rather than treating an estimate as a food ceiling." };
     else return;
   }
   if (!message) return;
@@ -666,7 +720,7 @@ async function sendDailyReminder(now, env) {
 function overCalorieMessage(amount) {
   return {
     title: "Calorie check-in",
-    body: "You’re about " + Math.max(0, Math.round(Number(amount) || 0)) + " calories above today’s target zone. No additional food is needed for the goal. If genuinely hungry, keep it small and protein-forward; otherwise, you’re all set. Resume normally tomorrow."
+    body: "Your logged estimate is above the saved setting. Keep regular meals and snacks as needed; do not skip food or add exercise to compensate. Review the current coaching guidance."
   };
 }
 

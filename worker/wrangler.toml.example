@@ -5,8 +5,10 @@ compatibility_date = "2026-09-07"
 [vars]
 ALLOWED_ORIGIN = "https://vinnyvuitton.github.io"
 ALLOW_LOCAL_DEV = "false"
+OPENAI_MODEL = "gpt-6.1-sol"
+OPENAI_ENABLED = "true"
 VAPID_PUBLIC_KEY = "REPLACE_WITH_PUBLIC_VAPID_KEY"
-VAPID_SUBJECT = "https://YOUR_GITHUB_USERNAME.github.io/YOUR_REPOSITORY/"
+VAPID_SUBJECT = "https://vinnyvuitton.github.io/tracker/"
 
 [triggers]
 # Ten-minute candidates allow personal reminder times. The Worker applies Chicago
@@ -31,5 +33,14 @@ max_retries = 3
 binding = "TRACKER_KV"
 id = "REPLACE_WITH_EXISTING_KV_NAMESPACE_ID"
 
-# Set TRACKER_TOKEN and VAPID_PRIVATE_JWK as encrypted Worker secrets.
-# Never put secret values in this file or in GitHub.
+# TRACKER_TOKEN and VAPID_PRIVATE_JWK are encrypted Worker secrets.
+
+# Enable only after configuring server secrets and reviewing API costs.
+# OPENAI_API_KEY and COACH_REVIEW_TOKEN must be encrypted Worker secrets.
+[[durable_objects.bindings]]
+name = "SHOPPING_ROOM"
+class_name = "ShoppingRoom"
+
+[[migrations]]
+tag = "shopping-v1"
+new_sqlite_classes = ["ShoppingRoom"]

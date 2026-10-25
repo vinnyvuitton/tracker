@@ -337,3 +337,7 @@ dialog label { display: grid; gap: 6px; color: var(--muted); font-size: 12px; }
   @keyframes enter { from { opacity: 0; transform: translateY(5px); } }
   @keyframes check-pop { 50% { transform: scale(1.12); } }
 }
+
+.preview-banner{max-width:1120px;margin:12px auto;padding:12px 16px;border-radius:12px;background:#fff0e8;color:#532b22;font:14px/1.5 system-ui}.preview-banner a{color:#9c3829;margin:0 5px}dialog{overscroll-behavior:contain}body:has(dialog[open]){overflow:hidden}
+
+.weekly-coach .button{display:inline-block;padding:12px 16px;border-radius:12px;background:var(--accent);color:var(--bg);text-decoration:none;min-height:44px}.weekly-coach details{margin:14px 0}.weekly-coach li{margin:6px 0}.weekly-coach h3{margin-top:18px}

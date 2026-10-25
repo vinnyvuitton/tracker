@@ -8,6 +8,7 @@
   var DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   var TODAY = chicagoToday();
   var localMode = location.hostname === "localhost" || location.hostname === "127.0.0.1" || location.protocol === "file:";
+  if (localMode && new URLSearchParams(location.search).get("preview") === "connected") { API_BASE = location.origin + "/api"; localMode = false; }
   var NOTIFICATION_DEVICE_KEY = "vinny_workout_2_notification_device";
   var PLATES = [2.5, 3.5, 4.5, 6.5];
   var DUMBBELL_HANDLE_WEIGHT = 1;
@@ -164,6 +165,7 @@
   };
 
   var state = {
+    coaching: null,
     view: "today",
     selectedDate: TODAY,
     data: defaultData(),
@@ -207,6 +209,8 @@
     mealPhotoPreviewUrl: "",
     toastTimer: null
   };
+
+  if (!localMode && API_BASE.indexOf("/api") >= 0 && new URLSearchParams(location.search).get("date") && /^\d{4}-\d{2}-\d{2}$/.test(new URLSearchParams(location.search).get("date"))) state.selectedDate = new URLSearchParams(location.search).get("date");
 
   function ex(name, prescription, tip, equipment) {
     return { name: name, prescription: prescription, tip: tip, equipment: equipment || null };
@@ -561,7 +565,7 @@
       },
       weeklyCheckins: {},
       midweekCheckins: {},
-      meta: { planVersion: "workout-2.14-2026-10-22", createdAt: new Date().toISOString() }
+      meta: { planVersion: "workout-2.15-2026-10-25", createdAt: new Date().toISOString() }
     };
   }
 
@@ -593,6 +597,22 @@
 
   function morningWeight(day) {
     return day && day.weightTiming !== "other" ? number(day.weight) : 0;
+  }
+
+  function weightTimingStatus(day) {
+    return day.weightTiming === "other"
+      ? "This reading stays in your daily log and is excluded from the morning trend because it was taken after food, drinks, or exercise."
+      : "For comparable morning readings, weigh after the bathroom and before food, drinks, or exercise. Other readings can stay in your daily log.";
+  }
+
+  function reconcileReviewedWeightTiming(day, iso, corrections) {
+    // Reviewed corrections come from private data, never embedded diary text.
+    var reviewed = (corrections || {})[iso];
+    if (!reviewed || day.weightTimingNoteReview) return;
+    var timing = typeof reviewed === "string" ? reviewed : reviewed.timing;
+    if (timing !== "other" && timing !== "morning") return;
+    day.weightTiming = timing;
+    day.weightTimingNoteReview = reviewed.reviewedAt || "reviewed";
   }
 
   function renderWaistInputs(day, iso) {
@@ -740,6 +760,7 @@
   }
 
   function recommendedLoad(exercise, id) {
+    if (state.coaching && state.selectedDate >= state.coaching.weekStart && exercise.weeklyLoad) return exercise.weeklyLoad;
     // The check-in sets this week's starting loads; effort-based changes resume afterward.
     if (exercise.weeklyLoad && state.selectedDate >= WEEK_FOUR_START && state.selectedDate < addDays(WEEK_FOUR_START, 7)) return exercise.weeklyLoad;
     if (exercise.weeklyLoad && state.selectedDate >= WEEK_FIVE_START && state.selectedDate < addDays(WEEK_FIVE_START, 7)) return exercise.weeklyLoad;
@@ -821,6 +842,24 @@
   function planForDate(iso) {
     if (SPECIAL_DAYS[iso]) return SPECIAL_DAYS[iso];
     var key = dayKey(iso), plan = PLAN[key];
+    if (state.coaching && state.coaching.status === "approved" && iso >= state.coaching.weekStart) {
+      var reviewed = weekSixStrengthPlan(key), changes = state.coaching.plan[key];
+      if (reviewed && changes) return Object.assign({}, reviewed, { subtitle: "Hold this week’s loads · controlled reps and manageable recovery", sections: reviewed.sections.map(function (section) {
+        return Object.assign({}, section, { exercises: section.exercises.map(function (exercise) {
+          var updated = Object.assign({}, exercise, changes[exercise.name] || {});
+          if (updated.equipment && updated.equipment.type === "bodyweight") delete updated.weeklyLoad;
+          return updated;
+        }) });
+      }) });
+      if (key === "Wed" || key === "Sat") {
+        var first = key === "Wed" ? 20 : 15, last = key === "Wed" ? 50 : 45;
+        var segments = weekFiveCardio(weekFourCardio(weekThreeCardio(key === "Wed" ? cardioOneProgressed() : cardioTwoProgressed(), first, last, 6), first, last), first, last, key === "Wed" ? 1 : 2).map(function (segment, index) {
+          var opening = state.coaching.cardio.opening[index];
+          return Object.assign({}, segment, index < 2 ? opening : {}, { cue: segment.automatic ? segment.cue : index < 2 ? "Gentle opening ramp. Ease in and keep conversation comfortable." : "Hold the familiar settings only while manageable, around 5/10. Ease or shorten if unusually drained." });
+        });
+        return Object.assign({}, plan, { subtitle: "65 minutes including warmup/cooldown when manageable · conversational effort", speedTrialAvailable: false, shortTrialAvailable: false, cardioSegments: segments, expressSegments: plan.expressSegments || null, sections: [{ label: "Treadmill", exercises: [Object.assign({}, plan.sections[0].exercises[0], { coachingNote: state.coaching.cardio.note })] }] });
+      }
+    }
     if (iso >= WEEK_SIX_START) {
       var reviewedStrength = weekSixStrengthPlan(key);
       if (reviewedStrength) return reviewedStrength;
@@ -917,6 +956,7 @@
   }
 
   function showMealFeedback(day, name) {
+    if (state.coaching) { showFeedback(name + " saved. Keep regular meals and snacks; respond to hunger. Logged nutrition is an estimate.", "success"); return; }
     var t = totals(day);
     var calorieTarget = number(state.data.targets.calories);
     var calorieMax = number(state.data.targets.calorieMax) || calorieTarget + 100;
@@ -924,7 +964,7 @@
     var proteinLeft = Math.max(0, Math.round(number(state.data.targets.protein) - t.protein));
     var aboveZone = t.calories > calorieMax;
     var message;
-    if (aboveZone) message = name + " saved. You’re about " + Math.round(t.calories - calorieMax) + " calories above today’s target zone. No additional food is needed for the goal unless you’re genuinely hungry.";
+    if (aboveZone) message = name + " saved. You’re about " + Math.round(t.calories - calorieMax) + " calories above today’s target zone. Logged totals are estimates; keep regular meals and snacks, and do not compensate.";
     else if (calorieLeft < 0) message = name + " saved. You’re within today’s target zone, with about " + Math.max(0, Math.round(calorieMax - t.calories)) + " calories before its upper end and " + proteinLeft + " g protein remaining.";
     else message = name + " saved. About " + calorieLeft + " calories and " + proteinLeft + " g protein remain.";
     showFeedback(message, aboveZone ? "warning" : "success");
@@ -956,14 +996,15 @@
     var day = getDay(iso);
     var t = totals(day);
     var html = header(plan.title, formatDate(iso)) + weekStrip();
+    if (state.coaching && iso >= state.coaching.weekStart) html += renderWeeklyCoach(true);
     html += '<div class="grid two">' +
       nutritionStatCard("Protein", Math.round(t.protein), "g", state.data.targets.proteinMin, state.data.targets.proteinMax) +
       nutritionStatCard("Calories", Math.round(t.calories), "cal", state.data.targets.calorieMin, state.data.targets.calorieMax) +
       '</div>';
 
-    html += '<section class="card"><div class="card-head"><div><h2>Morning check</h2><p>Immediately after the bathroom—before pre-workout, shakes, food, other drinks, photos, or training</p></div></div>' +
+    html += '<section class="card"><div class="card-head"><div><h2>Daily check-in</h2><p>Optional: if weighing, use comparable morning conditions after the bathroom, before pre-workout, shakes, food, other drinks, photos, or training. A pause is reasonable if checking is distressing.</p></div></div>' +
       '<div class="row wrap"><label class="field">Weight, lb<input id="weight" type="number" inputmode="decimal" min="90" max="300" step="0.1" value="' + esc(day.weight) + '"></label>' +
-      '<div class="field">Water, glasses<div class="stepper"><button type="button" data-water-step="-1" aria-label="Subtract one glass">−</button><input id="water" type="number" inputmode="numeric" min="0" max="30" step="1" value="' + esc(day.water) + '" aria-label="Water glasses"><button type="button" data-water-step="1" aria-label="Add one glass">+</button></div></div></div><label class="weight-timing"><input id="weight-standard" type="checkbox" ' + (day.weightTiming !== "other" ? 'checked' : '') + '> Taken before food, drinks, and exercise</label><p class="notification-status">Other weigh-ins stay in your log and are excluded from the morning trend.</p>' + renderWaistInputs(day, iso) + '</section>';
+      '<div class="field">Water, glasses<div class="stepper"><button type="button" data-water-step="-1" aria-label="Subtract one glass">−</button><input id="water" type="number" inputmode="numeric" min="0" max="30" step="1" value="' + esc(day.water) + '" aria-label="Water glasses"><button type="button" data-water-step="1" aria-label="Add one glass">+</button></div></div></div><label class="weight-timing"><input id="weight-standard" type="checkbox" ' + (day.weightTiming !== "other" ? 'checked' : '') + '> Taken before food, drinks, and exercise</label><p id="weight-timing-status" class="notification-status">' + weightTimingStatus(day) + '</p>' + renderWaistInputs(day, iso) + '</section>';
 
     html += renderMeals(day, t);
     html += renderPendingMeals(iso);
@@ -981,6 +1022,7 @@
 
   function nutritionStatCard(label, value, unit, low, high) {
     low = number(low); high = number(high) || low;
+    if (state.coaching && label === "Calories") return '<section class="card nutrition-stat"><p class="eyebrow">Calories · logged estimate</p><div class="stat">' + esc(value) + ' <small>cal</small></div><p class="target-status">Previous target under review. Keep regular meals and respond to hunger.</p></section>';
     var status = value < low ? (low - value) + " " + unit + " to target zone" : value > high ? (value - high) + " " + unit + " above target zone" : "Inside target zone";
     var css = value > high ? " over" : value >= low ? " in-zone" : "";
     if (label === "Protein" && value >= low) { status = "Protein minimum met"; css = " in-zone"; }
@@ -990,7 +1032,7 @@
 
   function renderPhotos(day, iso) {
     var official = dayKey(iso) === "Wed";
-    var html = '<section class="card"><div class="card-head"><div><h2>Progress photos</h2><p>' + (official ? "Official weekly checkpoint—take these before pre-workout and training" : "Daily is optional. Wednesday before training is the official checkpoint.") + '</p></div></div><div class="photos">';
+    var html = '<section class="card"><div class="card-head"><div><h2>Progress photos</h2><p>' + (official ? "Optional photos. A checking break is reasonable; saved history stays available." : "Daily is optional. Wednesday before training is the official checkpoint.") + '</p></div></div><div class="photos">';
     ["front", "side", "back"].forEach(function (side) {
       var ref = day.photos[side];
       var revealed = state.revealedPhoto === iso + ":" + side;
@@ -1085,6 +1127,7 @@
   }
 
   function renderExerciseHistory(plan, exercise, id) {
+    if (exercise.historyAlias && !previousExerciseLog(id, state.selectedDate)) id = exercise.historyAlias;
     var weekStart = startOfWeek(state.selectedDate), previousWeekStart = addDays(weekStart, -7);
     var previous = previousExerciseLog(id, weekStart);
     var lastWeek = previous && previous.iso >= previousWeekStart;
@@ -1210,7 +1253,7 @@
       var quantity = number(meal.quantity) || 1;
       html += '<div class="meal ' + (meal.photo ? "has-photo" : "") + '">';
       if (meal.photo) html += '<div class="meal-photo ' + (state.revealedPhoto === state.selectedDate + ":meal:" + index ? "revealed" : "") + '"><img alt="Private photo for ' + esc(meal.name || "meal") + '" data-photo-ref="' + esc(photoRefValue(meal.photo)) + '"><button type="button" data-reveal-meal-photo="' + index + '">' + (state.revealedPhoto === state.selectedDate + ":meal:" + index ? "Hide" : "Reveal") + '</button></div>';
-      html += '<button type="button" class="meal-summary" data-edit-meal="' + index + '"><strong>' + esc(meal.name || "Meal") + '</strong><small>' + Math.round(number(meal.protein)) + ' g protein · ' + Math.round(number(meal.calories)) + ' cal</small><span>' + (meal.photo ? 'Private photo saved · ' : '') + 'Edit details</span></button>' +
+      html += '<button type="button" class="meal-summary" data-edit-meal="' + index + '"><strong>' + esc(meal.name || "Meal") + '</strong><small>' + Math.round(number(meal.protein)) + ' g protein · ' + Math.round(number(meal.calories)) + ' cal</small><span>' + (meal.photo ? 'Private photo saved · ' : '') + (mealEnergyWarning(meal) ? 'Calories and macros disagree · review details' : 'Edit details') + '</span></button>' +
         '<div class="quantity-stepper" aria-label="Quantity for ' + esc(meal.name || "meal") + '"><button type="button" data-meal-quantity="-1" data-meal-index="' + index + '" aria-label="Decrease quantity">−</button><input type="number" min="0.25" max="50" step="0.25" value="' + esc(quantity) + '" data-meal-quantity-input="' + index + '" aria-label="Quantity"><button type="button" data-meal-quantity="1" data-meal-index="' + index + '" aria-label="Increase quantity">+</button></div>' +
         '<button type="button" class="remove-meal" data-remove-meal="' + index + '" aria-label="Remove ' + esc(meal.name || "meal") + '">×</button></div>';
     });
@@ -1231,6 +1274,12 @@
   }
 
   function nutritionItem(label, value) { return '<div class="nutrition-item"><span>' + esc(label) + '</span><strong>' + esc(value) + '</strong></div>'; }
+
+  function mealEnergyWarning(meal) {
+    if (["calories", "protein", "carbs", "fat"].some(function (key) { return meal[key] == null || meal[key] === "" || !Number.isFinite(Number(meal[key])); })) return false;
+    var calculated = number(meal.protein) * 4 + number(meal.carbs) * 4 + number(meal.fat) * 9;
+    return Math.abs(calculated - number(meal.calories)) > Math.max(100, number(meal.calories) * 0.2);
+  }
 
   function sortedFavorites(filter) {
     return (state.data.favorites || []).filter(function (favorite) { return filter === "all" || favorite.category === filter; }).slice().sort(function (a, b) {
@@ -1282,9 +1331,12 @@
     var priorFullWeekStart = addDays(priorFullWeekEnd, -6);
     var weeklyAverage = averageWeightBetween(latestFullWeekStart, latestFullWeekEnd);
     var priorAverage = averageWeightBetween(priorFullWeekStart, priorFullWeekEnd);
-    var averageChange = weeklyAverage && priorAverage ? weeklyAverage - priorAverage : 0;
+    var weeklyCount = periodStats(latestFullWeekStart, latestFullWeekEnd).weights.length;
+    var priorCount = periodStats(priorFullWeekStart, priorFullWeekEnd).weights.length;
+    var comparable = weeklyCount > 1 && priorCount > 1;
+    var averageChange = comparable ? weeklyAverage - priorAverage : 0;
     var html = header("Progress", "Trend over noise");
-    html += '<section class="card"><div class="grid two"><div><p class="eyebrow">Last full-week average</p><div class="stat">' + (weeklyAverage ? weeklyAverage.toFixed(1) : "No data") + (weeklyAverage ? ' <small>lb</small>' : '') + '</div></div><div><p class="eyebrow">Week-over-week</p><div class="stat">' + (weeklyAverage && priorAverage ? (averageChange > 0 ? "+" : "") + averageChange.toFixed(1) : "No trend") + (weeklyAverage && priorAverage ? ' <small>lb</small>' : '') + '</div></div></div><p class="notification-status">' + esc(formatDate(latestFullWeekStart, { month: "short", day: "numeric" })) + '–' + esc(formatDate(latestFullWeekEnd, { month: "short", day: "numeric" })) + ' · Daily changes are context, not the score.</p></section>';
+    html += '<section class="card"><div class="grid two"><div><p class="eyebrow">Last full-week average</p><div class="stat">' + (weeklyCount > 1 ? weeklyAverage.toFixed(1) : weeklyCount === 1 ? "Limited data" : "No data") + (weeklyCount > 1 ? ' <small>lb</small>' : '') + '</div></div><div><p class="eyebrow">Week-over-week</p><div class="stat">' + (comparable ? (averageChange > 0 ? "+" : "") + averageChange.toFixed(1) : "No trend") + (comparable ? ' <small>lb</small>' : '') + '</div></div></div><p class="notification-status">' + esc(formatDate(latestFullWeekStart, { month: "short", day: "numeric" })) + '–' + esc(formatDate(latestFullWeekEnd, { month: "short", day: "numeric" })) + ' · ' + (weeklyCount === 1 ? 'Only one comparable morning reading; no weekly comparison. No extra weighing is required to follow the plan.' : weeklyCount === 0 ? 'No comparable morning readings. No extra weighing is required to follow the plan.' : weeklyCount + ' comparable morning readings. Daily changes are context, not the score.') + '</p></section>';
     html += '<section class="card"><div class="card-head"><div><h2>Recent morning weights</h2><p>Weigh before drinks, training, and photos; judge only the weekly average</p></div></div><div class="weight-list">';
     weights.slice(-8).forEach(function (iso) { html += '<div class="weight-chip"><small>' + esc(formatDate(iso, { month: "short", day: "numeric" })) + '</small><strong>' + number(state.data.days[iso].weight).toFixed(1) + '</strong></div>'; });
     if (!weights.length) html += '<div class="empty">Your weight trend will appear here.</div>';
@@ -1320,6 +1372,7 @@
   }
 
   function renderReviewCheckpoints() {
+    if (state.coaching) return '<section class="card"><h2>Next checkpoints</h2><ul class="checkpoint-list">' + state.coaching.checkpoints.map(function (point) { return '<li><strong>' + esc(point.label) + '</strong><span>' + esc(point.note) + '</span></li>'; }).join("") + '</ul><p>' + esc(state.coaching.goal.nextStep) + '</p></section>';
     if (TODAY >= WEEK_SIX_START) return '<section class="card"><div class="card-head"><div><h2>Next checkpoints</h2><p>Use completed-week weight averages, waist, photos and recovery together.</p></div></div><ul class="checkpoint-list"><li><strong>October 21 · 8 pm Chicago</strong><span>Review Mon–Wed food, protein, sleep, training and any waist baseline. Decide whether Saturday’s optional speed step fits your recovery.</span></li><li><strong>October 25 · Weekly review</strong><span>Check the full week near the 1,850-calorie anchor. If verified intake, repeated waist readings and the weight trend support a change, choose one small adjustment. Collect another week if the picture is unclear.</span></li><li><strong>November 1 · Two-week direction</strong><span>Reassess the trend if October 25 was inconclusive. Avoid reacting to one morning’s number.</span></li><li><strong>November 4 · Photo checkpoint</strong><span>Repeat front, side and back photos with matching camera position, lighting, distance and waistband.</span></li></ul><p class="notification-status">First milestone: a sustained 150 lb weekly average. Reassess waist, photos, strength and the next target from there.</p></section>';
     return '<section class="card"><div class="card-head"><div><h2>Next checkpoints</h2><p>Judge the plan using weight averages, waist, photos, and recovery together.</p></div></div><ul class="checkpoint-list"><li><strong>Wednesday · 8 pm Chicago</strong><span>Review Mon–Wed logs, actual cardio effort, waist, photos, hunger, energy, and sleep. Adjust Thu–Sat if needed.</span></li><li><strong>October 18 · Process check</strong><span>Review consistent morning weights, the 1,850-calorie anchor, protein minimum, form, and recovery.</span></li><li><strong>October 25 · Results decision</strong><span>Assess two full weeks and waist change. Working weight-average range: 151.9–152.4 lb; a planning target, not a promised result. If weight and waist stay flat, review intake accuracy and activity before changing the plan.</span></li><li><strong>November 4 · Photo checkpoint</strong><span>Repeat front, side, and back photos with matching position, lighting, camera distance, and waistband.</span></li></ul><p class="notification-status">First milestone: a 150 lb weekly average. Reassess appearance, waist, strength, and recovery before deciding on 145 or 140.</p></section>';
   }
@@ -1426,6 +1479,7 @@
 
   function renderGoalProgress() {
     var stats = periodStats(state.data.profile.startDate || "2026-09-10", TODAY);
+    if (state.coaching) return '<section class="card"><p class="eyebrow">Standing performance goal</p><h2>' + esc(state.coaching.goal.name) + '</h2><p>' + esc(state.coaching.goal.date) + ' · ' + esc(state.coaching.goal.distance) + '</p><p>' + esc(state.coaching.goal.nextStep) + '</p>' + metric("Strength sessions through today", pct(stats.strengthDone, stats.strengthPlanned), stats.strengthDone + " of " + stats.strengthPlanned + " planned") + metric("Cardio sessions through today", pct(stats.cardioDone, stats.cardioPlanned), stats.cardioDone + " of " + stats.cardioPlanned + " planned") + '<p class="notification-status">Food, sleep, energy, recovery and growing comfortable endurance guide the next step.</p></section>';
     var start = state.data.profile.baselineWeight;
     var latest = stats.latestWeight || start;
     if (TODAY >= WEEK_SIX_START) {
@@ -1450,7 +1504,7 @@
   }
 
   function renderPlan() {
-    var html = header("The Plan", "September 10 to December 31");
+    var html = header("The Plan", state.coaching ? "Repeatable training · building toward the March 8K" : "September 10 to December 31");
     html += '<section class="card"><div class="notice">Four strength days, two cardio days, and one active recovery day. Progress reps before load; clean form and repeatability matter more than adding exercises.</div></section>';
     if (TODAY >= WEEK_SIX_START) html += renderWeekSixGuidance();
     else html += '<section class="card"><details class="form-guide"><summary>Why this week’s progression supports fat loss</summary><p>Your logged cardio effort was about 5–5.5/10 Wednesday and 4–4.5/10 Saturday. Try the increased work blocks at about 6/10, with a smooth walk and no leaning on the rails. The 65-minute duration stays the same.</p><p>At about 153 lb, the proposed full-session changes add roughly 20 calories Wednesday and 40 Saturday in a walking-equation estimate. These are estimates from the prescribed settings, not measured burn or a promise of weight loss. Keep the 1,850-calorie anchor; do not eat back treadmill calories.</p><p>Research across 116 trials links greater weekly moderate-to-vigorous aerobic duration with lower weight, waist, and body fat. It does not establish that a specific higher incline guarantees better fat loss. Strength training during dietary weight loss helps preserve lean tissue. We will judge this plan using actual effort, recovery, weight averages, waist, and standardized photos.</p><p><a href="https://jamanetwork.com/journals/jamanetworkopen/fullarticle/2828487" target="_blank" rel="noopener noreferrer">Cardio and fat-loss research ↗</a> · <a href="https://eprints.gla.ac.uk/361857/2/361857.pdf" target="_blank" rel="noopener noreferrer">Strength and muscle-preservation research ↗</a></p></details></section>';
@@ -1476,13 +1530,14 @@
   }
 
   function renderWeekSixGuidance() {
+    if (state.coaching) return renderWeeklyCoach(false);
     return '<section class="card"><details class="form-guide"><summary>This week’s focus · food, recovery and progression</summary><p>Aim near the existing 1,850-calorie anchor within the 1,750–1,950 zone, with at least 135 g protein. Plan protein into regular meals; three meals around 40 g plus a 15–25 g protein snack is one way to reach the minimum. Keep lobby-machine coffee explicitly estimated and do not subtract treadmill calories.</p><p><strong>Verified shake:</strong> one 32 g scoop of your whey powder provides 120 calories and 24 g protein. Your saved 1.5-scoop portion provides 180 calories and 36 g protein. Use the corrected favorites for new logs.</p><p>Give bedtime 30 minutes more room where feasible, working toward seven or more hours. Record two consistent morning waist readings when ready. Tuesday’s missed session needs no catch-up workout.</p><p>Bench and row use a 26 lb trial with fewer reps and a 23 lb fallback. Shoulder press builds reps at 17 lb. For October 24, the recommended full-session trial changes only minutes 25–30 to 3.5 mph at incline setting 8, then returns to the standard plan. Keep all other work steady while prioritizing food consistency and sleep. Use the standard fallback before starting if readiness is poor. The express plan stays the same.</p><p>Strength training during dietary weight loss supports lean-tissue preservation. Research supports regular aerobic activity, but does not establish that continually raising intensity guarantees better fat loss. Judge the plan using weight averages, waist, photos and recovery.</p><p><a href="https://jamanetwork.com/journals/jamanetworkopen/fullarticle/2828487" target="_blank" rel="noopener noreferrer">Cardio research ↗</a> · <a href="https://bmjopensem.bmj.com/content/11/3/e002363" target="_blank" rel="noopener noreferrer">Strength research ↗</a> · <a href="https://jamanetwork.com/journals/jamainternalmedicine/fullarticle/2788694" target="_blank" rel="noopener noreferrer">Sleep research ↗</a></p></details></section>';
   }
 
   function renderCheckin() {
     var range = selectedCheckinRange(), summary = buildCheckin(range.start, range.end, range.inProgress), checkin = readWeeklyCheckin(range.start);
     return header("Check-Ins", "Wednesday review · Sunday full review") + renderMidweekCard() + (TODAY >= WEEK_SIX_START ? renderWeekSixGuidance() : "") +
-      '<section class="card goals-card"><div class="card-head"><div><h2>Nutrition goals</h2><p>Targets stay steady this week—improve consistency before lowering calories.</p></div></div><div class="grid two"><label class="field">Daily calories<input id="calorie-target" type="number" inputmode="numeric" min="1200" max="4000" step="25" value="' + esc(state.data.targets.calories) + '"></label><label class="field">Daily protein, g<input id="protein-target" type="number" inputmode="numeric" min="50" max="300" step="5" value="' + esc(state.data.targets.protein) + '"></label></div><p class="notification-status">Calorie zone: ' + esc(state.data.targets.calorieMin) + '–' + esc(state.data.targets.calorieMax) + ' · Aim near ' + esc((number(state.data.targets.calories) * 7).toLocaleString()) + ' calories for the full week · Protein zone: ' + esc(state.data.targets.proteinMin) + '–' + esc(state.data.targets.proteinMax) + ' g · Do not subtract treadmill calories.</p></section>' +
+      '<section class="card goals-card"><div class="card-head"><div><h2>Nutrition settings</h2><p>These saved settings are under review. Keep regular adequate meals and snacks; the weekly coaching guidance takes priority.</p></div></div><div class="grid two"><label class="field">Daily calories<input id="calorie-target" type="number" inputmode="numeric" min="1200" max="4000" step="25" value="' + esc(state.data.targets.calories) + '"></label><label class="field">Daily protein, g<input id="protein-target" type="number" inputmode="numeric" min="50" max="300" step="5" value="' + esc(state.data.targets.protein) + '"></label></div><p class="notification-status">Calorie zone: ' + esc(state.data.targets.calorieMin) + '–' + esc(state.data.targets.calorieMax) + ' · ' + (state.coaching ? 'Previous weekly setting: ' : 'Aim near ') + esc((number(state.data.targets.calories) * 7).toLocaleString()) + (state.coaching ? ' calories; review with the current coaching plan' : ' calories for the full week') + ' · Protein zone: ' + esc(state.data.targets.proteinMin) + '–' + esc(state.data.targets.proteinMax) + ' g · Do not subtract treadmill calories.</p></section>' +
       '<section class="card"><label class="field">Week<select id="checkin-week">' + renderCheckinWeekOptions(range.start) + '</select></label><div class="card-head"><div><h2>Weekly recovery</h2><p>' + esc(formatDate(range.start, { month: "short", day: "numeric" })) + ' to ' + esc(formatDate(range.end, { month: "short", day: "numeric" })) + (range.inProgress ? ' · In progress' : '') + '</p></div></div><div class="notice">Complete all four recovery fields before exporting so next week can be adjusted safely.</div><div class="grid two"><label class="field">Hunger, 1–10<input data-weekly-checkin="hunger" type="number" min="1" max="10" value="' + esc(checkin.hunger || "") + '"></label><label class="field">Energy, 1–10<input data-weekly-checkin="energy" type="number" min="1" max="10" value="' + esc(checkin.energy || "") + '"></label><label class="field">Average sleep, hours<input data-weekly-checkin="sleep" type="number" min="0" max="14" step="0.25" value="' + esc(checkin.sleep || "") + '"></label><label class="field">Soreness, 1–10<input data-weekly-checkin="soreness" type="number" min="1" max="10" value="' + esc(checkin.soreness || "") + '"></label></div><label class="field">Recovery notes<textarea data-weekly-checkin="recoveryNotes" placeholder="Include leg soreness before Tuesday and Friday, plus any back tightness">' + esc(checkin.recoveryNotes || "") + '</textarea></label></section>' +
       '<section class="card"><div class="card-head"><div><h2>Export selected week</h2><p>' + (range.inProgress ? 'Includes Sunday through today. Future days are left out.' : 'Includes the full Sunday–Saturday week.') + '</p></div></div>' +
       '<textarea id="checkin-output" class="checkin-output" readonly>' + esc(summary) + '</textarea>' +
@@ -1535,7 +1590,7 @@
 
   function renderMidweekCard() {
     var start = startOfWeek(TODAY), checkin = readMidweekCheckin(start);
-    return '<section class="card midweek-card"><div class="card-head"><div><p class="eyebrow">Wednesday · 8 pm Chicago</p><h2>Midweek check-in</h2><p>Review Mon–Wed before the rest of the week. Sunday remains the full review.</p></div></div><p class="notification-status">Log Wednesday morning waist and photos, actual cardio effort, food, and any form issues. If Wednesday leads to a change, use a brief Friday follow-up.</p><details class="form-guide" ' + (dayKey(TODAY) === "Wed" ? 'open' : '') + '><summary>Midweek recovery</summary><div class="grid two">' + [
+    return '<section class="card midweek-card"><div class="card-head"><div><p class="eyebrow">Wednesday · 8 pm Chicago</p><h2>Midweek check-in</h2><p>Review Mon–Wed before the rest of the week. Sunday remains the full review.</p></div></div><p class="notification-status">Review regular meals, hunger, energy, sleep, actual cardio effort and form. Measurements and photos are optional while taking a checking break.</p><details class="form-guide" ' + (dayKey(TODAY) === "Wed" ? 'open' : '') + '><summary>Midweek recovery</summary><div class="grid two">' + [
       { key: "hunger", label: "Hunger, 1–10", min: 1, max: 10, step: 1 },
       { key: "energy", label: "Energy, 1–10", min: 1, max: 10, step: 1 },
       { key: "sleep", label: "Average sleep so far, hours", min: 0, max: 14, step: 0.25 },
@@ -1549,7 +1604,7 @@
     var reminders = reminderSettings();
     var paused = reminders.pausedDate === TODAY;
     return '<section class="card notification-card"><div><p class="eyebrow">Smart phone alerts</p><h2>Only nudge me when I’m behind</h2><p class="notification-status">Water and protein reminders compare your logged progress with the time of day. Completed targets stay quiet. Cardio alerts continue while another app is open.</p></div>' +
-      '<button id="enable-notifications" class="' + (state.notificationEnabled ? "secondary" : "primary") + '">' + (state.notificationEnabled ? "Notifications enabled" : "Enable notifications") + '</button><p id="notification-message" class="notification-status"></p>' +
+      (state.coaching && state.coaching.pausePacingReminders ? '<p class="notice">Calorie and protein pacing alerts are paused under your current coaching plan. Water, workout, cardio and review alerts remain available.</p>' : '') + '<button id="enable-notifications" class="' + (state.notificationEnabled ? "secondary" : "primary") + '">' + (state.notificationEnabled ? "Notifications enabled" : "Enable notifications") + '</button><p id="notification-message" class="notification-status"></p>' +
       '<div class="reminder-types"><label><input type="checkbox" data-reminder-toggle="workout" ' + (reminders.workout ? "checked" : "") + '> Workout</label><label><input type="checkbox" data-reminder-toggle="water" ' + (reminders.water ? "checked" : "") + '> Water</label><label><input type="checkbox" data-reminder-toggle="protein" ' + (reminders.protein ? "checked" : "") + '> Protein</label><label><input type="checkbox" data-reminder-toggle="calories" ' + (reminders.calories ? "checked" : "") + '> Calories</label><label><input type="checkbox" data-reminder-toggle="midweek" ' + (reminders.midweek ? "checked" : "") + '> Wednesday check-in</label></div>' +
       '<details class="reminder-settings"><summary>Reminder schedule</summary><div class="grid two"><label class="field">Wednesday check-in (Chicago)<input type="time" step="600" data-reminder-time="midweekTime" value="' + esc(reminders.midweekTime) + '"></label><label class="field">Workout<input type="time" step="600" data-reminder-time="workoutTime" value="' + esc(reminders.workoutTime) + '"></label><label class="field">Morning water<input type="time" step="600" data-reminder-time="waterTimes.0" value="' + esc(reminders.waterTimes[0]) + '"></label><label class="field">Afternoon water<input type="time" step="600" data-reminder-time="waterTimes.1" value="' + esc(reminders.waterTimes[1]) + '"></label><label class="field">Midday protein<input type="time" step="600" data-reminder-time="proteinTimes.0" value="' + esc(reminders.proteinTimes[0]) + '"></label><label class="field">Evening protein<input type="time" step="600" data-reminder-time="proteinTimes.1" value="' + esc(reminders.proteinTimes[1]) + '"></label><label class="field">Calorie pace 1<input type="time" step="600" data-reminder-time="calorieTimes.0" value="' + esc(reminders.calorieTimes[0]) + '"></label><label class="field">Calorie pace 2<input type="time" step="600" data-reminder-time="calorieTimes.1" value="' + esc(reminders.calorieTimes[1]) + '"></label><label class="field">Calorie pace 3<input type="time" step="600" data-reminder-time="calorieTimes.2" value="' + esc(reminders.calorieTimes[2]) + '"></label><label class="field">Calories to reserve for dinner<input type="number" min="300" max="1200" step="50" data-reminder-number="dinnerReserve" value="' + esc(reminders.dinnerReserve) + '"></label><label class="field">Quiet hours start<input type="time" step="600" data-reminder-time="quietStart" value="' + esc(reminders.quietStart) + '"></label><label class="field">Quiet hours end<input type="time" step="600" data-reminder-time="quietEnd" value="' + esc(reminders.quietEnd) + '"></label></div></details>' +
       '<button type="button" id="pause-reminders" class="ghost">' + (paused ? "Resume today’s reminders" : "Pause reminders for today") + '</button></section>';
@@ -1620,8 +1675,8 @@
       formatDate(startIso, { month: "short", day: "numeric" }) + " to " + formatDate(endIso, { month: "short", day: "numeric", year: "numeric" }),
       "",
       "Morning weights: " + (stats.weights.length ? stats.weights.map(function (w) { return w.toFixed(1); }).join(", ") + " lb" : "none logged"),
-      "Weekly average: " + (average ? average.toFixed(1) + " lb" : "not available"),
-      "Week-over-week average change: " + (average && priorAverage ? ((average - priorAverage) > 0 ? "+" : "") + (average - priorAverage).toFixed(1) + " lb" : "not available"),
+      "Weekly average: " + (stats.weights.length > 1 ? average.toFixed(1) + " lb from " + stats.weights.length + " comparable readings" : stats.weights.length === 1 ? "not available — only one comparable morning reading" : "not available"),
+      "Week-over-week average change: " + (stats.weights.length > 1 && priorStats.weights.length > 1 ? ((average - priorAverage) > 0 ? "+" : "") + (average - priorAverage).toFixed(1) + " lb" : "not available"),
       inProgress ? "Weight comparison uses the same weekdays last week; this is not a completed weekly trend." : "Weight comparison uses completed Sunday–Saturday weeks.",
       "Strength sessions: " + stats.strengthDone + " completed",
       "Cardio sessions: " + stats.cardioDone + " completed",
@@ -1817,7 +1872,12 @@
     ["weight", "water"].forEach(function (id) {
       document.getElementById(id).addEventListener("change", function (event) { getDay(state.selectedDate)[id] = event.target.value; queueSave(); });
     });
-    document.getElementById("weight-standard").addEventListener("change", function (event) { getDay(state.selectedDate).weightTiming = event.target.checked ? "morning" : "other"; queueSave(false); });
+    document.getElementById("weight-standard").addEventListener("change", function (event) {
+      var day = getDay(state.selectedDate);
+      day.weightTiming = event.target.checked ? "morning" : "other";
+      document.getElementById("weight-timing-status").textContent = weightTimingStatus(day);
+      queueSave(false);
+    });
     ["waist-first", "waist-second"].forEach(function (id) {
       document.getElementById(id).addEventListener("change", function () {
         var first = document.getElementById("waist-first"), second = document.getElementById("waist-second");
@@ -2230,7 +2290,7 @@
     document.getElementById("meal-result-sodium").value = result.sodium == null ? "" : result.sodium;
     document.getElementById("meal-confidence").textContent = (result.confidence || "Estimate") + " confidence—review before saving";
     document.getElementById("meal-included-items").textContent = result.includedItems ? "Included: " + result.includedItems : "";
-    document.getElementById("meal-nutrition-basis").textContent = result.nutritionBasis ? "Nutrition source: " + result.nutritionBasis : "";
+    document.getElementById("meal-nutrition-basis").textContent = (result.nutritionBasis ? "Reported nutrition basis: " + result.nutritionBasis + ". " : "") + "AI confidence is not independent label/menu verification. " + (mealEnergyWarning(result) ? "Calories and macros disagree substantially; review the original source before saving. Neither total is automatically corrected." : "Check the portion and source before relying on the estimate.");
     document.getElementById("meal-assumptions").textContent = result.assumptions || "Nutrition values are estimates.";
     setFavoriteCategory(result.category || defaultMealCategory(), Boolean(result.category));
   }
@@ -2930,6 +2990,7 @@
       state.data = migrateData(raw);
       state.version = number(result.version);
       state.sync = "Saved";
+      await loadCoaching();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state.data));
       render();
       if (migrated) queueSave(false);
@@ -2981,7 +3042,7 @@
     while (data.preferences.reminders.proteinTimes.length < 2) data.preferences.reminders.proteinTimes.push(defaultData().preferences.reminders.proteinTimes[data.preferences.reminders.proteinTimes.length]);
     while (data.preferences.reminders.calorieTimes.length < 3) data.preferences.reminders.calorieTimes.push(defaultData().preferences.reminders.calorieTimes[data.preferences.reminders.calorieTimes.length]);
     delete data.reward;
-    data.meta = Object.assign({}, data.meta || {}, { planVersion: "workout-2.14-2026-10-22" });
+    data.meta = Object.assign({}, data.meta || {}, { planVersion: "workout-2.15-2026-10-25" });
     Object.keys(data.days || {}).forEach(function (iso) {
       var day = data.days[iso];
       day.waist = Object.assign({ first: "", second: "" }, day.waist || {});
@@ -2995,10 +3056,27 @@
       });
       day.workout = Object.assign({ completed: false, rating: "", notes: "" }, day.workout || {});
       if (!day.weightTiming) day.weightTiming = iso === "2026-10-07" && /after workout and protein shake/i.test(day.workout.notes) ? "other" : "morning";
+      reconcileReviewedWeightTiming(day, iso, data.meta.reviewedWeightTimingCorrections || state.coaching && state.coaching.weightTimingCorrections || {});
       day.cardio = Object.assign({ sessionId: "", startedAt: "", status: "", durationMinutes: 0, completedAt: "", result: null }, day.cardio || {});
       day.photos = Object.assign({ front: null, side: null, back: null, treadmill: null }, day.photos || {});
     });
     return data;
+  }
+
+  function renderWeeklyCoach(compact) {
+    var coach = state.coaching;
+    if (!coach) return "";
+    return '<section class="card weekly-coach"><p class="eyebrow">Weekly Coach · approved ' + esc(coach.approvedAt) + '</p><h2>' + esc(coach.title) + '</h2><p>' + esc(coach.summary) + '</p><details' + (compact ? '' : ' open') + '><summary>Food options, recovery and the race goal</summary><p>' + esc(coach.targetStatus) + '</p>' + coach.meals.map(function (meal) { return '<h3>' + esc(meal.occasion) + '</h3><ul>' + meal.options.map(function (option) { return '<li>' + esc(option) + '</li>'; }).join('') + '</ul>'; }).join('') + '<p>' + esc(coach.shake) + '</p><p>' + esc(coach.sleep) + '</p><p>' + esc(coach.support) + '</p><p><strong>' + esc(coach.goal.name) + ' · ' + esc(coach.goal.date) + '</strong></p><p>' + esc(coach.goal.nextStep) + '</p><p>' + esc(coach.groceryStatus) + '</p></details><div class="row wrap"><a class="button" href="shopping/">Open shared shopping</a><a class="button secondary" href="shopping/#ask">Ask TrainerGPT</a></div><p class="notification-status">Next review: ' + esc(coach.reviewDue) + '. Saved history stays available.</p></section>';
+  }
+
+  async function loadCoaching() {
+    try {
+      var response = await apiFetch("/coaching", { method: "GET" });
+      state.coaching = (await response.json()).record;
+      if (state.coaching) { state.data.meta = state.data.meta || {}; state.data.meta.reviewedWeightTimingCorrections = state.coaching.weightTimingCorrections || state.data.meta.reviewedWeightTimingCorrections || {}; state.data = ensureDataShape(state.data); localStorage.setItem(STORAGE_KEY + "_coaching", JSON.stringify(state.coaching)); }
+    } catch (error) {
+      try { state.coaching = JSON.parse(localStorage.getItem(STORAGE_KEY + "_coaching") || "null"); } catch (ignore) {}
+    }
   }
 
   async function apiFetch(path, options, returnRaw) {
@@ -3038,6 +3116,7 @@
       state.data = migrateData(result.payload || defaultData());
       state.version = number(result.version);
       state.sync = "Saved";
+      await loadCoaching();
       document.getElementById("access-dialog").close();
       render();
       if (!(result.payload && result.payload.schemaVersion === 2)) queueSave(false);
@@ -3091,6 +3170,8 @@
 
   function lockTracker() {
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(STORAGE_KEY + "_coaching");
+    state.coaching = null;
     clearPhotoUrls();
     state.data = defaultData();
     state.sync = "Locked";

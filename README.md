@@ -143,3 +143,9 @@ The Worker retains 30 rotating daily tracker snapshots in KV. The Check-in scree
 7. Download a fresh backup.
 
 Do not replace the live frontend before the protected Worker is deployed. The new frontend intentionally requires the protected API.
+
+## Workout 2.15 / Our Shopping
+
+Adds authenticated private coaching, exercise notes and a responsive shopping companion at `shopping/`. Separate lists, shared messages and substitution approval, manual offer activation, shopping history, voice feedback and manual expense/repayment records are stored apart from fitness data. Mama’s scoped invitation cannot read fitness records. Server-side OpenAI answers use the authorized role’s context; draft groceries require review before adding. Existing workout history and cardio notification timing diagnostics are preserved.
+
+Configure `SHOPPING_ROOM` with the SQLite Durable Object migration in the Worker example. Keep `OPENAI_API_KEY`, `COACH_REVIEW_TOKEN`, `TRACKER_TOKEN` and `VAPID_PRIVATE_JWK` in encrypted Worker secrets. Personal coaching records and shopping preferences are private server records and must never be committed here.

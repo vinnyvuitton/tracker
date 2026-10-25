@@ -1,5 +1,5 @@
-const CACHE = "workout-2-shell-v32";
-const SHELL = ["./", "./index.html", "./styles.css?v=2.14.0", "./migration.js?v=2.14.0", "./app.js?v=2.14.0", "./manifest.webmanifest?v=2.14.0", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png"];
+const CACHE = "workout-2-shell-v33";
+const SHELL = ["./", "./index.html", "./styles.css?v=2.15.0", "./migration.js?v=2.15.0", "./app.js?v=2.15.0", "./manifest.webmanifest?v=2.15.0", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)));
@@ -7,13 +7,14 @@ self.addEventListener("install", (event) => {
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key)))));
+  event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((key) => key.startsWith("workout-2-shell-") && key !== CACHE).map((key) => caches.delete(key)))));
   self.clients.claim();
 });
 
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   if (event.request.method !== "GET" || url.origin !== self.location.origin) return;
+  if (!SHELL.some(file => new URL(file, self.location).pathname === url.pathname)) return;
   event.respondWith(fetch(event.request).then((response) => {
     const copy = response.clone();
     caches.open(CACHE).then((cache) => cache.put(event.request, copy));
