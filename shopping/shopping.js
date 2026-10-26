@@ -12,9 +12,39 @@
   const sunday = value => { const d = new Date(value + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() - d.getUTCDay()); return d.toISOString().slice(0, 10); };
   let data = null, week = sunday(today()), tab = ["ask", "updates"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "list", owner = "both", online = navigator.onLine, lastUndo = null, editorSubmit = null, editorEpoch = 0, recording = null, stream = null, voiceFile = null, voiceUrl = "", lastProductPhoto = null, turns = [], answer = null, groceryDraft = null, busy = false;
   let pending = []; try { pending = JSON.parse(localStorage.getItem(PENDING) || "[]"); } catch {}
-  const accessFragment = new URLSearchParams(location.hash.slice(1)).get("access");
-  if (accessFragment) { localStorage.setItem(KEY, accessFragment); localStorage.removeItem("our_shopping_signed_out"); history.replaceState(null, "", location.pathname); }
   function accessToken() { return (local && sessionStorage.getItem("shopping_preview_access")) || localStorage.getItem(KEY) || (!localStorage.getItem("our_shopping_signed_out") && localStorage.getItem("vinny_workout_2_access")) || ""; }
+  function shoppingAccess(value) {
+    const input = String(value || "").trim();
+    if (/^[A-Za-z0-9_.~+\/=\-]{16,512}$/.test(input)) return input;
+    let url;
+    try { url = new URL(input); } catch { throw new Error("Paste the complete private shopping invitation Vinny sent you."); }
+    const directory = new URL("./", location.href).pathname;
+    if (url.origin !== location.origin || ![directory, directory + "index.html"].includes(url.pathname)) throw new Error("Use the private invitation for this Shopping app.");
+    const code = new URLSearchParams(url.hash.slice(1)).get("access") || "";
+    if (!/^[A-Za-z0-9_.~+\/=\-]{16,512}$/.test(code)) throw new Error("That link is missing your private shopping access. Ask Vinny to copy Mama’s private invitation from Help & settings.");
+    return code;
+  }
+  async function openShoppingAccess(value) {
+    const code = shoppingAccess(value);
+    // Validate before replacing saved access; a bad paste must not discard a working invitation.
+    const next = await request("/shopping/state", { headers: { Authorization: "Bearer " + code } });
+    localStorage.setItem(KEY, code); localStorage.removeItem("our_shopping_signed_out");
+    if (local) sessionStorage.removeItem("shopping_preview_access");
+    localStorage.removeItem(CACHE); data = next; turns = []; answer = null; groceryDraft = null; lastProductPhoto = null;
+    online = true; localStorage.setItem(CACHE, JSON.stringify(data));
+    $("access-code").value = ""; $("access-error").textContent = "";
+    if ($("access").open) $("access").close();
+    render(); await loadAskHistory();
+  }
+  function accessError(error) {
+    unlock(); $("access-error").textContent = error.status === 401 ? "This shopping invitation is no longer valid. Ask Vinny for the current private shopping link." : error.message;
+  }
+  async function openInvitation() {
+    const code = new URLSearchParams(location.hash.slice(1)).get("access");
+    if (code === null) return;
+    history.replaceState(null, "", location.pathname + (location.search || ""));
+    try { await openShoppingAccess(code); } catch (error) { accessError(error); }
+  }
   function current() { return data?.weeks?.[week] || { items: [], input: [], trips: [] }; }
   function item(id) { return current().items.find(i => i.id === id); }
   function toast(message) { $("notice").textContent = message; $("notice").hidden = false; setTimeout(() => $("notice").hidden = true, 5500); }
@@ -29,8 +59,11 @@
   }
   async function refresh(renderNow = true) {
     if (!accessToken()) { unlock(); return; }
+    const credential = accessToken();
     try {
-      data = await request("/shopping/state"); online = true; localStorage.setItem(CACHE, JSON.stringify(data));
+      const next = await request("/shopping/state");
+      if (credential !== accessToken()) return;
+      data = next; online = true; localStorage.setItem(CACHE, JSON.stringify(data));
       if (renderNow) render(); else status();
     } catch (error) {
       online = false;
@@ -58,7 +91,10 @@
     }
     status();
   }
-  function unlock() { if (!$("access").open) $("access").showModal(); }
+  function unlock() {
+    $("use-vinny").hidden = !localStorage.getItem("vinny_workout_2_access") || data?.role === "mama" || Boolean(localStorage.getItem(KEY));
+    if (!$("access").open) $("access").showModal();
+  }
   function field(label, id, options = {}) {
     if (options.select) return '<label>' + esc(label) + '<select id="' + id + '">' + options.select.map(([value, title]) => '<option value="' + esc(value) + '"' + (options.value === value ? ' selected' : '') + '>' + esc(title) + '</option>').join('') + '</select></label>';
     return '<label>' + esc(label) + (options.textarea ? '<textarea id="' + id + '"' : '<input id="' + id + '" type="' + esc(options.type || 'text') + '"') + (options.required ? ' required' : '') + (options.accept ? ' accept="' + esc(options.accept) + '"' : '') + (options.type === 'number' ? ' min="0.01" step="0.01" inputmode="decimal"' : '') + (options.textarea ? '>' + esc(options.value) + '</textarea>' : ' value="' + esc(options.value) + '">') + '</label>';
@@ -249,11 +285,15 @@
   $('settings').onclick=()=>openEditor('Help & settings','<ol class="onboarding"><li>Use List to switch between Vinny’s list, Mama’s list and Shop both.</li><li>Check what you have at home. Mark items bought or unavailable during the trip.</li><li>Use Updates to message each other and approve substitutions.</li><li>Open official Jewel/Ibotta links and clip offers yourself.</li><li>Mama records actual shopping expenses and confirms repayments.</li><li>On iPhone: Safari → Share → Add to Home Screen. On a laptop, use the same private shopping access in your browser.</li><li>Ask uses OpenAI with approved context. App activity is available for our coaching/build reviews; this ChatGPT chat is not continuously watching it.</li></ol><div class="actions"><button type="button" id="enable-push" class="secondary">Enable notifications on this device</button>'+(data?.role==='vinny'?'<button type="button" id="invite-mama" class="secondary">Create / replace Mama’s private link</button>':'')+'</div><div id="invite-result"></div><h3>Pending edits</h3><p>'+pending.map(p=>esc(p.type+' · '+p.week)).join('<br>')+'</p><div class="actions"><button type="button" id="retry-pending" class="secondary">Retry pending edits</button><button type="button" id="discard-pending" class="quiet">Discard pending edits</button><button type="button" id="sign-out" class="quiet">Lock shopping on this device</button></div>',null);
   $('close-editor').onclick=closeEditor;$('cancel-editor').onclick=closeEditor;$('editor').addEventListener('cancel',()=>{editorEpoch++;cleanupRecording();});
   $('editor-form').onsubmit=async event=>{event.preventDefault();if(!editorSubmit)return;if(recording?.state==='recording'){$('editor-error').textContent='Stop and review the recording before sending.';return;}$('editor-save').disabled=true;try{await editorSubmit();closeEditor();}catch(error){$('editor-error').textContent=error.message;}finally{$('editor-save').disabled=false;}};
-  $('access-form').onsubmit=async event=>{event.preventDefault();localStorage.setItem(KEY,value('access-code'));localStorage.removeItem('our_shopping_signed_out');try{data=await request('/shopping/state');$('access').close();turns=[];answer=null;render();}catch(error){localStorage.removeItem(KEY);$('access-error').textContent=error.message;}};
-  $('use-vinny').onclick=()=>{localStorage.removeItem('our_shopping_signed_out');localStorage.removeItem(KEY);if(localStorage.getItem('vinny_workout_2_access')){$('access').close();refresh();}else $('access-error').textContent='Open and unlock Vinny’s dashboard on this device first.';};
+  $('access-form').onsubmit=async event=>{event.preventDefault();try{await openShoppingAccess(value('access-code'));}catch(error){accessError(error);}};
+  $('use-vinny').onclick=async()=>{const code=localStorage.getItem('vinny_workout_2_access');if(!code){$('use-vinny').hidden=true;$('access-error').textContent='Open the private shopping invitation Vinny sent you, or paste the complete link above.';return;}try{await openShoppingAccess(code);}catch(error){accessError(error);}};
   document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;history.replaceState(null,'','#'+tab);render();if(tab==='ask')loadAskHistory();window.scrollTo(0,0);});
   window.addEventListener('online',()=>refresh());window.addEventListener('offline',()=>{online=false;status();});window.addEventListener('pagehide',cleanupRecording);
+  window.addEventListener('hashchange',()=>openInvitation());
   setInterval(()=>{if(!data||busy||$('editor').open||$('access').open||document.hidden||['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName))return;refresh();},10000);
   if('serviceWorker'in navigator)shoppingRegistration=navigator.serviceWorker.register('./sw.js').catch(()=>null);
+  if (new URLSearchParams(location.hash.slice(1)).has('access')) openInvitation();
+  else {
   refresh().then(()=>{if(data)loadAskHistory();});
+  }
 })();
