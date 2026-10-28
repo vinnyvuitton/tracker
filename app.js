@@ -165,6 +165,9 @@
   };
 
   var state = {
+    foodGuide: null,
+    foodGuideObjectUrl: "",
+    foodGuideOpening: false,
     coaching: null,
     view: "today",
     selectedDate: TODAY,
@@ -1506,7 +1509,7 @@
   function renderPlan() {
     var html = header("The Plan", state.coaching ? "Repeatable training · building toward the March 8K" : "September 10 to December 31");
     html += '<section class="card"><div class="notice">Four strength days, two cardio days, and one active recovery day. Progress reps before load; clean form and repeatability matter more than adding exercises.</div></section>';
-    if (TODAY >= WEEK_SIX_START) html += renderWeekSixGuidance();
+    if (TODAY >= WEEK_SIX_START) html += state.coaching ? renderPlanFoodGuidance() : renderWeekSixGuidance();
     else html += '<section class="card"><details class="form-guide"><summary>Why this week’s progression supports fat loss</summary><p>Your logged cardio effort was about 5–5.5/10 Wednesday and 4–4.5/10 Saturday. Try the increased work blocks at about 6/10, with a smooth walk and no leaning on the rails. The 65-minute duration stays the same.</p><p>At about 153 lb, the proposed full-session changes add roughly 20 calories Wednesday and 40 Saturday in a walking-equation estimate. These are estimates from the prescribed settings, not measured burn or a promise of weight loss. Keep the 1,850-calorie anchor; do not eat back treadmill calories.</p><p>Research across 116 trials links greater weekly moderate-to-vigorous aerobic duration with lower weight, waist, and body fat. It does not establish that a specific higher incline guarantees better fat loss. Strength training during dietary weight loss helps preserve lean tissue. We will judge this plan using actual effort, recovery, weight averages, waist, and standardized photos.</p><p><a href="https://jamanetwork.com/journals/jamanetworkopen/fullarticle/2828487" target="_blank" rel="noopener noreferrer">Cardio and fat-loss research ↗</a> · <a href="https://eprints.gla.ac.uk/361857/2/361857.pdf" target="_blank" rel="noopener noreferrer">Strength and muscle-preservation research ↗</a></p></details></section>';
     DAYS.forEach(function (key) {
       var plan = planForDate(addDays(startOfWeek(TODAY), DAYS.indexOf(key)));
@@ -1819,6 +1822,8 @@
   }
 
   function bindViewEvents() {
+    var openGuide = document.getElementById("open-food-guide");
+    if (openGuide) openGuide.addEventListener("click", openFoodGuide);
     document.querySelectorAll("[data-date]").forEach(function (button) { button.addEventListener("click", function () { state.revealedPhoto = null; state.selectedDate = button.dataset.date; render(); }); });
     document.querySelectorAll("[data-week-shift]").forEach(function (button) { button.addEventListener("click", function () { state.revealedPhoto = null; state.selectedDate = addDays(state.selectedDate, Number(button.dataset.weekShift)); render(); }); });
     document.querySelectorAll("[data-this-week]").forEach(function (button) { button.addEventListener("click", function () { state.revealedPhoto = null; state.selectedDate = TODAY; render(); }); });
@@ -3069,6 +3074,53 @@
     return '<section class="card weekly-coach"><p class="eyebrow">Weekly Coach · approved ' + esc(coach.approvedAt) + '</p><h2>' + esc(coach.title) + '</h2><p>' + esc(coach.summary) + '</p><details' + (compact ? '' : ' open') + '><summary>Food options, recovery and the race goal</summary><p>' + esc(coach.targetStatus) + '</p>' + coach.meals.map(function (meal) { return '<h3>' + esc(meal.occasion) + '</h3><ul>' + meal.options.map(function (option) { return '<li>' + esc(option) + '</li>'; }).join('') + '</ul>'; }).join('') + '<p>' + esc(coach.shake) + '</p><p>' + esc(coach.sleep) + '</p><p>' + esc(coach.support) + '</p><p><strong>' + esc(coach.goal.name) + ' · ' + esc(coach.goal.date) + '</strong></p><p>' + esc(coach.goal.nextStep) + '</p><p>' + esc(coach.groceryStatus) + '</p></details><div class="row wrap"><a class="button" href="shopping/">Open shared shopping</a><a class="button secondary" href="shopping/#ask">Ask TrainerGPT</a></div><p class="notification-status">Next review: ' + esc(coach.reviewDue) + '. Saved history stays available.</p></section>';
   }
 
+  function renderFoodGuideCard() {
+    var guide = state.foodGuide;
+    var open = '<button type="button" id="open-food-guide"' + (state.foodGuideOpening ? ' disabled' : '') + '>' + (state.foodGuideOpening ? 'Opening Guide…' : 'Open Food Guide') + '</button>';
+    return '<section class="card food-guide"><p class="eyebrow">Your Meal And Snack Library</p><h2>Food Guide</h2><p>Familiar meals, new combinations and flexible servings, with your preferences kept in mind.</p>' + (guide ? '<p class="notification-status">Updated ' + esc(guide.updatedAt.slice(0,10)) + ' · Food logs reviewed through ' + esc(guide.logsReviewedThrough) + ' · ' + esc(guide.pages) + ' pages</p>' : '<p class="notification-status">Open to check for your latest reviewed edition.</p>') + '<div class="row wrap">' + open + '<a class="button secondary" href="shopping/#ask">Ask TrainerGPT</a></div><p class="notification-status">Refreshed during our weekly review. New foods are suggestions for review, not automatic additions. Use the PDF viewer to save a copy on your device.</p></section>';
+  }
+
+  function renderPlanFoodGuidance() {
+    return renderFoodGuideCard() + '<section class="card"><details class="form-guide"><summary>Training And Recovery</summary><p><strong>' + esc(state.coaching.goal.name) + '</strong> · ' + esc(state.coaching.goal.nextStep) + '</p><p>' + esc(state.coaching.sleep) + '</p><p>' + esc(state.coaching.support) + '</p></details></section>';
+  }
+
+  async function loadFoodGuide() {
+    try {
+      var response = await apiFetch("/food-guide", { method: "GET" });
+      var guide = (await response.json()).guide;
+      if (guide && typeof guide.version === "string" && typeof guide.updatedAt === "string" && typeof guide.logsReviewedThrough === "string") {
+        if (state.foodGuide && state.foodGuide.version !== guide.version && state.foodGuideObjectUrl) { URL.revokeObjectURL(state.foodGuideObjectUrl); state.foodGuideObjectUrl = ""; }
+        state.foodGuide = guide;
+      } else throw new Error("The guide information could not be read.");
+    } catch (error) { state.foodGuide = null; if(state.foodGuideObjectUrl){URL.revokeObjectURL(state.foodGuideObjectUrl);state.foodGuideObjectUrl="";} if(error.message==="unauthorized")throw error; }
+  }
+
+  async function openFoodGuide() {
+    if (state.foodGuideOpening) return;
+    // Reserve a viewer while the tap is active; the protected PDF itself is fetched with authorization.
+    var accessBefore = localStorage.getItem(TOKEN_KEY);
+    var viewer = null;
+    try { viewer = window.open("about:blank", "_blank"); } catch (ignore) {}
+    if (viewer) { try { viewer.opener = null; viewer.document.title = "Opening Food Guide"; viewer.document.body.textContent = "Opening your private food guide…"; } catch(ignore) { viewer.close(); viewer=null; } }
+    state.foodGuideOpening = true;
+    try {
+      await loadFoodGuide();
+      if (accessBefore !== localStorage.getItem(TOKEN_KEY)) throw new Error("unauthorized");
+      if (!state.foodGuide) throw new Error("Your reviewed food guide is not available yet.");
+      var response = await apiFetch("/food-guide/pdf?version=" + encodeURIComponent(state.foodGuide.version), { method: "GET" });
+      if (!(response.headers.get("Content-Type") || "").startsWith("application/pdf")) throw new Error("The guide could not be opened. Please try again.");
+      var blob = await response.blob();
+      if (accessBefore !== localStorage.getItem(TOKEN_KEY)) throw new Error("unauthorized");
+      if (state.foodGuideObjectUrl) URL.revokeObjectURL(state.foodGuideObjectUrl);
+      state.foodGuideObjectUrl = URL.createObjectURL(blob);
+      if (viewer) viewer.location.replace(state.foodGuideObjectUrl);
+      else location.assign(state.foodGuideObjectUrl);
+    } catch (error) {
+      if (viewer) viewer.close();
+      showFeedback(error.message === "unauthorized" ? "Unlock your dashboard to open the private food guide." : error.message, "warning");
+    } finally { state.foodGuideOpening = false; render(); }
+  }
+
   async function loadCoaching() {
     try {
       var response = await apiFetch("/coaching", { method: "GET" });
@@ -3077,6 +3129,7 @@
     } catch (error) {
       try { state.coaching = JSON.parse(localStorage.getItem(STORAGE_KEY + "_coaching") || "null"); } catch (ignore) {}
     }
+    await loadFoodGuide();
   }
 
   async function apiFetch(path, options, returnRaw) {
@@ -3172,6 +3225,8 @@
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(STORAGE_KEY + "_coaching");
     state.coaching = null;
+    state.foodGuide = null;
+    if (state.foodGuideObjectUrl) { URL.revokeObjectURL(state.foodGuideObjectUrl); state.foodGuideObjectUrl = ""; }
     clearPhotoUrls();
     state.data = defaultData();
     state.sync = "Locked";

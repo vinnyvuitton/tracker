@@ -1,5 +1,6 @@
 import { shoppingFetch, ShoppingRoom } from "./companion.js";
 import { readCoaching, saveCoaching, trainerReply } from "./trainer.js";
+import { foodGuide } from "./food-guide.js";
 export { ShoppingRoom };
 const DATA_KEY = "mytracker_v2";
 const LEGACY_KEY = "mytracker";
@@ -7,7 +8,7 @@ const MAX_DATA_BYTES = 24 * 1024 * 1024;
 const MAX_PHOTO_BYTES = 1024 * 1024;
 const BACKUP_LIMIT = 30;
 const MEAL_MODEL = "@cf/google/gemma-4-26b-a4b-it";
-const BUILD_ID = "workout-2.15-shopping-live";
+const BUILD_ID = "workout-2.16-food-guide";
 const TIMING_TTL = 30 * 86400;
 
 export default {
@@ -64,6 +65,7 @@ export default {
     }
 
     try {
+      if (url.pathname === "/food-guide" || url.pathname === "/food-guide/pdf") return foodGuide(request, env, cors);
       if (url.pathname === "/coaching" && request.method === "GET") return json({ record: await readCoaching(env) }, 200, cors);
       if (url.pathname === "/coaching" && request.method === "PUT") return withCors(await saveCoaching(request, env), cors);
       if (url.pathname === "/coach/ask" && request.method === "POST") return withCors(await trainerReply(await request.json(), env), cors);
