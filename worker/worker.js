@@ -8,7 +8,7 @@ const MAX_DATA_BYTES = 24 * 1024 * 1024;
 const MAX_PHOTO_BYTES = 1024 * 1024;
 const BACKUP_LIMIT = 30;
 const MEAL_MODEL = "@cf/google/gemma-4-26b-a4b-it";
-const BUILD_ID = "workout-2.16-food-guide";
+const BUILD_ID = "workout-2.16.1-date-schedule";
 const TIMING_TTL = 30 * 86400;
 
 export default {
@@ -687,7 +687,7 @@ async function sendDailyReminder(now, env) {
   }
   if (type === "workout") {
     if (day.workout && day.workout.completed) return;
-    message = { title: "Good morning, Vinny", body: workoutNames[parts.weekday] + " is ready when you are dressed and hydrated." };
+    message = { title: "Good morning, Vinny", body: workoutNames[coaching?.status === "approved" && Object.hasOwn(workoutNames, coaching.dateSchedule?.[parts.iso]) ? coaching.dateSchedule[parts.iso] : parts.weekday] + " is ready when you are dressed and hydrated." };
   }
   if (type === "water") {
     const expected = pacedTarget(Number(targets.water) || 10, hhmm, reminders.quietEnd, reminders.quietStart);

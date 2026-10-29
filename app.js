@@ -844,7 +844,8 @@
 
   function planForDate(iso) {
     if (SPECIAL_DAYS[iso]) return SPECIAL_DAYS[iso];
-    var key = dayKey(iso), plan = PLAN[key];
+    var override = state.coaching && state.coaching.status === "approved" && state.coaching.dateSchedule && state.coaching.dateSchedule[iso];
+    var key = DAYS.includes(override) ? override : dayKey(iso), plan = PLAN[key];
     if (state.coaching && state.coaching.status === "approved" && iso >= state.coaching.weekStart) {
       var reviewed = weekSixStrengthPlan(key), changes = state.coaching.plan[key];
       if (reviewed && changes) return Object.assign({}, reviewed, { subtitle: "Hold this week’s loads · controlled reps and manageable recovery", sections: reviewed.sections.map(function (section) {
@@ -999,6 +1000,7 @@
     var day = getDay(iso);
     var t = totals(day);
     var html = header(plan.title, formatDate(iso)) + weekStrip();
+    if (state.coaching && state.coaching.status === "approved" && DAYS.includes(state.coaching.dateSchedule && state.coaching.dateSchedule[iso]) && state.coaching.dateSchedule[iso] !== key) html += '<div class="notice">This week only · Friday and Saturday workouts swapped. Normal schedule resumes next week.</div>';
     if (state.coaching && iso >= state.coaching.weekStart) html += renderWeeklyCoach(true);
     html += '<div class="grid two">' +
       nutritionStatCard("Protein", Math.round(t.protein), "g", state.data.targets.proteinMin, state.data.targets.proteinMax) +
