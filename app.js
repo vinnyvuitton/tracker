@@ -847,10 +847,27 @@
     var override = state.coaching && state.coaching.status === "approved" && state.coaching.dateSchedule && state.coaching.dateSchedule[iso];
     var key = DAYS.includes(override) ? override : dayKey(iso), plan = PLAN[key];
     if (state.coaching && state.coaching.status === "approved" && iso >= state.coaching.weekStart) {
+      var datedCardio = state.coaching.cardioSessions && state.coaching.cardioSessions[iso];
+      if (datedCardio && plan.type === "Cardio" && Array.isArray(datedCardio.segments) && datedCardio.segments.length) {
+        var savedSession = state.data.days && state.data.days[iso] && state.data.days[iso].cardio;
+        var walkOnly = Boolean(savedSession && savedSession.walkOnly);
+        return Object.assign({}, plan, { title: datedCardio.title, subtitle: datedCardio.subtitle,
+          speedTrialAvailable: false, shortTrialAvailable: false, expressSegments: null,
+          walkOnlyAvailable: true, walkOnlyEnabled: walkOnly,
+          cardioSegments: walkOnly ? datedCardio.walkSegments : datedCardio.segments,
+          completionMessage: datedCardio.completionMessage,
+          sections: [{ label: "Treadmill", exercises: [Object.assign({}, plan.sections[0].exercises[0], {
+            prescription: walkOnly ? "60 minutes comfortable level walking, including warmup and cooldown" : "60 minutes total · eight 1-minute jogs with 90-second walk recoveries",
+            coachingNote: datedCardio.note
+          })] }]
+        });
+      }
       var reviewed = weekSixStrengthPlan(key), changes = state.coaching.plan[key];
       if (reviewed && changes) return Object.assign({}, reviewed, { subtitle: "Hold this week’s loads · controlled reps and manageable recovery", sections: reviewed.sections.map(function (section) {
         return Object.assign({}, section, { exercises: section.exercises.map(function (exercise) {
           var updated = Object.assign({}, exercise, changes[exercise.name] || {});
+          var noteUpdates = state.coaching.exerciseNotes;
+          if (noteUpdates && iso >= noteUpdates.from && noteUpdates.byName && noteUpdates.byName[updated.name]) updated.coachingNote = noteUpdates.byName[updated.name];
           if (updated.equipment && updated.equipment.type === "bodyweight") delete updated.weeklyLoad;
           return updated;
         }) });
@@ -1203,6 +1220,10 @@
     var fullDuration = plan.cardioSegments && plan.cardioSegments.length ? plan.cardioSegments[plan.cardioSegments.length - 1].end : duration;
     var expressDuration = plan.expressSegments && plan.expressSegments.length ? plan.expressSegments[plan.expressSegments.length - 1].end : 0;
     var html = plan.expressSegments ? '<div class="cardio-mode"><button type="button" data-cardio-mode="full" class="' + (state.cardioMode === "full" ? "active" : "") + '">Full · ' + fullDuration + ' min</button><button type="button" data-cardio-mode="express" class="' + (state.cardioMode === "express" ? "active" : "") + '">Express · ' + expressDuration + ' min</button></div>' : '';
+    if (plan.walkOnlyAvailable) {
+      var walkOnlyLocked = active || complete || Boolean(state.cardioCountdown && state.cardioCountdown.date === state.selectedDate);
+      html += '<div class="notice"><p>Keep full-sentence conversation, around 3–4/10 effort. Starting speeds are suggestions; slow down as needed. Stop jogging for pain or a changed stride. If unusually tired, use walking or rest.</p><label class="check-row"><input id="cardio-walk-only" type="checkbox" ' + (plan.walkOnlyEnabled ? 'checked ' : '') + (walkOnlyLocked ? 'disabled ' : '') + '> Walk only today · same 60 minutes, level incline</label><p>Choose before starting; your interval alerts follow this choice.</p></div>';
+    }
     if (plan.shortTrialAvailable && state.cardioMode !== "express") {
       var shortTrialLocked = active || complete || Boolean(state.cardioCountdown && state.cardioCountdown.date === state.selectedDate);
       html += '<details class="form-guide cardio-speed-option"><summary>Saturday five-minute trial · ' + (plan.shortTrialEnabled ? 'recommended plan' : 'standard plan') + '</summary><p>October 21 review: try 3.5 mph at incline setting 8 only during minutes 25–30, then return to 3.3 mph at setting 9. All other blocks and the 65-minute duration stay steady. Aim for about 6/10 effort with a smooth walk; reduce settings if form changes. Before starting, uncheck to use the standard plan if readiness is poor. Your interval alerts will match the choice.</p><label class="check-row"><input id="cardio-short-trial" type="checkbox" ' + (plan.shortTrialEnabled ? 'checked ' : '') + (shortTrialLocked ? 'disabled ' : '') + '> Use the five-minute trial · October 24 only</label></details>';
@@ -1213,7 +1234,7 @@
     }
     html += '<div class="cardio-timeline">';
     cardioSegmentsFor(plan).forEach(function (segment) {
-      html += '<div class="cardio-step' + (segment.automatic ? ' automatic' : '') + '"><time>' + segment.start + '–' + segment.end + ' min</time><div><strong>' + esc(cardioSettingLabel(segment)) + '</strong><span>' + esc(segment.cue) + '</span></div></div>';
+      html += '<div class="cardio-step' + (segment.automatic ? ' automatic' : '') + '"><time>' + cardioMinuteLabel(segment.start) + '–' + cardioMinuteLabel(segment.end) + ' min</time><div><strong>' + esc(cardioSettingLabel(segment)) + '</strong><span>' + esc(segment.cue) + '</span></div></div>';
     });
     html += '</div><div class="cardio-controls"><button class="primary" id="start-cardio" ' + (active ? "disabled" : "") + '>' + (active ? "Session alerts active" : complete ? "Start another " + duration + "-minute session" : "Start " + duration + "-minute session") + '</button>';
     if (active) html += '<button class="secondary" id="cancel-cardio">Cancel alerts</button>';
@@ -1241,8 +1262,12 @@
     return segment && segment.automatic ? "Automatic treadmill cooldown" : "Incline " + segment.incline + " · speed " + segment.speed.toFixed(1) + " mph";
   }
 
+  function cardioMinuteLabel(value) {
+    return value % 1 ? Math.floor(value) + ":" + String(Math.round((value % 1) * 60)).padStart(2, "0") : String(value);
+  }
+
   function cardioAlertTitle(segment) {
-    return "Minute " + segment.start + " · " + (segment.automatic ? "Automatic treadmill cooldown" : "Incline " + segment.incline + " · Speed " + segment.speed.toFixed(1) + " mph");
+    return "Minute " + cardioMinuteLabel(segment.start) + " · " + (segment.automatic ? "Automatic treadmill cooldown" : "Incline " + segment.incline + " · Speed " + segment.speed.toFixed(1) + " mph");
   }
 
   function renderCardioCountdown() {
@@ -1528,7 +1553,7 @@
           html += '</div>';
         });
       });
-      if (plan.cardioSegments) html += '<div class="cardio-timeline">' + plan.cardioSegments.map(function (segment) { return '<div class="cardio-step' + (segment.automatic ? ' automatic' : '') + '"><time>' + segment.start + '–' + segment.end + ' min</time><div><strong>' + esc(cardioSettingLabel(segment)) + '</strong><span>' + esc(segment.cue) + '</span></div></div>'; }).join("") + '</div>';
+      if (plan.cardioSegments) html += '<div class="cardio-timeline">' + plan.cardioSegments.map(function (segment) { return '<div class="cardio-step' + (segment.automatic ? ' automatic' : '') + '"><time>' + cardioMinuteLabel(segment.start) + '–' + cardioMinuteLabel(segment.end) + ' min</time><div><strong>' + esc(cardioSettingLabel(segment)) + '</strong><span>' + esc(segment.cue) + '</span></div></div>'; }).join("") + '</div>';
       html += '</section>';
     });
     return html;
@@ -1932,6 +1957,13 @@
     var cancelCardioCountdown = document.getElementById("cancel-cardio-countdown");
     if (cancelCardioCountdown) cancelCardioCountdown.addEventListener("click", cancelCardioSession);
     document.querySelectorAll("[data-cardio-mode]").forEach(function (button) { button.addEventListener("click", function () { state.cardioMode = button.dataset.cardioMode; render(); }); });
+    var walkOnlyChoice = document.getElementById("cardio-walk-only");
+    if (walkOnlyChoice) walkOnlyChoice.addEventListener("change", function () {
+      var plan = planForDate(state.selectedDate), day = getDay(state.selectedDate);
+      if (!plan.walkOnlyAvailable || day.cardio && (day.cardio.status === "active" || day.cardio.status === "complete") || state.cardioCountdown && state.cardioCountdown.date === state.selectedDate) { render(); return; }
+      day.cardio.walkOnly = walkOnlyChoice.checked;
+      queueSave(true);
+    });
     var speedTrial = document.getElementById("cardio-speed-trial");
     if (speedTrial) speedTrial.addEventListener("change", function () {
       var plan = planForDate(state.selectedDate), day = state.data.days[state.selectedDate];
@@ -2824,13 +2856,13 @@
       var alerts = segments.slice(1).map(function (segment) {
         return { atMinutes: segment.start, title: cardioAlertTitle(segment), body: segment.cue };
       });
-      alerts.push({ atMinutes: duration, title: duration + " minutes complete", body: "Nice work, Vinny. The programmed walk and automatic cooldown are complete." });
+      alerts.push({ atMinutes: duration, title: duration + " minutes complete", body: plan.completionMessage || "Nice work, Vinny. The programmed walk and automatic cooldown are complete." });
       var first = segments[0];
       var startAlert = { title: "GO · Time to rock 🤘🏻", body: cardioSettingLabel(first) };
       var response = await apiFetch("/notifications/cardio/start", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date: state.selectedDate, title: plan.title, durationMinutes: duration, countdownSeconds: 5, alerts: alerts, startAlert: startAlert }) });
       var result = await response.json();
       var day = getDay(state.selectedDate);
-      day.cardio = { sessionId: result.id, startedAt: result.startedAt, status: "active", durationMinutes: duration, completedAt: "", result: day.cardio && day.cardio.result || null, workSpeedTrial: Boolean(plan.speedTrialAvailable && day.cardio && day.cardio.workSpeedTrial), shortSpeedInclineTrial: Boolean(plan.shortTrialAvailable && plan.shortTrialEnabled && state.cardioMode !== "express"), mode: state.cardioMode };
+      day.cardio = { sessionId: result.id, startedAt: result.startedAt, status: "active", durationMinutes: duration, completedAt: "", result: day.cardio && day.cardio.result || null, workSpeedTrial: Boolean(plan.speedTrialAvailable && day.cardio && day.cardio.workSpeedTrial), shortSpeedInclineTrial: Boolean(plan.shortTrialAvailable && plan.shortTrialEnabled && state.cardioMode !== "express"), mode: state.cardioMode, walkOnly: Boolean(plan.walkOnlyAvailable && plan.walkOnlyEnabled) };
       state.cardioCountdown = { date: state.selectedDate, startedAt: result.startedAt, first: first, remaining: number(result.countdownSeconds) || 5, go: false };
       startCardioStatusPolling();
       queueSave(true);
