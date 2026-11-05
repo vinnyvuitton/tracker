@@ -215,6 +215,8 @@
 
   if (!localMode && API_BASE.indexOf("/api") >= 0 && new URLSearchParams(location.search).get("date") && /^\d{4}-\d{2}-\d{2}$/.test(new URLSearchParams(location.search).get("date"))) state.selectedDate = new URLSearchParams(location.search).get("date");
 
+  var entryTimingTracker = WorkoutEntryTiming.createTracker(state.data);
+
   function ex(name, prescription, tip, equipment) {
     return { name: name, prescription: prescription, tip: tip, equipment: equipment || null };
   }
@@ -1100,7 +1102,7 @@
     if (plan.type === "Recovery" && plan.sections.some(function (section) { return section.exercises.some(function (exercise) { return exercise.name === "Easy Walk"; }); })) html += renderTreadmillResult(day);
     html += '<label class="field">Session effort<select id="session-rating"><option value="">Choose after training</option>';
     ["Easy", "Solid", "Hard", "Brutal"].forEach(function (rating) { html += '<option ' + (day.workout.rating === rating ? "selected" : "") + '>' + rating + '</option>'; });
-    html += '</select></label></section>';
+    html += '</select></label><p class="notification-status">Set entries are timestamped automatically when you log them.</p></section>';
     return html;
   }
 
@@ -2130,7 +2132,7 @@
     var sets = exerciseSets(day.exercises[id], exercise || { prescription: "1 set" });
     sets.push("");
     day.exercises[id].sets = sets;
-    render();
+    queueSave(true);
   }
 
   function addSidePlankSet(id) {
@@ -2289,6 +2291,7 @@
     existingPhoto.innerHTML = source && source.photo ? '<img alt="Saved private meal photo" data-photo-ref="' + esc(photoRefValue(source.photo)) + '"><span>Saved private photo</span>' : '';
     document.getElementById("duplicate-meal-edit").hidden = !editing;
     document.getElementById("meal-date").value = editing && editing.date || state.selectedDate;
+    document.getElementById("meal-time").value = editing && source && source.occurredAt && source.occurredAt.time || "";
     document.getElementById("save-meal-favorite").checked = false;
     document.getElementById("favorite-category-wrap").hidden = true;
     document.getElementById("meal-error").textContent = "";
@@ -2309,6 +2312,8 @@
     var copy = JSON.parse(JSON.stringify(source));
     copy.name = (copy.name || "Meal") + " copy";
     delete copy.photo;
+    delete copy.logTiming;
+    delete copy.occurredAt;
     getDay(editing.date).meals.push(copy);
     document.getElementById("meal-dialog").close();
     state.editingMeal = null;
@@ -2555,6 +2560,7 @@
     document.getElementById("meal-notes").value = pending.notes || "";
     clearPhotoInputs("meal-photo", "meal-photo-camera");
     document.getElementById("meal-date").value = pending.date || state.selectedDate;
+    document.getElementById("meal-time").value = "";
     document.getElementById("keep-meal-photo").checked = Boolean(pending.keepPhoto);
     document.getElementById("save-meal-favorite").checked = false;
     document.getElementById("favorite-category-wrap").hidden = true;
@@ -2625,6 +2631,8 @@
       meal.photo = existingMeal.photo;
     }
     var mealDate = pending ? pending.date : (document.getElementById("meal-date").value || state.selectedDate);
+    entryTimingTracker.inherit(existingMeal, meal);
+    meal.occurredAt = WorkoutEntryTiming.occurred(mealDate, document.getElementById("meal-time").value);
     var wantsFavorite = document.getElementById("save-meal-favorite").checked;
     var selectedCategory = wantsFavorite && document.querySelector('input[name="favorite-category"]:checked');
     if (wantsFavorite && !selectedCategory) { document.getElementById("meal-error").textContent = "Choose a favorite category before saving."; return; }
@@ -2862,7 +2870,9 @@
       var response = await apiFetch("/notifications/cardio/start", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date: state.selectedDate, title: plan.title, durationMinutes: duration, countdownSeconds: 5, alerts: alerts, startAlert: startAlert }) });
       var result = await response.json();
       var day = getDay(state.selectedDate);
+      var previousCardio = day.cardio;
       day.cardio = { sessionId: result.id, startedAt: result.startedAt, status: "active", durationMinutes: duration, completedAt: "", result: day.cardio && day.cardio.result || null, workSpeedTrial: Boolean(plan.speedTrialAvailable && day.cardio && day.cardio.workSpeedTrial), shortSpeedInclineTrial: Boolean(plan.shortTrialAvailable && plan.shortTrialEnabled && state.cardioMode !== "express"), mode: state.cardioMode, walkOnly: Boolean(plan.walkOnlyAvailable && plan.walkOnlyEnabled) };
+      entryTimingTracker.inherit(previousCardio, day.cardio);
       state.cardioCountdown = { date: state.selectedDate, startedAt: result.startedAt, first: first, remaining: number(result.countdownSeconds) || 5, go: false };
       startCardioStatusPolling();
       queueSave(true);
@@ -2916,7 +2926,9 @@
     var day = getDay(state.selectedDate);
     try { if (day.cardio && day.cardio.sessionId) await apiFetch("/notifications/cardio/" + encodeURIComponent(day.cardio.sessionId), { method: "DELETE" }); } catch (ignore) {}
     clearCardioCountdown();
+    var previousCardio = day.cardio;
     day.cardio = { sessionId: "", startedAt: "", status: "cancelled", durationMinutes: 0, completedAt: "", result: day.cardio && day.cardio.result || null, workSpeedTrial: Boolean(day.cardio && day.cardio.workSpeedTrial), shortSpeedInclineTrial: Boolean(day.cardio && day.cardio.shortSpeedInclineTrial), mode: day.cardio && day.cardio.mode || state.cardioMode };
+    entryTimingTracker.inherit(previousCardio, day.cardio);
     queueSave(true);
   }
 
@@ -2965,6 +2977,7 @@
   }
 
   function queueSave(redraw) {
+    entryTimingTracker.stamp(state.data);
     state.sync = "Saving";
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.data));
     state.saveDirty = true;
@@ -3099,6 +3112,7 @@
       day.cardio = Object.assign({ sessionId: "", startedAt: "", status: "", durationMinutes: 0, completedAt: "", result: null }, day.cardio || {});
       day.photos = Object.assign({ front: null, side: null, back: null, treadmill: null }, day.photos || {});
     });
+    entryTimingTracker.capture(data);
     return data;
   }
 
