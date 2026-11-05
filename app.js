@@ -1020,7 +1020,6 @@
     var t = totals(day);
     var html = header(plan.title, formatDate(iso)) + weekStrip();
     if (state.coaching && state.coaching.status === "approved" && DAYS.includes(state.coaching.dateSchedule && state.coaching.dateSchedule[iso]) && state.coaching.dateSchedule[iso] !== key) html += '<div class="notice">This week only · Friday and Saturday workouts swapped. Normal schedule resumes next week.</div>';
-    if (state.coaching && iso >= state.coaching.weekStart) html += renderWeeklyCoach(true);
     html += '<div class="grid two">' +
       nutritionStatCard("Protein", Math.round(t.protein), "g", state.data.targets.proteinMin, state.data.targets.proteinMax) +
       nutritionStatCard("Calories", Math.round(t.calories), "cal", state.data.targets.calorieMin, state.data.targets.calorieMax) +
@@ -3116,10 +3115,11 @@
     return data;
   }
 
-  function renderWeeklyCoach(compact) {
+  function renderWeeklyCoach(compact, collapsed) {
     var coach = state.coaching;
     if (!coach) return "";
-    return '<section class="card weekly-coach"><p class="eyebrow">Weekly Coach · approved ' + esc(coach.approvedAt) + '</p><h2>' + esc(coach.title) + '</h2><p>' + esc(coach.summary) + '</p><details' + (compact ? '' : ' open') + '><summary>Food options, recovery and the race goal</summary><p>' + esc(coach.targetStatus) + '</p>' + coach.meals.map(function (meal) { return '<h3>' + esc(meal.occasion) + '</h3><ul>' + meal.options.map(function (option) { return '<li>' + esc(option) + '</li>'; }).join('') + '</ul>'; }).join('') + '<p>' + esc(coach.shake) + '</p><p>' + esc(coach.sleep) + '</p><p>' + esc(coach.support) + '</p><p><strong>' + esc(coach.goal.name) + ' · ' + esc(coach.goal.date) + '</strong></p><p>' + esc(coach.goal.nextStep) + '</p><p>' + esc(coach.groceryStatus) + '</p></details><div class="row wrap"><a class="button" href="shopping/">Open shared shopping</a><a class="button secondary" href="shopping/#ask">Ask TrainerGPT</a></div><p class="notification-status">Next review: ' + esc(coach.reviewDue) + '. Saved history stays available.</p></section>';
+    var reviewStatus = /^\d{4}-\d{2}-\d{2}$/.test(coach.reviewDue || "") && coach.reviewDue >= TODAY ? "Next review: " + coach.reviewDue + "." : "Check-ins: Wednesday evenings and Sunday mornings (Chicago).";
+    return '<section class="card weekly-coach">' + (collapsed ? '<details class="form-guide"><summary>Coaching notes</summary>' : '') + '<p class="eyebrow">Weekly Coach · approved ' + esc(coach.approvedAt) + '</p><h2>' + esc(coach.title) + '</h2><p>' + esc(coach.summary) + '</p><details' + (compact ? '' : ' open') + '><summary>Food options, recovery and the race goal</summary><p>' + esc(coach.targetStatus) + '</p>' + coach.meals.map(function (meal) { return '<h3>' + esc(meal.occasion) + '</h3><ul>' + meal.options.map(function (option) { return '<li>' + esc(option) + '</li>'; }).join('') + '</ul>'; }).join('') + '<p>' + esc(coach.shake) + '</p><p>' + esc(coach.sleep) + '</p><p>' + esc(coach.support) + '</p><p><strong>' + esc(coach.goal.name) + ' · ' + esc(coach.goal.date) + '</strong></p><p>' + esc(coach.goal.nextStep) + '</p><p>' + esc(coach.groceryStatus) + '</p></details><div class="row wrap"><a class="button" href="shopping/">Open shared shopping</a><a class="button secondary" href="shopping/#ask">Ask TrainerGPT</a></div><p class="notification-status">' + esc(reviewStatus) + ' Saved history stays available.</p>' + (collapsed ? '</details>' : '') + '</section>';
   }
 
   function renderFoodGuideCard() {
@@ -3129,7 +3129,7 @@
   }
 
   function renderPlanFoodGuidance() {
-    return renderFoodGuideCard() + '<section class="card"><details class="form-guide"><summary>Training And Recovery</summary><p><strong>' + esc(state.coaching.goal.name) + '</strong> · ' + esc(state.coaching.goal.nextStep) + '</p><p>' + esc(state.coaching.sleep) + '</p><p>' + esc(state.coaching.support) + '</p></details></section>';
+    return renderFoodGuideCard() + renderWeeklyCoach(false, true);
   }
 
   async function loadFoodGuide() {
