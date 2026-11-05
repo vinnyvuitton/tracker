@@ -170,6 +170,7 @@
     foodGuideOpening: false,
     coaching: null,
     view: "today",
+    workoutFocus: false,
     selectedDate: TODAY,
     data: defaultData(),
     version: 0,
@@ -801,10 +802,17 @@
     return old;
   }
 
+  function renderSetRow(exerciseId, index, label, unit, value, exerciseName) {
+    var inputId = "set-" + exerciseId + "-" + index;
+    return '<div class="workout-set-row"><div><label for="' + esc(inputId) + '">' + esc(label) + '</label><small class="set-row-status"></small></div>' +
+      '<input id="' + esc(inputId) + '" data-exercise-set="' + esc(exerciseId) + '" data-set-index="' + index + '" inputmode="numeric" placeholder="' + esc(unit) + '" value="' + esc(value) + '" aria-label="' + esc(exerciseName + " " + label + " " + unit) + '">' +
+      '<button type="button" class="secondary" data-set-action>' + (number(value) > 0 ? 'Update' : 'Log set') + '</button></div>';
+  }
+
   function renderSetInputs(exercise, id, log) {
-    var sets = exerciseSets(log, exercise);
-    return '<div class="set-entry"><div class="set-grid">' + sets.map(function (value, index) {
-      return '<label>Set ' + (index + 1) + '<input data-exercise-set="' + id + '" data-set-index="' + index + '" inputmode="numeric" min="0" value="' + esc(value) + '" aria-label="' + esc(exercise.name) + ' set ' + (index + 1) + '"></label>';
+    var unit = /sec|second/i.test(exercise.prescription) ? "Sec" : "Reps";
+    return '<div class="set-entry"><div class="workout-set-rows">' + exerciseSets(log, exercise).map(function (value, index) {
+      return renderSetRow(id, index, "Set " + (index + 1), unit, value, exercise.name);
     }).join("") + '</div><button type="button" class="ghost add-set" data-add-set="' + id + '">+ Add set</button></div>';
   }
 
@@ -960,12 +968,20 @@
   function render() {
     document.querySelectorAll(".bottom-nav button").forEach(function (button) { button.classList.toggle("active", button.dataset.view === state.view); });
     var app = document.getElementById("app");
+    var oldDialog = document.getElementById("workout-area");
+    var workoutScroll = oldDialog?.open ? oldDialog.scrollTop : 0;
     if (state.view === "today") app.innerHTML = renderToday();
     if (state.view === "progress") app.innerHTML = renderProgress();
     if (state.view === "plan") app.innerHTML = renderPlan();
     if (state.view === "checkin") app.innerHTML = renderCheckin();
     bindViewEvents();
     hydratePhotos();
+    if (state.view === "today" && state.workoutFocus) {
+      var workoutDialog = document.getElementById("workout-area");
+      openDashboardDialog(workoutDialog);
+      workoutDialog.scrollTop = workoutScroll;
+      highlightNextSet(false);
+    }
   }
 
   function showFeedback(message, tone) {
@@ -1012,27 +1028,79 @@
     return html + '</div>';
   }
 
+  function nextWorkoutSet(day, plan) {
+    if (plan.type !== "Strength") return null;
+    for (var exercise of exercisesForPlan(plan)) {
+      var id = exerciseId(exercise.name), log = day.exercises[id] || {};
+      if (log.done) continue;
+      var sidePlank = exercise.name === "Side Plank";
+      var sets = sidePlank ? sidePlankSets(log) : exerciseSets(log, exercise);
+      var required = sidePlank ? 4 : prescribedSetCount(exercise);
+      for (var index = 0; index < required; index++) {
+        if (number(sets[index]) <= 0) {
+          var label = sidePlank ? "set " + (Math.floor(index / 2) + 1) + (index % 2 ? " right" : " left") : "set " + (index + 1);
+          return { id: id, index: index, label: exercise.name + " · " + label };
+        }
+      }
+    }
+    return null;
+  }
+
+  function highlightNextSet(scroll) {
+    var plan = planForDate(state.selectedDate), day = getDay(state.selectedDate);
+    var next = nextWorkoutSet(day, plan), target = null;
+    document.querySelectorAll("[data-exercise-set]").forEach(function (input) {
+      var isNext = next && input.dataset.exerciseSet === next.id && Number(input.dataset.setIndex) === next.index;
+      var row = input.closest(".workout-set-row");
+      var log = day.exercises[input.dataset.exerciseSet] || {};
+      var exercise = exercisesForPlan(plan).find(function (item) { return exerciseId(item.name) === input.dataset.exerciseSet; });
+      var values = exercise?.name === "Side Plank" ? sidePlankSets(log) : exerciseSets(log, exercise || {});
+      var logged = number(values[Number(input.dataset.setIndex)]) > 0;
+      row.toggleAttribute("data-next-set", Boolean(isNext));
+      row.toggleAttribute("data-logged-set", logged);
+      row.querySelector(".set-row-status").textContent = isNext ? "Up next" : logged ? "Logged" : "";
+      row.querySelector("[data-set-action]").textContent = logged ? "Update" : "Log set";
+      if (isNext) target = input;
+    });
+    var label = document.getElementById("next-workout-set");
+    if (label) label.textContent = next ? "Up next · " + next.label : "";
+    var count = document.getElementById("focused-workout-count");
+    if (count) {
+      var exercises = exercisesForPlan(plan);
+      var done = exercises.filter(function (exercise) { return day.exercises[exerciseId(exercise.name)]?.done; }).length;
+      count.textContent = done + " of " + exercises.length + " complete";
+    }
+    if (scroll && target) target.closest(".exercise").scrollIntoView({ block: "start" });
+  }
+
   function renderToday() {
     var iso = state.selectedDate;
     var key = dayKey(iso);
     var plan = planForDate(iso);
     var day = getDay(iso);
     var t = totals(day);
-    var html = header(plan.title, formatDate(iso)) + weekStrip();
+    var next = nextWorkoutSet(day, plan);
+    var started = day.cardio?.status === "active" || Object.values(day.exercises).some(function (log) { return log.done || log.reps; });
+    var workoutAction = day.workout.completed ? "Review workout" : started ? "Resume workout" : "Start workout";
+    var html = header("Daily", formatDate(iso));
+    html += '<div class="daily-overview">' + weekStrip();
+    html += '<section class="card daily-launch"><div><p class="eyebrow">Selected workout</p><h2>' + esc(plan.title) + '</h2><p class="notification-status">' + esc(next && started ? 'Up next · ' + next.label : plan.subtitle) + '</p></div><button type="button" id="open-workout" class="primary">' + workoutAction + '</button><button type="button" id="quick-log-food" class="secondary">Log food</button></section>';
     if (state.coaching && state.coaching.status === "approved" && DAYS.includes(state.coaching.dateSchedule && state.coaching.dateSchedule[iso]) && state.coaching.dateSchedule[iso] !== key) html += '<div class="notice">This week only · Friday and Saturday workouts swapped. Normal schedule resumes next week.</div>';
-    html += '<div class="grid two">' +
+    html += '<div class="grid two daily-nutrition">' +
       nutritionStatCard("Protein", Math.round(t.protein), "g", state.data.targets.proteinMin, state.data.targets.proteinMax) +
       nutritionStatCard("Calories", Math.round(t.calories), "cal", state.data.targets.calorieMin, state.data.targets.calorieMax) +
       '</div>';
 
+    html += renderMeals(day, t) + renderPendingMeals(iso);
     html += '<section class="card"><div class="card-head"><div><h2>Daily check-in</h2><p>Optional: if weighing, use comparable morning conditions after the bathroom, before pre-workout, shakes, food, other drinks, photos, or training. A pause is reasonable if checking is distressing.</p></div></div>' +
       '<div class="row wrap"><label class="field">Weight, lb<input id="weight" type="number" inputmode="decimal" min="90" max="300" step="0.1" value="' + esc(day.weight) + '"></label>' +
       '<div class="field">Water, glasses<div class="stepper"><button type="button" data-water-step="-1" aria-label="Subtract one glass">−</button><input id="water" type="number" inputmode="numeric" min="0" max="30" step="1" value="' + esc(day.water) + '" aria-label="Water glasses"><button type="button" data-water-step="1" aria-label="Add one glass">+</button></div></div></div><label class="weight-timing"><input id="weight-standard" type="checkbox" ' + (day.weightTiming !== "other" ? 'checked' : '') + '> Taken before food, drinks, and exercise</label><p id="weight-timing-status" class="notification-status">' + weightTimingStatus(day) + '</p>' + renderWaistInputs(day, iso) + '</section>';
 
-    html += renderMeals(day, t);
-    html += renderPendingMeals(iso);
-    html += renderPhotos(day, iso);
-    html += renderWorkout(day, plan, iso);
+    html += renderPhotos(day, iso) + '</div>';
+    html += '<dialog id="workout-area" aria-labelledby="workout-dialog-title"><div class="focused-workout-nav"><div><h2 id="workout-dialog-title">' + esc(plan.title) + '</h2><span id="focused-workout-count"></span><span id="workout-sync" role="status">' + esc(state.sync) + '</span></div><button type="button" class="secondary" id="back-to-daily" autofocus>Close</button></div><p id="next-workout-set" class="notification-status"></p>';
+    html += '<p class="notification-status">' + esc(plan.subtitle) + '</p>';
+    if (plan.type === "Strength") html += '<p class="notification-status">Set entries save when you leave the field.</p>';
+    html += renderWorkout(day, plan, iso) + '</dialog>';
     html += '<section class="card"><div class="card-head"><div><h2>Day note</h2><p>Energy, sleep, soreness, schedule, or anything I should know</p></div></div>' +
       '<textarea id="day-note" placeholder="Optional note">' + esc(day.workout.notes) + '</textarea></section>';
     return html;
@@ -1094,8 +1162,8 @@
         var secondLabel = plan.type === "Strength" ? "Reps completed" : plan.type === "Cardio" ? "Minutes completed" : "Notes";
         var firstPlaceholder = plan.type === "Strength" ? "Choose below" : plan.type === "Cardio" ? "Example: incline 5 felt right" : "Optional";
         var secondPlaceholder = plan.type === "Strength" ? "Example: 12, 12, 11" : plan.type === "Cardio" ? String(cardioDuration(plan)) : "Optional";
-        html += '<div class="exercise"><div class="exercise-main"><input type="checkbox" data-exercise-done="' + id + '" ' + (log.done ? "checked" : "") + ' aria-label="Complete ' + esc(exercise.name) + '"><div><div class="exercise-name-row"><div class="exercise-name">' + esc(exercise.name) + equipmentBadge(exercise) + '</div>' + (plan.type === "Strength" ? '<span class="exercise-count">' + exercisePosition + '/' + total + '</span>' : '') + '</div><div class="exercise-prescription">' + esc(exercise.prescription) + '</div>' + exerciseGuide(exercise) + '</div></div>' +
-          renderTimedExerciseTimer(plan, exercise, id) + renderExerciseLog(plan, exercise, id, log, firstLabel, secondLabel, firstPlaceholder, secondPlaceholder) + '</div>';
+        html += '<div class="exercise"><div class="exercise-main"><input type="checkbox" data-exercise-done="' + id + '" ' + (log.done ? "checked" : "") + ' aria-label="Complete ' + esc(exercise.name) + '"><div><div class="exercise-name-row"><div class="exercise-name">' + esc(exercise.name) + equipmentBadge(exercise) + '</div>' + (plan.type === "Strength" ? '<span class="exercise-count">' + exercisePosition + '/' + total + '</span>' : '') + '</div><div class="exercise-prescription">' + esc(exercise.prescription) + '</div></div></div>' +
+          renderTimedExerciseTimer(plan, exercise, id) + renderExerciseLog(plan, exercise, id, log, firstLabel, secondLabel, firstPlaceholder, secondPlaceholder) + exerciseGuide(exercise) + '</div>';
       });
     });
     if (plan.type === "Recovery" && plan.sections.some(function (section) { return section.exercises.some(function (exercise) { return exercise.name === "Easy Walk"; }); })) html += renderTreadmillResult(day);
@@ -1172,10 +1240,9 @@
   }
 
   function renderSidePlankInputs(id, log) {
-    var sets = sidePlankSets(log);
-    return '<div class="set-entry"><div class="set-grid side-plank-grid">' + sets.map(function (value, index) {
-      var label = "Set " + (Math.floor(index / 2) + 1) + " " + (index % 2 === 0 ? "left" : "right");
-      return '<label>' + label + ' (sec)<input data-exercise-set="' + id + '" data-set-index="' + index + '" inputmode="numeric" min="0" value="' + esc(value) + '" aria-label="Side Plank ' + label.toLowerCase() + '"></label>';
+    return '<div class="set-entry"><div class="workout-set-rows">' + sidePlankSets(log).map(function (value, index) {
+      var label = "Set " + (Math.floor(index / 2) + 1) + (index % 2 ? " right" : " left");
+      return renderSetRow(id, index, label, "Sec", value, "Side Plank");
     }).join("") + '</div><button type="button" class="ghost add-set" data-add-side-plank-set="' + id + '">+ Add set</button></div>';
   }
 
@@ -1330,7 +1397,10 @@
       var options = MEAL_CATEGORIES.map(function (category) { return '<option value="' + category + '" ' + (favorite.category === category ? "selected" : "") + '>' + categoryLabel(category) + '</option>'; }).join("");
       return '<div class="favorite-edit"><input data-favorite-name="' + esc(favorite.id) + '" value="' + esc(favorite.name) + '" aria-label="Favorite name"><select data-favorite-category="' + esc(favorite.id) + '" aria-label="Favorite category">' + options + '</select><button data-remove-favorite="' + esc(favorite.id) + '" aria-label="Remove ' + esc(favorite.name) + '">Remove</button></div>';
     }).join("");
-    return '<details class="favorites-panel" ' + (state.favoritesOpen ? "open" : "") + '><summary>Add from favorites</summary><div class="favorite-picker"><select id="favorite-category-filter" aria-label="Favorite category">' + categoryOptions + '</select><select id="favorite-meal-select" aria-label="Favorite meal">' + favoriteOptions + '</select></div>' +
+    var quick = '<div class="quick-favorites"><p class="eyebrow">Quick favorites</p>' + all.slice(0, 3).map(function (favorite) {
+      return '<button type="button" class="secondary" data-quick-favorite="' + esc(favorite.id) + '">' + esc(favorite.name) + '</button>';
+    }).join("") + '</div>';
+    return quick + '<details class="favorites-panel" '  + (state.favoritesOpen ? "open" : "") + '><summary>Add from favorites</summary><div class="favorite-picker"><select id="favorite-category-filter" aria-label="Favorite category">' + categoryOptions + '</select><select id="favorite-meal-select" aria-label="Favorite meal">' + favoriteOptions + '</select></div>' +
       '<div class="favorite-picker-actions"><button id="add-favorite-meal" class="primary" ' + (filtered.length ? '' : 'disabled') + '>Add usual portion</button><button id="adjust-favorite-meal" class="secondary" ' + (filtered.length ? '' : 'disabled') + '>Adjust portion first</button></div>' +
       '<details class="favorite-manager" ' + (state.favoriteManagerOpen ? "open" : "") + '><summary>Manage favorites</summary>' + manager + '<p class="notification-status">Changes save automatically.</p></details></details>';
   }
@@ -1902,6 +1972,27 @@
       return;
     }
 
+    document.getElementById("open-workout").addEventListener("click", function (event) {
+      var resume = event.currentTarget.textContent === "Resume workout";
+      state.workoutFocus = true;
+      render();
+      if (resume) highlightNextSet(true);
+    });
+    function closeWorkout() {
+      var dialog = document.getElementById("workout-area");
+      if (dialog.contains(document.activeElement)) document.activeElement.blur();
+      state.workoutFocus = false;
+      dialog.close();
+      releaseDialogScrollLock();
+      render();
+      document.getElementById("open-workout").focus({ preventScroll: true });
+    }
+    document.getElementById("back-to-daily").addEventListener("click", closeWorkout);
+    document.getElementById("workout-area").addEventListener("cancel", function (event) {
+      event.preventDefault();
+      closeWorkout();
+    });
+    document.getElementById("quick-log-food").addEventListener("click", function () { openMealDialog(false); });
     ["weight", "water"].forEach(function (id) {
       document.getElementById(id).addEventListener("change", function (event) { getDay(state.selectedDate)[id] = event.target.value; queueSave(); });
     });
@@ -1930,6 +2021,13 @@
     document.querySelectorAll("[data-exercise-load]").forEach(function (input) { input.addEventListener("change", function () { updateExercise(input.dataset.exerciseLoad, "load", input.value); }); });
     document.querySelectorAll("[data-exercise-reps]").forEach(function (input) { input.addEventListener("change", function () { updateExercise(input.dataset.exerciseReps, "reps", input.value); }); });
     document.querySelectorAll("[data-exercise-set]").forEach(function (input) { input.addEventListener("change", function () { updateExerciseSet(input.dataset.exerciseSet, Number(input.dataset.setIndex), input.value); }); });
+    document.querySelectorAll("[data-set-action]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var input = button.closest(".workout-set-row").querySelector("[data-exercise-set]");
+        if (!input.value.trim()) { input.focus(); return; }
+        updateExerciseSet(input.dataset.exerciseSet, Number(input.dataset.setIndex), input.value);
+      });
+    });
     document.querySelectorAll("[data-add-set]").forEach(function (button) { button.addEventListener("click", function () { addExerciseSet(button.dataset.addSet); }); });
     document.querySelectorAll("[data-add-side-plank-set]").forEach(function (button) { button.addEventListener("click", function () { addSidePlankSet(button.dataset.addSidePlankSet); }); });
     document.querySelectorAll("[data-load-feel]").forEach(function (button) { button.addEventListener("click", function () { updateExercise(button.dataset.loadFeel, "loadFeel", button.dataset.feel); }); });
@@ -2007,6 +2105,7 @@
     if (!day.exercises[id]) day.exercises[id] = {};
     var exercise = exercisesForPlan(planForDate(state.selectedDate)).find(function (item) { return exerciseId(item.name) === id; });
     var sets = exercise && exercise.name === "Side Plank" ? sidePlankSets(day.exercises[id]) : exerciseSets(day.exercises[id], exercise || { prescription: "1 set" });
+    if (String(sets[index] ?? "") === String(value)) return;
     sets[index] = value;
     day.exercises[id].sets = sets;
     day.exercises[id].reps = sets.filter(function (item) { return item !== ""; }).join(", ");
@@ -2030,7 +2129,12 @@
     var wasWorkoutComplete = day.workout.completed;
     day.workout.completed = planned.every(function (plannedExercise) { return day.exercises[exerciseId(plannedExercise.name)] && day.exercises[exerciseId(plannedExercise.name)].done; });
     if (completionChanged && day.exercises[id].done) showExerciseFeedback(id, planned, day, wasWorkoutComplete);
-    queueSave(completionChanged);
+    if (state.workoutFocus) {
+      var checkbox = Array.from(document.querySelectorAll("[data-exercise-done]")).find(function (input) { return input.dataset.exerciseDone === id; });
+      if (checkbox) checkbox.checked = day.exercises[id].done;
+      highlightNextSet(false);
+      queueSave(false);
+    } else queueSave(completionChanged);
   }
 
   function showExerciseFeedback(id, planned, day, wasWorkoutComplete) {
@@ -2185,8 +2289,8 @@
     return id ? favoriteById(id) : null;
   }
 
-  function useSelectedFavorite(adjustFirst) {
-    var favorite = selectedFavorite();
+  function useSelectedFavorite(adjustFirst, id) {
+    var favorite = id ? favoriteById(id) : selectedFavorite();
     if (!favorite) return;
     state.selectedFavoriteId = favorite.id;
     if (adjustFirst) {
@@ -2242,6 +2346,9 @@
   }
 
   function bindFavoritePickerEvents() {
+    document.querySelectorAll("[data-quick-favorite]").forEach(function (button) {
+      button.addEventListener("click", function () { useSelectedFavorite(true, button.dataset.quickFavorite); });
+    });
     document.querySelectorAll("#meal-favorites-slot .favorites-panel, #meal-favorites-slot .favorite-manager").forEach(function (details) { details.addEventListener("toggle", function () { if (details.classList.contains("favorites-panel")) state.favoritesOpen = details.open; else state.favoriteManagerOpen = details.open; }); });
     var favoriteFilter = document.getElementById("favorite-category-filter");
     if (favoriteFilter) favoriteFilter.addEventListener("change", function () { state.favoriteFilter = favoriteFilter.value; state.favoritesOpen = true; document.getElementById("meal-favorites-slot").innerHTML = renderFavoritePicker(); bindFavoritePickerEvents(); });
@@ -2988,12 +3095,14 @@
   function updateSyncLabel() {
     var label = document.querySelector(".sync span:last-child");
     if (label) label.textContent = state.sync;
+    var workoutLabel = document.getElementById("workout-sync");
+    if (workoutLabel) workoutLabel.textContent = state.sync;
   }
 
   async function saveData() {
     clearTimeout(state.saveTimer);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.data));
-    if (localMode) { state.saveDirty = false; state.sync = "Saved locally"; render(); return true; }
+    if (localMode) { state.saveDirty = false; state.sync = "Saved locally"; if (state.workoutFocus) updateSyncLabel(); else render(); return true; }
     if (state.saveInFlight) {
       state.saveDirty = true;
       await state.savePromise;
@@ -3019,6 +3128,7 @@
     state.saveInFlight = false;
     state.savePromise = null;
     if (state.saveDirty) state.saveTimer = setTimeout(saveData, 1000);
+    else if (state.workoutFocus) updateSyncLabel();
     else render();
     return saved;
   }
@@ -3296,6 +3406,7 @@
   document.querySelectorAll(".bottom-nav button").forEach(function (button) { button.addEventListener("click", function () {
     state.revealedPhoto = null;
     state.view = button.dataset.view;
+    state.workoutFocus = false;
     render();
     window.scrollTo(0, 0);
     document.documentElement.scrollTop = 0;
