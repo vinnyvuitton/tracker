@@ -1344,9 +1344,12 @@
   }
 
   function renderMeals(day, t) {
-    var html = '<section class="card"><div class="card-head"><div><h2>Meals</h2><p>' + Math.round(t.protein) + ' g protein and ' + Math.round(t.calories) + ' calories logged</p></div></div>';
-    html += '<div class="meal-actions"><button id="open-meal" class="primary">Log what I ate</button><button id="open-advice" class="secondary">Help me decide</button><button id="open-manual-meal" class="secondary">Enter macros manually</button></div>';
-    if (!day.meals.length) html += '<div class="empty">No meals logged yet</div>';
+    var currentDiary = document.getElementById("meal-diary");
+    var keepOpen = currentDiary?.dataset.date === state.selectedDate && currentDiary.open;
+    var count = day.meals.length;
+    var html = '<details id="meal-diary" class="card meal-diary" data-date="' + esc(state.selectedDate) + '"' + (keepOpen ? ' open' : '') + '>' +
+      '<summary><strong>Meals</strong><span>' + count + (count === 1 ? ' entry' : ' entries') + '</span></summary>';
+    if (!count) html += '<div class="empty">No meals logged yet</div>';
     day.meals.forEach(function (meal, index) {
       var quantity = number(meal.quantity) || 1;
       html += '<div class="meal ' + (meal.photo ? "has-photo" : "") + '">';
@@ -1355,8 +1358,7 @@
         '<div class="quantity-stepper" aria-label="Quantity for ' + esc(meal.name || "meal") + '"><button type="button" data-meal-quantity="-1" data-meal-index="' + index + '" aria-label="Decrease quantity">−</button><input type="number" min="0.25" max="50" step="0.25" value="' + esc(quantity) + '" data-meal-quantity-input="' + index + '" aria-label="Quantity"><button type="button" data-meal-quantity="1" data-meal-index="' + index + '" aria-label="Increase quantity">+</button></div>' +
         '<button type="button" class="remove-meal" data-remove-meal="' + index + '" aria-label="Remove ' + esc(meal.name || "meal") + '">×</button></div>';
     });
-    html += renderNutritionDetails(t, day.meals.length);
-    html += '</section>';
+    html += renderNutritionDetails(t, day.meals.length) + '</details>';
     return html;
   }
 
@@ -2046,9 +2048,6 @@
     document.querySelectorAll("[data-review-pending]").forEach(function (button) { button.addEventListener("click", function () { reviewPendingMeal(button.dataset.reviewPending); }); });
     document.querySelectorAll("[data-retry-pending]").forEach(function (button) { button.addEventListener("click", function () { retryPendingMeal(button.dataset.retryPending, true); }); });
     document.querySelectorAll("[data-discard-pending]").forEach(function (button) { button.addEventListener("click", function () { discardPendingMeal(button.dataset.discardPending); }); });
-    document.getElementById("open-meal").addEventListener("click", function () { openMealDialog(false); });
-    document.getElementById("open-advice").addEventListener("click", openAdviceDialog);
-    document.getElementById("open-manual-meal").addEventListener("click", function () { openMealDialog(true); });
     var startCardioButton = document.getElementById("start-cardio");
     if (startCardioButton) startCardioButton.addEventListener("click", startCardioSession);
     var cancelCardioButton = document.getElementById("cancel-cardio");
@@ -2385,6 +2384,7 @@
     state.mealEstimate = null;
     state.activePendingMealId = null;
     state.editingMeal = editing || null;
+    document.getElementById("meal-entry-options").hidden = Boolean(editing || source);
     state.adviceImage = source && source.adviceImage || "";
     clearMealPhotoPreview();
     document.getElementById("meal-favorites-slot").innerHTML = editing ? "" : renderFavoritePicker();
@@ -2406,6 +2406,7 @@
     else if (manual) showMealResult({ name: "Meal", calories: "", protein: "", carbs: "", fat: "", fiber: null, saturatedFat: null, addedSugar: null, sodium: null, category: defaultMealCategory(), confidence: "Manual entry", nutritionBasis: "Manual", assumptions: "Enter the package, restaurant, or measured values you trust." });
     syncFavoriteAdjustmentUi();
     openDashboardDialog(document.getElementById("meal-dialog"));
+    document.getElementById("meal-dialog").scrollTop = 0;
     document.getElementById("meal-close").focus({ preventScroll: true });
     hydratePhotos();
   }
@@ -2457,6 +2458,7 @@
     clearPhotoInputs("advice-photo", "advice-photo-camera");
     renderAdviceConversation();
     openDashboardDialog(document.getElementById("advice-dialog"));
+    document.getElementById("advice-dialog").scrollTop = 0;
     document.getElementById("advice-close").focus({ preventScroll: true });
   }
 
@@ -2659,6 +2661,7 @@
     if (!pending || !pending.result) return;
     state.activePendingMealId = id;
     state.editingMeal = null;
+    document.getElementById("meal-entry-options").hidden = true;
     state.mealEstimate = pending.result;
     clearMealPhotoPreview();
     document.getElementById("meal-favorites-slot").innerHTML = renderFavoritePicker();
@@ -3416,7 +3419,11 @@
   document.getElementById("photo-form").addEventListener("submit", function (event) { event.preventDefault(); savePhoto(); });
   document.getElementById("photo-cancel").addEventListener("click", function () { document.getElementById("photo-dialog").close(); clearPhotoInputs("photo-input", "photo-camera-input"); document.getElementById("photo-error").textContent = ""; });
   document.getElementById("analyze-meal").addEventListener("click", analyzeMeal);
-  document.getElementById("manual-meal").addEventListener("click", function () { showMealResult({ name: "Meal", calories: "", protein: "", carbs: "", fat: "", fiber: null, saturatedFat: null, addedSugar: null, sodium: null, category: defaultMealCategory(), confidence: "Manual entry", nutritionBasis: "Manual", assumptions: "Enter the package, restaurant, or measured values you trust." }); });
+  document.getElementById("meal-advice-shortcut").addEventListener("click", function () {
+    document.getElementById("meal-dialog").close();
+    openAdviceDialog();
+  });
+  document.getElementById("manual-meal").addEventListener("click", function () { showMealResult({ name: "Meal", calories: "", protein: "", carbs: "", fat: "", fiber: null, saturatedFat: null, addedSugar: null, sodium: null, category: defaultMealCategory(), confidence: "Manual entry", nutritionBasis: "Manual", assumptions: "Enter the package, restaurant, or measured values you trust." }); document.getElementById("meal-result").scrollIntoView({ block: "start" }); });
   document.querySelectorAll("[data-favorite-portion]").forEach(function (button) { button.addEventListener("click", function () { updateFavoriteAdjustment(state.adjustingFavoriteQuantity + Number(button.dataset.favoritePortion)); }); });
   document.getElementById("favorite-portion-quantity").addEventListener("change", function (event) { updateFavoriteAdjustment(event.target.value); });
   document.getElementById("save-meal-favorite").addEventListener("change", function (event) { document.getElementById("favorite-category-wrap").hidden = !event.target.checked; });
