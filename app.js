@@ -171,6 +171,7 @@
     coaching: null,
     view: "today",
     workoutFocus: false,
+    openMealDiaryDate: null,
     selectedDate: TODAY,
     data: defaultData(),
     version: 0,
@@ -796,8 +797,9 @@
   }
 
   function exerciseSets(log, exercise) {
-    if (Array.isArray(log.sets) && log.sets.length) return log.sets.map(function (value) { return String(value == null ? "" : value); });
-    var old = String(log.reps || "").split(/[,/]+/).map(function (value) { return value.trim(); }).filter(Boolean);
+    var old = Array.isArray(log.sets) && log.sets.length
+      ? log.sets.map(function (value) { return String(value == null ? "" : value); })
+      : String(log.reps || "").split(/[,/]+/).map(function (value) { return value.trim(); }).filter(Boolean);
     while (old.length < prescribedSetCount(exercise)) old.push("");
     return old;
   }
@@ -1270,7 +1272,7 @@
     if (plan.type !== "Strength") return "";
     var options = timedExerciseOptions(exercise);
     if (!options.length) return "";
-    var timer = state.exerciseTimer && state.exerciseTimer.id === id ? state.exerciseTimer : null;
+    var timer = state.exerciseTimer?.id === id && state.exerciseTimer.date === state.selectedDate ? state.exerciseTimer : null;
     var selected = timer ? timer.duration : options[0];
     var remaining = timer ? timer.remaining : selected;
     return '<div class="exercise-timer"><div><span class="timer-label">Stopwatch</span><strong data-timer-display="' + id + '">' + formatTimer(remaining) + '</strong></div><select data-timer-duration="' + id + '" aria-label="Timer length for ' + esc(exercise.name) + '">' + options.map(function (seconds) { return '<option value="' + seconds + '" ' + (selected === seconds ? "selected" : "") + '>' + seconds + ' sec</option>'; }).join("") + '</select><button type="button" class="primary" data-timer-start="' + id + '">' + (timer && timer.running ? "Pause" : timer && timer.remaining > 0 && timer.remaining < timer.duration ? "Resume" : "Start") + '</button><button type="button" class="ghost" data-timer-reset="' + id + '">Reset</button></div>';
@@ -1344,11 +1346,11 @@
   }
 
   function renderMeals(day, t) {
-    var currentDiary = document.getElementById("meal-diary");
-    var keepOpen = currentDiary?.dataset.date === state.selectedDate && currentDiary.open;
+    var isOpen = state.openMealDiaryDate === state.selectedDate;
     var count = day.meals.length;
-    var html = '<details id="meal-diary" class="card meal-diary" data-date="' + esc(state.selectedDate) + '"' + (keepOpen ? ' open' : '') + '>' +
-      '<summary><strong>Meals</strong><span>' + count + (count === 1 ? ' entry' : ' entries') + '</span></summary>';
+    var html = '<section class="card meal-diary"><button type="button" id="meal-diary-toggle" aria-expanded="' + isOpen + '" aria-controls="meal-diary">' +
+      '<strong>Meals</strong><span>' + count + (count === 1 ? ' entry' : ' entries') + '</span><span aria-hidden="true" class="meal-diary-chevron">⌄</span></button>' +
+      '<div id="meal-diary"' + (isOpen ? '' : ' hidden') + '>';
     if (!count) html += '<div class="empty">No meals logged yet</div>';
     day.meals.forEach(function (meal, index) {
       var quantity = number(meal.quantity) || 1;
@@ -1358,7 +1360,7 @@
         '<div class="quantity-stepper" aria-label="Quantity for ' + esc(meal.name || "meal") + '"><button type="button" data-meal-quantity="-1" data-meal-index="' + index + '" aria-label="Decrease quantity">−</button><input type="number" min="0.25" max="50" step="0.25" value="' + esc(quantity) + '" data-meal-quantity-input="' + index + '" aria-label="Quantity"><button type="button" data-meal-quantity="1" data-meal-index="' + index + '" aria-label="Increase quantity">+</button></div>' +
         '<button type="button" class="remove-meal" data-remove-meal="' + index + '" aria-label="Remove ' + esc(meal.name || "meal") + '">×</button></div>';
     });
-    html += renderNutritionDetails(t, day.meals.length) + '</details>';
+    html += renderNutritionDetails(t, day.meals.length) + '</div></section>';
     return html;
   }
 
@@ -1994,6 +1996,13 @@
       event.preventDefault();
       closeWorkout();
     });
+    document.getElementById("meal-diary-toggle").addEventListener("click", function (event) {
+      var panel = document.getElementById("meal-diary");
+      var open = panel.hidden;
+      state.openMealDiaryDate = open ? state.selectedDate : null;
+      panel.hidden = !open;
+      event.currentTarget.setAttribute("aria-expanded", String(open));
+    });
     document.getElementById("quick-log-food").addEventListener("click", function () { openMealDialog(false); });
     ["weight", "water"].forEach(function (id) {
       document.getElementById(id).addEventListener("change", function (event) { getDay(state.selectedDate)[id] = event.target.value; queueSave(); });
@@ -2099,10 +2108,11 @@
     queueSave(field === "done" || field === "load" || field === "loadFeel");
   }
 
-  function updateExerciseSet(id, index, value) {
-    var day = getDay(state.selectedDate);
+  function updateExerciseSet(id, index, value, date) {
+    date = date || state.selectedDate;
+    var day = getDay(date);
     if (!day.exercises[id]) day.exercises[id] = {};
-    var exercise = exercisesForPlan(planForDate(state.selectedDate)).find(function (item) { return exerciseId(item.name) === id; });
+    var exercise = exercisesForPlan(planForDate(date)).find(function (item) { return exerciseId(item.name) === id; });
     var sets = exercise && exercise.name === "Side Plank" ? sidePlankSets(day.exercises[id]) : exerciseSets(day.exercises[id], exercise || { prescription: "1 set" });
     if (String(sets[index] ?? "") === String(value)) return;
     sets[index] = value;
@@ -2124,11 +2134,13 @@
       delete day.exercises[id].autoCompleted;
       completionChanged = true;
     }
-    var planned = exercisesForPlan(planForDate(state.selectedDate));
+    var planned = exercisesForPlan(planForDate(date));
     var wasWorkoutComplete = day.workout.completed;
     day.workout.completed = planned.every(function (plannedExercise) { return day.exercises[exerciseId(plannedExercise.name)] && day.exercises[exerciseId(plannedExercise.name)].done; });
     if (completionChanged && day.exercises[id].done) showExerciseFeedback(id, planned, day, wasWorkoutComplete);
-    if (state.workoutFocus) {
+    if (date !== state.selectedDate || state.view !== "today") {
+      queueSave(false);
+    } else if (state.workoutFocus) {
       var checkbox = Array.from(document.querySelectorAll("[data-exercise-done]")).find(function (input) { return input.dataset.exerciseDone === id; });
       if (checkbox) checkbox.checked = day.exercises[id].done;
       highlightNextSet(false);
@@ -2145,16 +2157,21 @@
   function setExerciseTimerDuration(id, seconds) {
     stopExerciseTimerInterval();
     releaseTimerWakeLock();
-    state.exerciseTimer = { id: id, duration: seconds, remaining: seconds, endAt: 0, running: false, interval: null };
+    state.exerciseTimer = { id: id, date: state.selectedDate, duration: seconds, remaining: seconds, endAt: 0, running: false, interval: null };
     render();
   }
 
   function toggleExerciseTimer(id) {
     var select = document.querySelector('[data-timer-duration="' + id + '"]');
     var seconds = select ? Number(select.value) : 30;
-    if (!state.exerciseTimer || state.exerciseTimer.id !== id) state.exerciseTimer = { id: id, duration: seconds, remaining: seconds, endAt: 0, running: false, interval: null };
+    if (state.exerciseTimer?.id !== id || state.exerciseTimer.date !== state.selectedDate) {
+      stopExerciseTimerInterval();
+      releaseTimerWakeLock();
+      state.exerciseTimer = { id: id, date: state.selectedDate, duration: seconds, remaining: seconds, endAt: 0, running: false, interval: null };
+    }
     var timer = state.exerciseTimer;
     if (timer.running) {
+      if (timer.endAt <= Date.now()) { tickExerciseTimer(); return; }
       timer.remaining = Math.max(0, Math.ceil((timer.endAt - Date.now()) / 1000));
       stopExerciseTimerInterval();
       timer.running = false;
@@ -2174,7 +2191,8 @@
     var timer = state.exerciseTimer;
     if (!timer || !timer.running) return;
     timer.remaining = Math.max(0, Math.ceil((timer.endAt - Date.now()) / 1000));
-    var display = document.querySelector('[data-timer-display="' + timer.id + '"]');
+    var onTimerDate = timer.date === state.selectedDate && state.view === "today";
+    var display = onTimerDate && document.querySelector('[data-timer-display="' + timer.id + '"]');
     if (display) display.textContent = formatTimer(timer.remaining);
     if (timer.remaining > 0) return;
     var id = timer.id, duration = timer.duration;
@@ -2182,24 +2200,34 @@
     timer.running = false;
     releaseTimerWakeLock();
     if (navigator.vibrate) navigator.vibrate([180, 80, 180]);
-    logCompletedTimedSet(id, duration);
+    logCompletedTimedSet(id, duration, timer.date);
+    if (onTimerDate) {
+      var start = document.querySelector('[data-timer-start="' + id + '"]');
+      if (start) start.textContent = "Start";
+    }
   }
 
-  function logCompletedTimedSet(id, seconds) {
-    var day = getDay(state.selectedDate);
-    var exercise = exercisesForPlan(planForDate(state.selectedDate)).find(function (item) { return exerciseId(item.name) === id; });
+  function logCompletedTimedSet(id, seconds, date) {
+    var day = getDay(date);
+    var exercise = exercisesForPlan(planForDate(date)).find(function (item) { return exerciseId(item.name) === id; });
+    if (!exercise) return;
     var log = day.exercises[id] || {};
-    var sets = exercise && exercise.name === "Side Plank" ? sidePlankSets(log) : exerciseSets(log, exercise || { prescription: "1 set" });
-    var required = exercise && exercise.name === "Side Plank" ? sets.length : prescribedSetCount(exercise || { prescription: "1 set" });
-    var index = -1;
-    for (var i = 0; i < required; i++) if (!String(sets[i] == null ? "" : sets[i]).trim()) { index = i; break; }
-    if (index >= 0) updateExerciseSet(id, index, seconds);
-    else showFeedback("Timer complete—this exercise is already fully logged.", "success");
+    var sets = exercise.name === "Side Plank" ? sidePlankSets(log) : exerciseSets(log, exercise);
+    var index = sets.findIndex(function (value) { return number(value) <= 0; });
+    if (index < 0) {
+      showFeedback("Timer complete—this exercise is already fully logged.", "success");
+      return;
+    }
+    updateExerciseSet(id, index, String(seconds), date);
+    if (date === state.selectedDate && state.view === "today") {
+      var input = document.getElementById("set-" + id + "-" + index);
+      if (input) input.value = String(seconds);
+    }
   }
 
   function resetExerciseTimer(id) {
     var timer = state.exerciseTimer;
-    if (!timer || timer.id !== id) return;
+    if (!timer || timer.id !== id || timer.date !== state.selectedDate) return;
     stopExerciseTimerInterval();
     timer.running = false;
     timer.remaining = timer.duration;
