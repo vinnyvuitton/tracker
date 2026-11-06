@@ -698,7 +698,7 @@
   function formatDate(iso, options) { return new Intl.DateTimeFormat("en-US", options || { weekday: "long", month: "long", day: "numeric" }).format(new Date(iso + "T12:00:00Z")); }
   function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
   function number(value) { var n = Number(value); return Number.isFinite(n) ? n : 0; }
-  function optionalNumber(value) { if (value === "" || value == null) return null; var n = Number(value); return Number.isFinite(n) && n >= 0 ? n : null; }
+  function optionalNumber(value) { if (value == null || typeof value === "string" && !value.trim()) return null; var n = Number(value); return Number.isFinite(n) && n >= 0 ? n : null; }
   function selectedPhotoFile(libraryId, cameraId) {
     var library = document.getElementById(libraryId), camera = document.getElementById(cameraId);
     return camera && camera.files && camera.files[0] || library && library.files && library.files[0] || null;
@@ -833,15 +833,12 @@
   function totals(day) {
     return day.meals.reduce(function (sum, meal) {
       sum.calories += number(meal.calories);
-      sum.protein += number(meal.protein);
-      sum.carbs += number(meal.carbs);
-      sum.fat += number(meal.fat);
-      ["fiber", "saturatedFat", "addedSugar", "sodium"].forEach(function (field) {
+      ["protein", "carbs", "fat", "fiber", "saturatedFat", "addedSugar", "sodium"].forEach(function (field) {
         var value = optionalNumber(meal[field]);
         if (value != null) { sum[field] += value; sum.known[field]++; }
       });
       return sum;
-    }, { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, saturatedFat: 0, addedSugar: 0, sodium: 0, known: { fiber: 0, saturatedFat: 0, addedSugar: 0, sodium: 0 } });
+    }, { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, saturatedFat: 0, addedSugar: 0, sodium: 0, known: { protein: 0, carbs: 0, fat: 0, fiber: 0, saturatedFat: 0, addedSugar: 0, sodium: 0 } });
   }
 
   function allExercises(dayName) {
@@ -999,6 +996,10 @@
   function showMealFeedback(day, name) {
     if (state.coaching) { showFeedback(name + " saved. Keep regular meals and snacks; respond to hunger. Logged nutrition is an estimate.", "success"); return; }
     var t = totals(day);
+    if (t.known.protein < day.meals.length) {
+      showFeedback(name + " saved. Some meals have no protein value.", "success");
+      return;
+    }
     var calorieTarget = number(state.data.targets.calories);
     var calorieMax = number(state.data.targets.calorieMax) || calorieTarget + 100;
     var calorieLeft = Math.round(calorieTarget - t.calories);
@@ -1089,7 +1090,7 @@
     html += '<section class="card daily-launch"><div><p class="eyebrow">Selected workout</p><h2>' + esc(plan.title) + '</h2><p class="notification-status">' + esc(next && started ? 'Up next · ' + next.label : plan.subtitle) + '</p></div><button type="button" id="open-workout" class="primary">' + workoutAction + '</button><button type="button" id="quick-log-food" class="secondary">Log food</button></section>';
     if (state.coaching && state.coaching.status === "approved" && DAYS.includes(state.coaching.dateSchedule && state.coaching.dateSchedule[iso]) && state.coaching.dateSchedule[iso] !== key) html += '<div class="notice">This week only · Friday and Saturday workouts swapped. Normal schedule resumes next week.</div>';
     html += '<div class="grid two daily-nutrition">' +
-      nutritionStatCard("Protein", Math.round(t.protein), "g", state.data.targets.proteinMin, state.data.targets.proteinMax) +
+      nutritionStatCard("Protein", Math.round(t.protein), "g", state.data.targets.proteinMin, state.data.targets.proteinMax, day.meals.length > t.known.protein ? (t.known.protein ? "partial" : "unknown") : null) +
       nutritionStatCard("Calories", Math.round(t.calories), "cal", state.data.targets.calorieMin, state.data.targets.calorieMax) +
       '</div>';
 
@@ -1113,7 +1114,12 @@
       '<div class="progress-bar"><span style="width:' + pct(value, target) + '%"></span></div></section>';
   }
 
-  function nutritionStatCard(label, value, unit, low, high) {
+  function nutritionStatCard(label, value, unit, low, high, coverage) {
+    if (coverage) {
+      var displayed = coverage === "unknown" ? "Unknown" : esc(value) + " <small>" + esc(unit) + "</small>";
+      var note = coverage === "unknown" ? "No protein values entered" : "Partial total · some meals have no protein value";
+      return '<section class="card nutrition-stat"><p class="eyebrow">' + esc(label) + '</p><div class="stat">' + displayed + '</div><p class="target-status">' + note + '</p></section>';
+    }
     low = number(low); high = number(high) || low;
     if (state.coaching && label === "Calories") return '<section class="card nutrition-stat"><p class="eyebrow">Calories · logged estimate</p><div class="stat">' + esc(value) + ' <small>cal</small></div><p class="target-status">Previous target under review. Keep regular meals and respond to hunger.</p></section>';
     var status = value < low ? (low - value) + " " + unit + " to target zone" : value > high ? (value - high) + " " + unit + " above target zone" : "Inside target zone";
@@ -1354,9 +1360,10 @@
     if (!count) html += '<div class="empty">No meals logged yet</div>';
     day.meals.forEach(function (meal, index) {
       var quantity = number(meal.quantity) || 1;
+      var protein = optionalNumber(meal.protein);
       html += '<div class="meal ' + (meal.photo ? "has-photo" : "") + '">';
       if (meal.photo) html += '<div class="meal-photo ' + (state.revealedPhoto === state.selectedDate + ":meal:" + index ? "revealed" : "") + '"><img alt="Private photo for ' + esc(meal.name || "meal") + '" data-photo-ref="' + esc(photoRefValue(meal.photo)) + '"><button type="button" data-reveal-meal-photo="' + index + '">' + (state.revealedPhoto === state.selectedDate + ":meal:" + index ? "Hide" : "Reveal") + '</button></div>';
-      html += '<button type="button" class="meal-summary" data-edit-meal="' + index + '"><strong>' + esc(meal.name || "Meal") + '</strong><small>' + Math.round(number(meal.protein)) + ' g protein · ' + Math.round(number(meal.calories)) + ' cal</small><span>' + (meal.photo ? 'Private photo saved · ' : '') + (mealEnergyWarning(meal) ? 'Calories and macros disagree · review details' : 'Edit details') + '</span></button>' +
+      html += '<button type="button" class="meal-summary" data-edit-meal="' + index + '"><strong>' + esc(meal.name || "Meal") + '</strong><small>' + (protein == null ? 'Protein unknown' : Math.round(protein) + ' g protein') + ' · ' + Math.round(number(meal.calories)) + ' cal</small><span>' + (meal.photo ? 'Private photo saved · ' : '') + (mealEnergyWarning(meal) ? 'Calories and macros disagree · review details' : 'Edit details') + '</span></button>' +
         '<div class="quantity-stepper" aria-label="Quantity for ' + esc(meal.name || "meal") + '"><button type="button" data-meal-quantity="-1" data-meal-index="' + index + '" aria-label="Decrease quantity">−</button><input type="number" min="0.25" max="50" step="0.25" value="' + esc(quantity) + '" data-meal-quantity-input="' + index + '" aria-label="Quantity"><button type="button" data-meal-quantity="1" data-meal-index="' + index + '" aria-label="Increase quantity">+</button></div>' +
         '<button type="button" class="remove-meal" data-remove-meal="' + index + '" aria-label="Remove ' + esc(meal.name || "meal") + '">×</button></div>';
     });
@@ -1367,18 +1374,22 @@
   function renderNutritionDetails(t, mealCount) {
     var known = t.known || {};
     var optional = function (field, unit) { return known[field] ? (field === "sodium" ? Math.round(t[field]) : Math.round(t[field] * 10) / 10) + " " + unit : "Not available"; };
-    var missing = ["fiber", "saturatedFat", "addedSugar", "sodium"].some(function (field) { return known[field] < mealCount; });
+    var missing = ["protein", "carbs", "fat", "fiber", "saturatedFat", "addedSugar", "sodium"].some(function (field) { return known[field] < mealCount; });
+    function macro(field) {
+      if (!known[field]) return "Not available";
+      return Math.round(t[field]) + " g" + (known[field] < mealCount ? " · partial" : "");
+    }
     return '<details class="nutrition-details"><summary>Nutrition details</summary><div class="nutrition-grid">' +
-      nutritionItem("Carbohydrates", Math.round(t.carbs) + " g") + nutritionItem("Total fat", Math.round(t.fat) + " g") +
+      nutritionItem("Carbohydrates", macro("carbs")) + nutritionItem("Total fat", macro("fat")) +
       nutritionItem("Fiber", optional("fiber", "g")) + nutritionItem("Saturated fat", optional("saturatedFat", "g")) +
       nutritionItem("Added sugar", optional("addedSugar", "g")) + nutritionItem("Sodium", optional("sodium", "mg")) +
-      '</div><p class="meal-detail-note">' + (missing && mealCount ? "Some detailed values are unavailable because photos cannot always reveal them reliably." : "Detailed values come from the information available for each meal.") + '</p></details>';
+      '</div><p class="meal-detail-note">' + (missing && mealCount ? "Totals include available values. Some logged meals are missing nutrition details." : "Detailed values come from the information available for each meal.") + '</p></details>';
   }
 
   function nutritionItem(label, value) { return '<div class="nutrition-item"><span>' + esc(label) + '</span><strong>' + esc(value) + '</strong></div>'; }
 
   function mealEnergyWarning(meal) {
-    if (["calories", "protein", "carbs", "fat"].some(function (key) { return meal[key] == null || meal[key] === "" || !Number.isFinite(Number(meal[key])); })) return false;
+    if (["calories", "protein", "carbs", "fat"].some(function (key) { return optionalNumber(meal[key]) == null; })) return false;
     var calculated = number(meal.protein) * 4 + number(meal.carbs) * 4 + number(meal.fat) * 9;
     return Math.abs(calculated - number(meal.calories)) > Math.max(100, number(meal.calories) * 0.2);
   }
@@ -1518,6 +1529,7 @@
         if (plan.type === "Strength" || plan.type === "Cardio") points.push({ iso: iso, value: sessionComplete(day, plan) ? 100 : 0 });
       } else {
         var totalsForDay = totals(day);
+        if (metric === "protein" && day.meals.length && !totalsForDay.known.protein) continue;
         points.push({ iso: iso, value: metric === "water" ? number(day.water) : number(totalsForDay[metric]) });
       }
     }
@@ -1579,7 +1591,7 @@
     return '<section class="card progress-visual"><div class="card-head"><div><p class="eyebrow">Explore your data</p><h2>Progress graph</h2><p>' + (previousAverage ? (difference >= 0 ? "+" : "") + difference.toFixed(1) + ' versus the preceding period' : 'Choose a metric and timeframe') + '</p></div></div>' +
       '<div class="range-tabs">' + PROGRESS_RANGES.map(function (range) { var label = range === "all" ? "All" : range === 30 ? "1 mo" : range === 90 ? "3 mo" : range + " d"; return '<button type="button" data-progress-range="' + range + '" class="' + (String(state.progressRange) === String(range) ? "active" : "") + '">' + label + '</button>'; }).join("") + '</div>' +
       '<div class="progress-filters"><label class="field">Metric<select id="progress-metric">' + options.map(function (option) { return '<option value="' + option.value + '" ' + (state.progressMetric === option.value ? "selected" : "") + '>' + option.label + '</option>'; }).join("") + '</select></label>' +
-      (state.progressMetric === "exercise" ? '<label class="field">Exercise<select id="progress-exercise">' + exercises.map(function (exercise) { return '<option value="' + exercise.id + '" ' + (state.progressExercise === exercise.id ? "selected" : "") + '>' + esc(exercise.name) + '</option>'; }).join("") + '</select></label>' : '') + '</div>' + summary + renderSvgChart(points, chartTarget(state.progressMetric), state.progressMetric) + '</section>';
+      (state.progressMetric === "exercise" ? '<label class="field">Exercise<select id="progress-exercise">' + exercises.map(function (exercise) { return '<option value="' + exercise.id + '" ' + (state.progressExercise === exercise.id ? "selected" : "") + '>' + esc(exercise.name) + '</option>'; }).join("") + '</select></label>' : '') + '</div>' + summary + renderSvgChart(points, chartTarget(state.progressMetric), state.progressMetric) + (state.progressMetric === "protein" ? '<p class="notification-status">Protein totals use known values and may be partial. Meal logs with no protein values are skipped.</p>' : '') + '</section>';
   }
 
   function renderGoalProgress() {
@@ -1750,14 +1762,19 @@
     var average = stats.weights.length ? stats.weights.reduce(function (a, b) { return a + b; }, 0) / stats.weights.length : 0;
     var priorStats = periodStats(addDays(startIso, -7), inProgress ? addDays(endIso, -7) : addDays(startIso, -1));
     var priorAverage = priorStats.weights.length ? priorStats.weights.reduce(function (a, b) { return a + b; }, 0) / priorStats.weights.length : 0;
-    var notes = [], nutrition = [], calorieTotal = 0, proteinTotal = 0, nutritionDays = 0;
+    var notes = [], nutrition = [], calorieTotal = 0, proteinTotal = 0, nutritionDays = 0, proteinDays = 0, partialProtein = false;
     var training = [];
     for (var iso = startIso; iso <= endIso; iso = addDays(iso, 1)) {
       var day = state.data.days[iso];
       var t = day ? totals(day) : { calories: 0, protein: 0 };
       var hasNutrition = Boolean(day && day.meals && day.meals.length);
-      if (hasNutrition) { calorieTotal += t.calories; proteinTotal += t.protein; nutritionDays++; }
-      nutrition.push(formatDate(iso, { weekday: "short", month: "short", day: "numeric" }) + ": " + (hasNutrition ? Math.round(t.calories) + " calories · " + Math.round(t.protein) + " g protein" : "No nutrition data logged") + " · weight " + (day && number(day.weight) ? number(day.weight).toFixed(1) + " lb" : "not logged") + " · water " + (day ? number(day.water) : 0) + " glasses");
+      var hasProtein = hasNutrition && t.known.protein > 0;
+      var proteinMissing = hasNutrition && t.known.protein < day.meals.length;
+      if (hasNutrition) { calorieTotal += t.calories; nutritionDays++; }
+      if (hasProtein) { proteinTotal += t.protein; proteinDays++; }
+      if (proteinMissing) partialProtein = true;
+      var proteinText = hasProtein ? Math.round(t.protein) + " g protein" + (proteinMissing ? " (partial)" : "") : "protein unknown";
+      nutrition.push(formatDate(iso, { weekday: "short", month: "short", day: "numeric" }) + ": " + (hasNutrition ? Math.round(t.calories) + " calories · " + proteinText : "No nutrition data logged") + " · weight " + (day && number(day.weight) ? number(day.weight).toFixed(1) + " lb" : "not logged") + " · water " + (day ? number(day.water) : 0) + " glasses");
       if (!day) continue;
       if (day.workout && day.workout.notes) notes.push(formatDate(iso, { weekday: "short" }) + ": " + day.workout.notes);
       var exerciseLines = [];
@@ -1790,8 +1807,8 @@
       "",
       "Daily summary:",
       nutrition.join("\n"),
-      "Weekly nutrition totals: " + (nutritionDays ? Math.round(calorieTotal) + " calories · " + Math.round(proteinTotal) + " g protein" : "not available"),
-      "Logged-day averages: " + (nutritionDays ? Math.round(calorieTotal / nutritionDays) + " calories · " + Math.round(proteinTotal / nutritionDays) + " g protein" : "not available"),
+      "Weekly nutrition totals: " + (nutritionDays ? Math.round(calorieTotal) + " calories · " + (proteinDays ? Math.round(proteinTotal) + " g protein" + (partialProtein ? " (partial)" : "") : "protein unknown") : "not available"),
+      "Logged-day averages: " + (nutritionDays ? Math.round(calorieTotal / nutritionDays) + " calories · " + (proteinDays ? Math.round(proteinTotal / proteinDays) + " g protein" + (partialProtein ? " (known values across " + proteinDays + " days)" : "") : "protein unknown") : "not available"),
       "Current target zones: " + state.data.targets.calorieMin + "–" + state.data.targets.calorieMax + " calories · " + state.data.targets.proteinMin + "–" + state.data.targets.proteinMax + " g protein",
       "",
       measurementCheckin(startIso, endIso),
@@ -2283,7 +2300,7 @@
 
   function mealFromNutrition(source, fallbackNotes) {
     var meal = {
-      name: source.name || "Meal", protein: number(source.protein), calories: number(source.calories), carbs: number(source.carbs), fat: number(source.fat),
+      name: source.name || "Meal", protein: optionalNumber(source.protein), calories: number(source.calories), carbs: optionalNumber(source.carbs), fat: optionalNumber(source.fat),
       fiber: optionalNumber(source.fiber), saturatedFat: optionalNumber(source.saturatedFat), addedSugar: optionalNumber(source.addedSugar), sodium: optionalNumber(source.sodium),
       notes: source.notes || fallbackNotes || "", category: MEAL_CATEGORIES.includes(source.category) ? source.category : "",
       estimateConfidence: source.estimateConfidence || source.confidence || "saved favorite", estimateAssumptions: source.estimateAssumptions || source.assumptions || "",
@@ -2295,7 +2312,10 @@
 
   function nutritionSnapshot(meal, divisor) {
     var result = {}, amount = Math.max(0.25, number(divisor) || 1);
-    NUTRITION_FIELDS.forEach(function (field) { result[field] = meal[field] == null ? null : number(meal[field]) / amount; });
+    NUTRITION_FIELDS.forEach(function (field) {
+      var value = optionalNumber(meal[field]);
+      result[field] = value == null ? null : value / amount;
+    });
     return result;
   }
 
@@ -2306,7 +2326,10 @@
     var next = clamp(Math.round(number(quantity) * 4) / 4, 0.25, 50);
     meal.perServing = meal.perServing || nutritionSnapshot(meal, oldQuantity);
     meal.quantity = next;
-    NUTRITION_FIELDS.forEach(function (field) { meal[field] = meal.perServing[field] == null ? null : Math.round(meal.perServing[field] * next * 10) / 10; });
+    NUTRITION_FIELDS.forEach(function (field) {
+      var value = optionalNumber(meal.perServing[field]);
+      meal[field] = value == null ? null : Math.round(value * next * 10) / 10;
+    });
     queueSave(true);
   }
 
@@ -2731,9 +2754,9 @@
     var meal = {
       name: document.getElementById("meal-result-name").value.trim() || "Meal",
       calories: number(document.getElementById("meal-result-calories").value),
-      protein: number(document.getElementById("meal-result-protein").value),
-      carbs: number(document.getElementById("meal-result-carbs").value),
-      fat: number(document.getElementById("meal-result-fat").value),
+      protein: optionalNumber(document.getElementById("meal-result-protein").value),
+      carbs: optionalNumber(document.getElementById("meal-result-carbs").value),
+      fat: optionalNumber(document.getElementById("meal-result-fat").value),
       fiber: optionalNumber(document.getElementById("meal-result-fiber").value),
       saturatedFat: optionalNumber(document.getElementById("meal-result-saturated-fat").value),
       addedSugar: optionalNumber(document.getElementById("meal-result-added-sugar").value),
