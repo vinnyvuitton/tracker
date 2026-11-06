@@ -1527,10 +1527,12 @@
       if (metric === "workouts") {
         var plan = planForDate(iso);
         if (plan.type === "Strength" || plan.type === "Cardio") points.push({ iso: iso, value: sessionComplete(day, plan) ? 100 : 0 });
-      } else {
+      } else if (metric === "water") {
+        points.push({ iso: iso, value: number(day.water) });
+      } else if (day.meals.length) {
         var totalsForDay = totals(day);
-        if (metric === "protein" && day.meals.length && !totalsForDay.known.protein) continue;
-        points.push({ iso: iso, value: metric === "water" ? number(day.water) : number(totalsForDay[metric]) });
+        if (metric === "protein" && !totalsForDay.known.protein) continue;
+        points.push({ iso: iso, value: totalsForDay[metric] });
       }
     }
     return points;
@@ -1591,7 +1593,7 @@
     return '<section class="card progress-visual"><div class="card-head"><div><p class="eyebrow">Explore your data</p><h2>Progress graph</h2><p>' + (previousAverage ? (difference >= 0 ? "+" : "") + difference.toFixed(1) + ' versus the preceding period' : 'Choose a metric and timeframe') + '</p></div></div>' +
       '<div class="range-tabs">' + PROGRESS_RANGES.map(function (range) { var label = range === "all" ? "All" : range === 30 ? "1 mo" : range === 90 ? "3 mo" : range + " d"; return '<button type="button" data-progress-range="' + range + '" class="' + (String(state.progressRange) === String(range) ? "active" : "") + '">' + label + '</button>'; }).join("") + '</div>' +
       '<div class="progress-filters"><label class="field">Metric<select id="progress-metric">' + options.map(function (option) { return '<option value="' + option.value + '" ' + (state.progressMetric === option.value ? "selected" : "") + '>' + option.label + '</option>'; }).join("") + '</select></label>' +
-      (state.progressMetric === "exercise" ? '<label class="field">Exercise<select id="progress-exercise">' + exercises.map(function (exercise) { return '<option value="' + exercise.id + '" ' + (state.progressExercise === exercise.id ? "selected" : "") + '>' + esc(exercise.name) + '</option>'; }).join("") + '</select></label>' : '') + '</div>' + summary + renderSvgChart(points, chartTarget(state.progressMetric), state.progressMetric) + (state.progressMetric === "protein" ? '<p class="notification-status">Protein totals use known values and may be partial. Meal logs with no protein values are skipped.</p>' : '') + '</section>';
+      (state.progressMetric === "exercise" ? '<label class="field">Exercise<select id="progress-exercise">' + exercises.map(function (exercise) { return '<option value="' + exercise.id + '" ' + (state.progressExercise === exercise.id ? "selected" : "") + '>' + esc(exercise.name) + '</option>'; }).join("") + '</select></label>' : '') + '</div>' + summary + renderSvgChart(points, chartTarget(state.progressMetric), state.progressMetric) + (state.progressMetric === "protein" ? '<p class="notification-status">Protein totals use known values and may be partial. Days without meals or known protein are skipped.</p>' : '') + '</section>';
   }
 
   function renderGoalProgress() {
@@ -1711,7 +1713,7 @@
       { key: "hunger", label: "Hunger, 1–10", min: 1, max: 10, step: 1 },
       { key: "energy", label: "Energy, 1–10", min: 1, max: 10, step: 1 },
       { key: "sleep", label: "Average sleep so far, hours", min: 0, max: 14, step: 0.25 },
-      { key: "soreness", label: "Soreness, 1–10", min: 1, max: 10, step: 1 }
+      { key: "soreness", label: "Soreness, 0–10", min: 0, max: 10, step: 1 }
     ].map(function (field) { return '<label class="field">' + field.label + '<input data-midweek-checkin="' + field.key + '" type="number" min="' + field.min + '" max="' + field.max + '" step="' + field.step + '" value="' + esc(checkin[field.key] == null ? "" : checkin[field.key]) + '"></label>'; }).join("") + '</div><label class="field">What needs adjusting?<textarea data-midweek-checkin="recoveryNotes" placeholder="Actual cardio effort, form, hunger, sleep, or schedule">' + esc(checkin.recoveryNotes || "") + '</textarea></label><p class="notification-status">Saved separately from Sunday’s recovery fields' + (checkin.asOf ? ' · last updated ' + esc(formatDate(checkin.asOf, { month: "short", day: "numeric" })) : '') + '</p></details><button id="copy-midweek" class="primary">Copy current-week update</button><p id="midweek-copy-status" class="notification-status">Includes Sunday through today; compares weights with the same weekdays last week.</p></section>';
   }
 
@@ -1817,7 +1819,7 @@
       "Hunger: " + (checkin.hunger || "not entered") + (checkin.hunger ? "/10" : ""),
       "Energy: " + (checkin.energy || "not entered") + (checkin.energy ? "/10" : ""),
       "Average sleep: " + (checkin.sleep || "not entered") + (checkin.sleep ? " hours" : ""),
-      "Soreness: " + (checkin.soreness || "not entered") + (checkin.soreness ? "/10" : ""),
+      "Soreness: " + (optionalNumber(checkin.soreness) == null ? "not entered" : checkin.soreness + "/10"),
       "Recovery notes: " + (checkin.recoveryNotes || "none entered"),
       "",
       "Training details:",
