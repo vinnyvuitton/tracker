@@ -857,6 +857,18 @@
     var key = DAYS.includes(override) ? override : dayKey(iso), plan = PLAN[key];
     if (state.coaching && state.coaching.status === "approved" && iso >= state.coaching.weekStart) {
       var datedCardio = state.coaching.cardioSessions && state.coaching.cardioSessions[iso];
+      if (datedCardio && datedCardio.mode === "outdoor" && plan.type === "Cardio") return {
+        type: "Cardio",
+        title: datedCardio.title,
+        subtitle: datedCardio.subtitle,
+        outdoorTrial: true,
+        sections: [{ label: "Outdoor cardio", exercises: [Object.assign({}, plan.sections[0].exercises[0], {
+          displayName: datedCardio.exerciseName,
+          prescription: datedCardio.prescription,
+          tip: datedCardio.tip,
+          coachingNote: datedCardio.note
+        })] }]
+      };
       if (datedCardio && plan.type === "Cardio" && Array.isArray(datedCardio.segments) && datedCardio.segments.length) {
         var savedSession = state.data.days && state.data.days[iso] && state.data.days[iso].cardio;
         var walkOnly = Boolean(savedSession && savedSession.walkOnly);
@@ -1168,9 +1180,9 @@
         var log = day.exercises[id] || {};
         var firstLabel = plan.type === "Strength" ? "Load used" : plan.type === "Cardio" ? "Adjustments made" : "Setup used";
         var secondLabel = plan.type === "Strength" ? "Reps completed" : plan.type === "Cardio" ? "Minutes completed" : "Notes";
-        var firstPlaceholder = plan.type === "Strength" ? "Choose below" : plan.type === "Cardio" ? "Example: incline 5 felt right" : "Optional";
-        var secondPlaceholder = plan.type === "Strength" ? "Example: 12, 12, 11" : plan.type === "Cardio" ? String(cardioDuration(plan)) : "Optional";
-        html += '<div class="exercise"><div class="exercise-main"><input type="checkbox" data-exercise-done="' + id + '" ' + (log.done ? "checked" : "") + ' aria-label="Complete ' + esc(exercise.name) + '"><div><div class="exercise-name-row"><div class="exercise-name">' + esc(exercise.name) + equipmentBadge(exercise) + '</div>' + (plan.type === "Strength" ? '<span class="exercise-count">' + exercisePosition + '/' + total + '</span>' : '') + '</div><div class="exercise-prescription">' + esc(exercise.prescription) + '</div></div></div>' +
+        var firstPlaceholder = plan.type === "Strength" ? "Choose below" : plan.type === "Cardio" ? (plan.outdoorTrial ? "Example: 4 jogs, effort 3/10" : "Example: incline 5 felt right") : "Optional";
+        var secondPlaceholder = plan.type === "Strength" ? "Example: 12, 12, 11" : plan.type === "Cardio" ? (plan.outdoorTrial ? "Trail minutes, e.g. 20" : String(cardioDuration(plan))) : "Optional";
+        html += '<div class="exercise"><div class="exercise-main"><input type="checkbox" data-exercise-done="' + id + '" ' + (log.done ? "checked" : "") + ' aria-label="Complete ' + esc(exercise.displayName || exercise.name) + '"><div><div class="exercise-name-row"><div class="exercise-name">' + esc(exercise.displayName || exercise.name) + equipmentBadge(exercise) + '</div>' + (plan.type === "Strength" ? '<span class="exercise-count">' + exercisePosition + '/' + total + '</span>' : '') + '</div><div class="exercise-prescription">' + esc(exercise.prescription) + '</div></div></div>' +
           renderTimedExerciseTimer(plan, exercise, id) + renderExerciseLog(plan, exercise, id, log, firstLabel, secondLabel, firstPlaceholder, secondPlaceholder) + exerciseGuide(exercise) + '</div>';
       });
     });
@@ -1290,6 +1302,10 @@
   }
 
   function renderCardioGuide(day, plan) {
+    if (plan.outdoorTrial) {
+      var result = day.cardio && day.cardio.result || {};
+      return '<p class="notice">Walk by default. Indoor fallback: a comfortable level treadmill walk. Use your own timer outdoors.</p><div class="treadmill-result"><strong>Route result</strong><div class="treadmill-fields"><label>Minutes<input data-cardio-result="durationMinutes" type="number" min="0" step="0.1" value="' + esc(result.durationMinutes == null ? "" : result.durationMinutes) + '"></label><label>Distance, mi<input data-cardio-result="distanceMiles" type="number" min="0" step="0.01" value="' + esc(result.distanceMiles == null ? "" : result.distanceMiles) + '"></label></div><small>Outdoors, use elapsed time and distance from bridge to bridge. If you walk indoors, log that session instead and mention the fallback below.</small></div>';
+    }
     var duration = cardioDuration(plan);
     var active = day.cardio && day.cardio.status === "active";
     var complete = day.cardio && day.cardio.status === "complete";
@@ -1633,7 +1649,7 @@
       plan.sections.forEach(function (section) {
         html += '<div class="section-label">' + esc(section.label) + '</div>';
         section.exercises.forEach(function (exercise) {
-          html += '<div class="exercise"><div class="exercise-name">' + esc(exercise.name) + equipmentBadge(exercise) + '</div><div class="exercise-prescription">' + esc(exercise.prescription) + '</div>';
+          html += '<div class="exercise"><div class="exercise-name">' + esc(exercise.displayName || exercise.name) + equipmentBadge(exercise) + '</div><div class="exercise-prescription">' + esc(exercise.prescription) + '</div>';
           if (exercise.equipment && exercise.equipment.type === "dumbbell") {
             var suggestedLoad = exercise.weeklyLoad || exercise.equipment.start;
             html += '<p class="exercise-tip">Starting point: ≈ ' + suggestedLoad + ' lb ' + (exercise.equipment.dumbbells === 2 ? "per dumbbell. " : "on one dumbbell. ") + esc(plateText(suggestedLoad, exercise.equipment.dumbbells)) + '</p>';
@@ -1655,12 +1671,13 @@
 
   function renderCheckin() {
     var range = selectedCheckinRange(), summary = buildCheckin(range.start, range.end, range.inProgress), checkin = readWeeklyCheckin(range.start);
-    return header("Check-Ins", "Wednesday review · Sunday full review") + renderMidweekCard() + (TODAY >= WEEK_SIX_START ? renderWeekSixGuidance() : "") +
+    return header("Check-Ins", "Wednesday review · Sunday full review") +
+      '<section class="card"><h2>Copy a check-in</h2><div class="grid two"><div><button id="copy-midweek" class="primary">Copy midweek check-in</button><p id="midweek-copy-status" class="notification-status" aria-live="polite">Current week through today.</p></div><div><label class="field">Weekly check-in date<select id="checkin-week">' + renderCheckinWeekOptions(range.start) + '</select></label><button id="copy-checkin" class="primary">Copy weekly check-in</button></div></div></section>' + renderMidweekCard() + (TODAY >= WEEK_SIX_START ? renderWeekSixGuidance() : "") +
       '<section class="card goals-card"><div class="card-head"><div><h2>Nutrition settings</h2><p>These saved settings are under review. Keep regular adequate meals and snacks; the weekly coaching guidance takes priority.</p></div></div><div class="grid two"><label class="field">Daily calories<input id="calorie-target" type="number" inputmode="numeric" min="1200" max="4000" step="25" value="' + esc(state.data.targets.calories) + '"></label><label class="field">Daily protein, g<input id="protein-target" type="number" inputmode="numeric" min="50" max="300" step="5" value="' + esc(state.data.targets.protein) + '"></label></div><p class="notification-status">Calorie zone: ' + esc(state.data.targets.calorieMin) + '–' + esc(state.data.targets.calorieMax) + ' · ' + (state.coaching ? 'Previous weekly setting: ' : 'Aim near ') + esc((number(state.data.targets.calories) * 7).toLocaleString()) + (state.coaching ? ' calories; review with the current coaching plan' : ' calories for the full week') + ' · Protein zone: ' + esc(state.data.targets.proteinMin) + '–' + esc(state.data.targets.proteinMax) + ' g · Do not subtract treadmill calories.</p></section>' +
-      '<section class="card"><label class="field">Week<select id="checkin-week">' + renderCheckinWeekOptions(range.start) + '</select></label><div class="card-head"><div><h2>Weekly recovery</h2><p>' + esc(formatDate(range.start, { month: "short", day: "numeric" })) + ' to ' + esc(formatDate(range.end, { month: "short", day: "numeric" })) + (range.inProgress ? ' · In progress' : '') + '</p></div></div><div class="notice">Complete all four recovery fields before exporting so next week can be adjusted safely.</div><div class="grid two"><label class="field">Hunger, 1–10<input data-weekly-checkin="hunger" type="number" min="1" max="10" value="' + esc(checkin.hunger || "") + '"></label><label class="field">Energy, 1–10<input data-weekly-checkin="energy" type="number" min="1" max="10" value="' + esc(checkin.energy || "") + '"></label><label class="field">Average sleep, hours<input data-weekly-checkin="sleep" type="number" min="0" max="14" step="0.25" value="' + esc(checkin.sleep || "") + '"></label><label class="field">Soreness, 1–10<input data-weekly-checkin="soreness" type="number" min="1" max="10" value="' + esc(checkin.soreness || "") + '"></label></div><label class="field">Recovery notes<textarea data-weekly-checkin="recoveryNotes" placeholder="Include leg soreness before Tuesday and Friday, plus any back tightness">' + esc(checkin.recoveryNotes || "") + '</textarea></label></section>' +
+      '<section class="card"><div class="card-head"><div><h2>Weekly recovery</h2><p>' + esc(formatDate(range.start, { month: "short", day: "numeric" })) + ' to ' + esc(formatDate(range.end, { month: "short", day: "numeric" })) + (range.inProgress ? ' · In progress' : '') + '</p></div></div><div class="notice">Complete all four recovery fields before exporting so next week can be adjusted safely.</div><div class="grid two"><label class="field">Hunger, 1–10<input data-weekly-checkin="hunger" type="number" min="1" max="10" value="' + esc(checkin.hunger || "") + '"></label><label class="field">Energy, 1–10<input data-weekly-checkin="energy" type="number" min="1" max="10" value="' + esc(checkin.energy || "") + '"></label><label class="field">Average sleep, hours<input data-weekly-checkin="sleep" type="number" min="0" max="14" step="0.25" value="' + esc(checkin.sleep || "") + '"></label><label class="field">Soreness, 1–10<input data-weekly-checkin="soreness" type="number" min="1" max="10" value="' + esc(checkin.soreness || "") + '"></label></div><label class="field">Recovery notes<textarea data-weekly-checkin="recoveryNotes" placeholder="Include leg soreness before Tuesday and Friday, plus any back tightness">' + esc(checkin.recoveryNotes || "") + '</textarea></label></section>' +
       '<section class="card"><div class="card-head"><div><h2>Export selected week</h2><p>' + (range.inProgress ? 'Includes Sunday through today. Future days are left out.' : 'Includes the full Sunday–Saturday week.') + '</p></div></div>' +
       '<textarea id="checkin-output" class="checkin-output" readonly>' + esc(summary) + '</textarea>' +
-      '<div class="row wrap"><button id="copy-checkin" class="primary">Copy selected week</button><button id="download-backup" class="secondary">Download private backup</button><button id="lock-tracker" class="secondary">Lock this device</button></div></section>' +
+      '<div class="row wrap"><button id="download-backup" class="secondary">Download private backup</button><button id="lock-tracker" class="secondary">Lock this device</button></div></section>' +
       renderNotificationCard() +
       '<section class="card"><div class="notice">Your weekly summary is only copied when you tap the button. Meal analysis sends only the meal photo and notes you choose, and does not expose your dashboard access code.</div></section>';
   }
@@ -1714,7 +1731,7 @@
       { key: "energy", label: "Energy, 1–10", min: 1, max: 10, step: 1 },
       { key: "sleep", label: "Average sleep so far, hours", min: 0, max: 14, step: 0.25 },
       { key: "soreness", label: "Soreness, 0–10", min: 0, max: 10, step: 1 }
-    ].map(function (field) { return '<label class="field">' + field.label + '<input data-midweek-checkin="' + field.key + '" type="number" min="' + field.min + '" max="' + field.max + '" step="' + field.step + '" value="' + esc(checkin[field.key] == null ? "" : checkin[field.key]) + '"></label>'; }).join("") + '</div><label class="field">What needs adjusting?<textarea data-midweek-checkin="recoveryNotes" placeholder="Actual cardio effort, form, hunger, sleep, or schedule">' + esc(checkin.recoveryNotes || "") + '</textarea></label><p class="notification-status">Saved separately from Sunday’s recovery fields' + (checkin.asOf ? ' · last updated ' + esc(formatDate(checkin.asOf, { month: "short", day: "numeric" })) : '') + '</p></details><button id="copy-midweek" class="primary">Copy current-week update</button><p id="midweek-copy-status" class="notification-status">Includes Sunday through today; compares weights with the same weekdays last week.</p></section>';
+    ].map(function (field) { return '<label class="field">' + field.label + '<input data-midweek-checkin="' + field.key + '" type="number" min="' + field.min + '" max="' + field.max + '" step="' + field.step + '" value="' + esc(checkin[field.key] == null ? "" : checkin[field.key]) + '"></label>'; }).join("") + '</div><label class="field">What needs adjusting?<textarea data-midweek-checkin="recoveryNotes" placeholder="Actual cardio effort, form, hunger, sleep, or schedule">' + esc(checkin.recoveryNotes || "") + '</textarea></label><p class="notification-status">Saved separately from Sunday’s recovery fields' + (checkin.asOf ? ' · last updated ' + esc(formatDate(checkin.asOf, { month: "short", day: "numeric" })) : '') + '</p></details></section>';
   }
 
   function reminderSettings() { return state.data.preferences.reminders; }
@@ -1784,11 +1801,11 @@
       exercisesForPlan(plan).forEach(function (exercise) {
         var log = day.exercises && day.exercises[exerciseId(exercise.name)];
         if (!log || (!log.done && !log.load && !log.reps)) return;
-        exerciseLines.push("  " + (log.done ? "✓ " : "• ") + exercise.name + (log.load ? " | " + log.load : "") + (log.reps ? " | " + log.reps : ""));
+        exerciseLines.push("  " + (log.done ? "✓ " : "• ") + (exercise.displayName || exercise.name) + (log.load ? " | " + log.load : "") + (log.reps ? " | " + log.reps : ""));
       });
-      if (exerciseLines.length || (day.workout && day.workout.rating) || plan.type === "Cardio" && day.cardio && day.cardio.mode) {
+      if (exerciseLines.length || (day.workout && day.workout.rating) || plan.type === "Cardio" && day.cardio && (day.cardio.mode || plan.outdoorTrial && day.cardio.result)) {
         var cardioResult = day.cardio && day.cardio.result;
-        var resultLine = cardioResult ? "\n  Treadmill result: " + [cardioResult.durationMinutes != null ? cardioResult.durationMinutes + " min" : "", cardioResult.distanceMiles != null ? cardioResult.distanceMiles + " mi" : "", cardioResult.calories != null ? cardioResult.calories + " screen cal" : "", cardioResult.averageSpeedMph != null ? cardioResult.averageSpeedMph + " mph avg" : ""].filter(Boolean).join(" · ") : "";
+        var resultLine = cardioResult ? (plan.outdoorTrial ? "\n  Route result: " : "\n  Treadmill result: ") + [cardioResult.durationMinutes != null ? cardioResult.durationMinutes + " min" : "", cardioResult.distanceMiles != null ? cardioResult.distanceMiles + " mi" : "", cardioResult.calories != null ? cardioResult.calories + " screen cal" : "", cardioResult.averageSpeedMph != null ? cardioResult.averageSpeedMph + " mph avg" : ""].filter(Boolean).join(" · ") : "";
         var cardioChoiceLine = (plan.speedTrialAvailable || plan.shortTrialAvailable) && day.cardio && (day.cardio.mode || day.cardio.workSpeedTrial || typeof day.cardio.shortSpeedInclineTrial === "boolean") ? "\n  Cardio plan selected: " + (day.cardio.mode === "express" ? plan.shortTrialAvailable ? "Express · five-minute trial not used" : "Express · full-session speed option not used" : plan.shortTrialAvailable ? day.cardio.shortSpeedInclineTrial ? "Full · five-minute trial at minutes 25–30: 3.5 mph / incline setting 8; other blocks standard" : "Full · standard work-block speeds" : day.cardio.workSpeedTrial ? "Full · optional +0.1 mph during minutes 15–45; incline unchanged" : "Full · standard work-block speeds") : "";
         training.push(formatDate(iso, { weekday: "short", month: "short", day: "numeric" }) + " · " + plan.title + (day.workout.rating ? " · " + day.workout.rating : "") + "\n" + exerciseLines.join("\n") + resultLine + cardioChoiceLine);
       }
@@ -2492,7 +2509,7 @@
     document.getElementById("meal-result-saturated-fat").value = result.saturatedFat == null ? "" : result.saturatedFat;
     document.getElementById("meal-result-added-sugar").value = result.addedSugar == null ? "" : result.addedSugar;
     document.getElementById("meal-result-sodium").value = result.sodium == null ? "" : result.sodium;
-    document.getElementById("meal-confidence").textContent = (result.confidence || "Estimate") + " confidence—review before saving";
+    document.getElementById("meal-confidence").textContent = (result.confidence || "Estimate") + " · Review before saving" + (mealEnergyWarning(result) ? " · Calories and macros differ; check the source." : "");
     document.getElementById("meal-included-items").textContent = result.includedItems ? "Included: " + result.includedItems : "";
     document.getElementById("meal-nutrition-basis").textContent = (result.nutritionBasis ? "Reported nutrition basis: " + result.nutritionBasis + ". " : "") + "AI confidence is not independent label/menu verification. " + (mealEnergyWarning(result) ? "Calories and macros disagree substantially; review the original source before saving. Neither total is automatically corrected." : "Check the portion and source before relying on the estimate.");
     document.getElementById("meal-assumptions").textContent = result.assumptions || "Nutrition values are estimates.";
@@ -2655,6 +2672,7 @@
       if (reviewOnSuccess) {
         state.activePendingMealId = pending.id;
         showMealResult(pending.result);
+        document.getElementById("meal-result").scrollIntoView({ block: "start" });
         var photoStatus = document.getElementById("meal-photo-status");
         if (photoStatus && (pending.photoId || pending.localImage)) photoStatus.textContent = "Photo uploaded and analyzed successfully.";
       } else {
@@ -3012,6 +3030,7 @@
   }
 
   async function startCardioSession() {
+    if (planForDate(state.selectedDate).outdoorTrial) return;
     var startButton = document.getElementById("start-cardio");
     if (startButton) { startButton.disabled = true; startButton.textContent = "Preparing countdown…"; }
     try {
@@ -3021,6 +3040,7 @@
         if (!state.notificationEnabled) return;
       }
       var plan = planForDate(state.selectedDate);
+      if (plan.outdoorTrial) return;
       var duration = cardioDuration(plan);
       var segments = cardioSegmentsFor(plan);
       var alerts = segments.slice(1).map(function (segment) {
@@ -3409,7 +3429,7 @@
     output.value = await summary;
     var button = document.getElementById("copy-checkin");
     button.textContent = "Copied";
-    setTimeout(function () { button.textContent = "Copy check-in"; }, 1500);
+    setTimeout(function () { button.textContent = "Copy weekly check-in"; }, 1500);
   }
 
   async function copyMidweekCheckin() {
@@ -3421,7 +3441,7 @@
       } else await navigator.clipboard.writeText(await summary);
       document.getElementById("midweek-copy-status").textContent = "Copied current week through today, including waist, saved photo dates, training, and midweek recovery.";
     } catch (error) {
-      document.getElementById("midweek-copy-status").textContent = "Copy could not finish. Use the selected-week export below or try again.";
+      document.getElementById("midweek-copy-status").textContent = "Copy could not finish. Try copying the midweek check-in again.";
     }
   }
 
