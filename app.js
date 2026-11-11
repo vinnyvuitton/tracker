@@ -1133,7 +1133,7 @@
     var html = header("Daily", formatDate(iso));
     html += '<div class="daily-overview">' + weekStrip();
     html += '<section class="card daily-launch"><div><p class="eyebrow">Selected workout</p><h2>' + esc(plan.title) + '</h2><p class="notification-status">' + esc(next && started ? 'Up next · ' + next.label : plan.subtitle) + '</p></div><button type="button" id="open-workout" class="primary">' + workoutAction + '</button><button type="button" id="quick-log-food" class="secondary">Log food</button></section>';
-    if (state.coaching && state.coaching.status === "approved" && DAYS.includes(state.coaching.dateSchedule && state.coaching.dateSchedule[iso]) && state.coaching.dateSchedule[iso] !== key) html += '<div class="notice">This week only · Friday and Saturday workouts swapped. Normal schedule resumes next week.</div>';
+    if (state.coaching && state.coaching.status === "approved" && DAYS.includes(state.coaching.dateSchedule && state.coaching.dateSchedule[iso]) && state.coaching.dateSchedule[iso] !== key) html += '<div class="notice">This week only · Adjusted workout schedule.</div>';
     html += '<div class="grid two daily-nutrition">' +
       nutritionStatCard("Protein", Math.round(t.protein), "g", state.data.targets.proteinMin, state.data.targets.proteinMax, day.meals.length > t.known.protein ? (t.known.protein ? "partial" : "unknown") : null) +
       nutritionStatCard("Calories", Math.round(t.calories), "cal", state.data.targets.calorieMin, state.data.targets.calorieMax) +
