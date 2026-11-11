@@ -889,6 +889,7 @@
     var key = DAYS.includes(override) ? override : dayKey(iso), plan = PLAN[key];
     if (state.coaching && state.coaching.status === "approved" && iso >= state.coaching.weekStart) {
       var datedCardio = state.coaching.cardioSessions && state.coaching.cardioSessions[iso];
+      if (!datedCardio && state.coaching.cardioDefaults && iso >= state.coaching.cardioDefaults.from) datedCardio = state.coaching.cardioDefaults.session;
       if (datedCardio && datedCardio.mode === "outdoor" && plan.type === "Cardio") return {
         type: "Cardio",
         title: datedCardio.title,
