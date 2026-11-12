@@ -1414,7 +1414,8 @@
       '<strong>Meals</strong><span>' + count + (count === 1 ? ' entry' : ' entries') + '</span><span aria-hidden="true" class="meal-diary-chevron">⌄</span></button>' +
       '<div id="meal-diary"' + (isOpen ? '' : ' hidden') + '>';
     if (!count) html += '<div class="empty">No meals logged yet</div>';
-    day.meals.forEach(function (meal, index) {
+    for (var index = count - 1; index >= 0; index--) {
+      var meal = day.meals[index];
       var quantity = number(meal.quantity) || 1;
       var protein = optionalNumber(meal.protein);
       html += '<div class="meal ' + (meal.photo ? "has-photo" : "") + '">';
@@ -1422,7 +1423,7 @@
       html += '<button type="button" class="meal-summary" data-edit-meal="' + index + '"><strong>' + esc(meal.name || "Meal") + '</strong><small>' + (protein == null ? 'Protein unknown' : Math.round(protein) + ' g protein') + ' · ' + Math.round(number(meal.calories)) + ' cal</small><span>' + (meal.photo ? 'Private photo saved · ' : '') + (mealEnergyWarning(meal) ? 'Calories and macros disagree · review details' : 'Edit details') + '</span></button>' +
         '<div class="quantity-stepper" aria-label="Quantity for ' + esc(meal.name || "meal") + '"><button type="button" data-meal-quantity="-1" data-meal-index="' + index + '" aria-label="Decrease quantity">−</button><input type="number" min="0.25" max="50" step="0.25" value="' + esc(quantity) + '" data-meal-quantity-input="' + index + '" aria-label="Quantity"><button type="button" data-meal-quantity="1" data-meal-index="' + index + '" aria-label="Increase quantity">+</button></div>' +
         '<button type="button" class="remove-meal" data-remove-meal="' + index + '" aria-label="Remove ' + esc(meal.name || "meal") + '">×</button></div>';
-    });
+    }
     html += renderNutritionDetails(t, day.meals.length) + '</div></section>';
     return html;
   }
