@@ -1147,8 +1147,13 @@
     html += '<div class="grid two daily-nutrition">' +
       nutritionStatCard("Protein", Math.round(t.protein), "g", state.data.targets.proteinMin, state.data.targets.proteinMax, day.meals.length > t.known.protein ? (t.known.protein ? "partial" : "unknown") : null) +
       nutritionStatCard("Calories", Math.round(t.calories), "cal", state.data.targets.calorieMin, state.data.targets.calorieMax) +
-      renderNutrientTotal("Fiber", "fiber", "At least 30 g per day", t, day.meals.length) +
-      renderNutrientTotal("Added sugar", "addedSugar", "No more than 36 g per day", t, day.meals.length) +
+      renderDailyMeter("Fiber", t.known.fiber ? t.fiber : 0, 30, "g", {
+        goal: "At least 30 g per day", partial: t.known.fiber > 0 && t.known.fiber < day.meals.length
+      }) +
+      renderDailyMeter("Added sugar", t.known.addedSugar ? t.addedSugar : 0, 36, "g", {
+        limit: true, partial: t.known.addedSugar > 0 && t.known.addedSugar < day.meals.length
+      }) +
+      renderWaterCard(day.water) +
       '</div>';
 
     html += renderMeals(day, t) + renderPendingMeals(iso);
@@ -1440,10 +1445,26 @@
     return html;
   }
 
-  function renderNutrientTotal(label, field, goal, totals, mealCount) {
-    var known = totals.known[field];
-    var value = known ? Math.round(totals[field] * 10) / 10 + ' <small>g</small>' : 'Unknown';
-    return '<section class="card nutrition-stat"><p class="eyebrow">' + label + '</p><div class="stat">' + value + '</div><p class="target-status">' + goal + (known && known < mealCount ? ' · Partial total' : '') + '</p></section>';
+  function renderDailyMeter(label, value, target, unit, options) {
+    var difference = Math.abs(target - value);
+    var remaining = Math.round(difference * 10) / 10 || (difference > 0 ? "<0.1" : 0);
+    var amount = remaining + " " + (unit === "glasses" && remaining === 1 ? "glass" : unit);
+    var css = "", status;
+    if (options.limit) {
+      css = value > target ? " over" : value >= target * 0.8 ? " near-limit" : " below-limit";
+      status = value > target ? "Over by " + amount : amount + " left";
+    } else {
+      status = value >= target ? "Goal met" : amount + " to go";
+    }
+    return '<section' + (options.id ? ' id="' + options.id + '"' : '') + ' class="card nutrition-stat' + css + '"><p class="eyebrow">' + esc(label) + '</p>' +
+      '<div class="stat">' + esc(Math.round(value * 10) / 10) + ' <small>' + esc(unit) + '</small></div>' +
+      '<div class="progress-bar"><span style="width:' + pct(value, target) + '%"></span></div>' +
+      (options.goal ? '<p class="target-status">' + esc(options.goal) + (options.partial ? ' · Partial total' : '') + '</p>' : '') +
+      '<p class="target-status">' + esc(status) + (!options.goal && options.partial ? ' · Partial total' : '') + '</p></section>';
+  }
+
+  function renderWaterCard(value) {
+    return renderDailyMeter("Water", optionalNumber(value) ?? 0, optionalNumber(state.data.targets.water) ?? 10, "glasses", { id: "daily-water-card" });
   }
 
   function renderNutritionDetails(t, mealCount) {
@@ -1570,8 +1591,8 @@
 
   function renderReviewCheckpoints() {
     if (state.coaching) return '<section class="card"><h2>Next checkpoints</h2><ul class="checkpoint-list">' + state.coaching.checkpoints.map(function (point) { return '<li><strong>' + esc(point.label) + '</strong><span>' + esc(point.note) + '</span></li>'; }).join("") + '</ul><p>' + esc(state.coaching.goal.nextStep) + '</p></section>';
-    if (TODAY >= WEEK_SIX_START) return '<section class="card"><div class="card-head"><div><h2>Next checkpoints</h2><p>Use completed-week weight averages, waist, photos and recovery together.</p></div></div><ul class="checkpoint-list"><li><strong>October 21 · 8 pm Chicago</strong><span>Review Mon–Wed food, protein, sleep, training and any waist baseline. Decide whether Saturday’s optional speed step fits your recovery.</span></li><li><strong>October 25 · Weekly review</strong><span>Check the full week near the 1,850-calorie anchor. If verified intake, repeated waist readings and the weight trend support a change, choose one small adjustment. Collect another week if the picture is unclear.</span></li><li><strong>November 1 · Two-week direction</strong><span>Reassess the trend if October 25 was inconclusive. Avoid reacting to one morning’s number.</span></li><li><strong>November 4 · Photo checkpoint</strong><span>Repeat front, side and back photos with matching camera position, lighting, distance and waistband.</span></li></ul><p class="notification-status">First milestone: a sustained 150 lb weekly average. Reassess waist, photos, strength and the next target from there.</p></section>';
-    return '<section class="card"><div class="card-head"><div><h2>Next checkpoints</h2><p>Judge the plan using weight averages, waist, photos, and recovery together.</p></div></div><ul class="checkpoint-list"><li><strong>Wednesday · 8 pm Chicago</strong><span>Review Mon–Wed logs, actual cardio effort, waist, photos, hunger, energy, and sleep. Adjust Thu–Sat if needed.</span></li><li><strong>October 18 · Process check</strong><span>Review consistent morning weights, the 1,850-calorie anchor, protein minimum, form, and recovery.</span></li><li><strong>October 25 · Results decision</strong><span>Assess two full weeks and waist change. Working weight-average range: 151.9–152.4 lb; a planning target, not a promised result. If weight and waist stay flat, review intake accuracy and activity before changing the plan.</span></li><li><strong>November 4 · Photo checkpoint</strong><span>Repeat front, side, and back photos with matching position, lighting, camera distance, and waistband.</span></li></ul><p class="notification-status">First milestone: a 150 lb weekly average. Reassess appearance, waist, strength, and recovery before deciding on 145 or 140.</p></section>';
+    if (TODAY >= WEEK_SIX_START) return '<section class="card"><div class="card-head"><div><h2>Next checkpoints</h2><p>Use completed-week weight averages, photos and recovery together.</p></div></div><ul class="checkpoint-list"><li><strong>October 21 · 8 pm Chicago</strong><span>Review Mon–Wed food, protein, sleep, and training. Decide whether Saturday’s optional speed step fits your recovery.</span></li><li><strong>October 25 · Weekly review</strong><span>Check the full week near the 1,850-calorie anchor. If verified intake and the weight trend support a change, choose one small adjustment. Collect another week if the picture is unclear.</span></li><li><strong>November 1 · Two-week direction</strong><span>Reassess the trend if October 25 was inconclusive. Avoid reacting to one morning’s number.</span></li><li><strong>November 4 · Photo checkpoint</strong><span>Repeat front, side and back photos with matching camera position, lighting, distance and waistband.</span></li></ul><p class="notification-status">First milestone: a sustained 150 lb weekly average. Reassess photos, strength and the next target from there.</p></section>';
+    return '<section class="card"><div class="card-head"><div><h2>Next checkpoints</h2><p>Judge the plan using weight averages, photos, and recovery together.</p></div></div><ul class="checkpoint-list"><li><strong>Wednesday · 8 pm Chicago</strong><span>Review Mon–Wed logs, actual cardio effort, photos, hunger, energy, and sleep. Adjust Thu–Sat if needed.</span></li><li><strong>October 18 · Process check</strong><span>Review consistent morning weights, the 1,850-calorie anchor, protein minimum, form, and recovery.</span></li><li><strong>October 25 · Results decision</strong><span>Assess two full weeks. Working weight-average range: 151.9–152.4 lb; a planning target, not a promised result. If weight stays flat, review intake accuracy and activity before changing the plan.</span></li><li><strong>November 4 · Photo checkpoint</strong><span>Repeat front, side, and back photos with matching position, lighting, camera distance, and waistband.</span></li></ul><p class="notification-status">First milestone: a 150 lb weekly average. Reassess appearance, strength, and recovery before deciding on 145 or 140.</p></section>';
   }
 
   function progressWindow() {
@@ -2114,7 +2135,12 @@
     });
     document.getElementById("quick-log-food").addEventListener("click", function () { openMealDialog(false); });
     ["weight", "water"].forEach(function (id) {
-      document.getElementById(id).addEventListener("change", function (event) { getDay(state.selectedDate)[id] = event.target.value; queueSave(); });
+      document.getElementById(id).addEventListener("change", function (event) {
+        var value = event.target.value;
+        getDay(state.selectedDate)[id] = value;
+        if (id === "water") document.getElementById("daily-water-card").outerHTML = renderWaterCard(value);
+        queueSave();
+      });
     });
     document.getElementById("weight-standard").addEventListener("change", function (event) {
       var day = getDay(state.selectedDate);
