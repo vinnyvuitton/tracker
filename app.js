@@ -1144,17 +1144,7 @@
     html += '<div class="daily-overview">' + weekStrip();
     html += '<section class="card daily-launch"><div><p class="eyebrow">Selected workout</p><h2>' + esc(plan.title) + '</h2><p class="notification-status">' + esc(next && started ? 'Up next · ' + next.label : plan.subtitle) + '</p></div><button type="button" id="open-workout" class="primary">' + workoutAction + '</button><button type="button" id="quick-log-food" class="secondary">Log food</button></section>';
     if (state.coaching && state.coaching.status === "approved" && DAYS.includes(state.coaching.dateSchedule && state.coaching.dateSchedule[iso]) && state.coaching.dateSchedule[iso] !== key) html += '<div class="notice">This week only · Adjusted workout schedule.</div>';
-    html += '<div class="grid two daily-nutrition">' +
-      nutritionStatCard("Protein", Math.round(t.protein), "g", state.data.targets.proteinMin, state.data.targets.proteinMax, day.meals.length > t.known.protein ? (t.known.protein ? "partial" : "unknown") : null) +
-      nutritionStatCard("Calories", Math.round(t.calories), "cal", state.data.targets.calorieMin, state.data.targets.calorieMax) +
-      renderDailyMeter("Fiber", t.known.fiber ? t.fiber : 0, 30, "g", {
-        goal: "At least 30 g per day", partial: t.known.fiber > 0 && t.known.fiber < day.meals.length
-      }) +
-      renderDailyMeter("Added sugar", t.known.addedSugar ? t.addedSugar : 0, 36, "g", {
-        limit: true, partial: t.known.addedSugar > 0 && t.known.addedSugar < day.meals.length
-      }) +
-      renderWaterCard(day.water) +
-      '</div>';
+    html += renderTodayTotals(day, t);
 
     html += renderMeals(day, t) + renderPendingMeals(iso);
     html += '<section class="card"><div class="card-head"><div><h2>Daily check-in</h2><p>Optional: if weighing, use comparable morning conditions after the bathroom, before pre-workout, shakes, food, other drinks, photos, or training. A pause is reasonable if checking is distressing.</p></div></div>' +
@@ -1176,19 +1166,34 @@
       '<div class="progress-bar"><span style="width:' + pct(value, target) + '%"></span></div></section>';
   }
 
-  function nutritionStatCard(label, value, unit, low, high, coverage) {
-    if (coverage) {
-      var displayed = coverage === "unknown" ? "Unknown" : esc(value) + " <small>" + esc(unit) + "</small>";
-      var note = coverage === "unknown" ? "No protein values entered" : "Partial total · some meals have no protein value";
-      return '<section class="card nutrition-stat"><p class="eyebrow">' + esc(label) + '</p><div class="stat">' + displayed + '</div><p class="target-status">' + note + '</p></section>';
-    }
-    low = number(low); high = number(high) || low;
-    if (state.coaching && label === "Calories") return '<section class="card nutrition-stat"><p class="eyebrow">Calories · logged estimate</p><div class="stat">' + esc(value) + ' <small>cal</small></div><p class="target-status">Previous target under review. Keep regular meals and respond to hunger.</p></section>';
-    var status = value < low ? (low - value) + " " + unit + " to target zone" : value > high ? (value - high) + " " + unit + " above target zone" : "Inside target zone";
-    var css = value > high ? " over" : value >= low ? " in-zone" : "";
-    if (label === "Protein" && value >= low) { status = "Protein minimum met"; css = " in-zone"; }
-    return '<section class="card nutrition-stat' + css + '"><p class="eyebrow">' + esc(label) + '</p><div class="stat">' + esc(value) + ' <small>/ ' + esc(low) + '–' + esc(high) + ' ' + esc(unit) + '</small></div>' +
-      '<div class="progress-bar"><span style="width:' + pct(value, high) + '%"></span></div><p class="target-status">' + esc(status) + '</p></section>';
+  function renderTodayTotals(day, t) {
+    var protein = Math.round(t.protein);
+    var proteinMin = number(state.data.targets.proteinMin);
+    var proteinMax = number(state.data.targets.proteinMax) || proteinMin;
+    var mealCount = day.meals.length;
+    var proteinStatus = protein >= proteinMin ? "Protein minimum met" : (proteinMin - protein) + " g to target zone";
+    if (t.known.protein < mealCount) proteinStatus = t.known.protein ? "Some meals have no protein value" : "No protein values entered";
+    var proteinValue = t.known.protein || !mealCount ? protein : "Unknown";
+
+    var calories = Math.round(t.calories);
+    var fiberPartial = t.known.fiber > 0 && t.known.fiber < mealCount;
+    var sugarPartial = t.known.addedSugar > 0 && t.known.addedSugar < mealCount;
+    var partialNote = fiberPartial && sugarPartial ? "Fiber and added sugar include only meals where they were logged."
+      : fiberPartial ? "Fiber includes only meals where it was logged."
+      : sugarPartial ? "Added sugar includes only meals where it was logged." : "";
+    return '<section class="card daily-nutrition" aria-labelledby="daily-totals-title"><h2 id="daily-totals-title">Today</h2>' +
+      renderTodayTotalRow("Protein", proteinStatus, proteinValue + " / " + proteinMin + " to " + proteinMax + " g", { fill: pct(protein, proteinMax) }) +
+      renderTodayTotalRow("Calories", "logged estimate", calories + " cal", {}) +
+      renderDailyMeter("Fiber", t.known.fiber ? t.fiber : 0, 30, "g") +
+      renderDailyMeter("Added sugar", t.known.addedSugar ? t.addedSugar : 0, 36, "g", { limit: true }) +
+      renderWaterCard(day.water) +
+      (partialNote ? '<p class="today-total-note">' + esc(partialNote) + '</p>' : '') + '</section>';
+  }
+
+  function renderTodayTotalRow(label, status, value, options) {
+    return '<section' + (options.id ? ' id="' + options.id + '"' : '') + ' class="nutrition-stat today-total-row' + (options.css || "") + '">' +
+      '<div class="today-total-heading"><p>' + esc(label) + ' <span>· ' + esc(status) + '</span></p><strong>' + esc(value) + '</strong></div>' +
+      (options.fill == null ? '' : '<div class="progress-bar"><span style="width:' + options.fill + '%"></span></div>') + '</section>';
   }
 
   function renderPhotos(day, iso) {
@@ -1445,7 +1450,7 @@
     return html;
   }
 
-  function renderDailyMeter(label, value, target, unit, options) {
+  function renderDailyMeter(label, value, target, unit, options = {}) {
     var difference = Math.abs(target - value);
     var remaining = Math.round(difference * 10) / 10 || (difference > 0 ? "<0.1" : 0);
     var amount = remaining + " " + (unit === "glasses" && remaining === 1 ? "glass" : unit);
@@ -1456,11 +1461,9 @@
     } else {
       status = value >= target ? "Goal met" : amount + " to go";
     }
-    return '<section' + (options.id ? ' id="' + options.id + '"' : '') + ' class="card nutrition-stat' + css + '"><p class="eyebrow">' + esc(label) + '</p>' +
-      '<div class="stat">' + esc(Math.round(value * 10) / 10) + ' <small>' + esc(unit) + '</small></div>' +
-      '<div class="progress-bar"><span style="width:' + pct(value, target) + '%"></span></div>' +
-      (options.goal ? '<p class="target-status">' + esc(options.goal) + (options.partial ? ' · Partial total' : '') + '</p>' : '') +
-      '<p class="target-status">' + esc(status) + (!options.goal && options.partial ? ' · Partial total' : '') + '</p></section>';
+    return renderTodayTotalRow(label, status, Math.round(value * 10) / 10 + " / " + target + " " + unit, {
+      fill: pct(value, target), css: css, id: options.id
+    });
   }
 
   function renderWaterCard(value) {
