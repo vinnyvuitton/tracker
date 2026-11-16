@@ -355,6 +355,13 @@ dialog label { display: grid; gap: 6px; color: var(--muted); font-size: 12px; }
 .today-total-heading span, .today-total-note { color: var(--muted); }
 .today-total-heading strong { text-align: right; font-variant-numeric: tabular-nums; }
 .today-total-row .progress-bar { height: 5px; margin-top: 5px; }
+.today-total-row.fiber-nudge .progress-bar span { background: #d7a65a; }
+#daily-water-card .today-total-heading { grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; }
+.today-water-controls { display: flex; gap: 4px; }
+.today-water-controls button { width: 44px; min-height: 44px; padding: 0; font-size: 1.125rem; }
+.daily-disclosure { padding-block: 0; }
+.daily-disclosure[open] { padding-bottom: 16px; }
+.daily-disclosure > summary { min-height: 48px; padding-block: 12px; font-weight: 700; cursor: pointer; }
 .today-total-note { margin: 5px 0 0; font-size: 11px; }
 .daily-nutrition > .today-total-note { margin-top: 9px; }
 .focused-workout-nav { display: flex; align-items: center; justify-content: space-between; gap: 10px; }

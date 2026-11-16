@@ -173,6 +173,8 @@
     view: "today",
     workoutFocus: false,
     openMealDiaryDate: null,
+    openDailyWeightDate: null,
+    openDailyPhotosDate: null,
     selectedDate: TODAY,
     data: defaultData(),
     version: 0,
@@ -607,12 +609,6 @@
     return day && day.weightTiming !== "other" ? number(day.weight) : 0;
   }
 
-  function weightTimingStatus(day) {
-    return day.weightTiming === "other"
-      ? "This reading stays in your daily log and is excluded from the morning trend because it was taken after food, drinks, or exercise."
-      : "For comparable morning readings, weigh after the bathroom and before food, drinks, or exercise. Other readings can stay in your daily log.";
-  }
-
   function reconcileReviewedWeightTiming(day, iso, corrections) {
     // Reviewed corrections come from private data, never embedded diary text.
     var reviewed = (corrections || {})[iso];
@@ -689,8 +685,8 @@
     if (!canMoveInsidePopup) event.preventDefault();
   }
 
-  function chicagoToday() {
-    var parts = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+  function chicagoToday(now = new Date()) {
+    var parts = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
     var map = {};
     parts.forEach(function (p) { map[p.type] = p.value; });
     return map.year + "-" + map.month + "-" + map.day;
@@ -1147,10 +1143,7 @@
     html += renderTodayTotals(day, t);
 
     html += renderMeals(day, t) + renderPendingMeals(iso);
-    html += '<section class="card"><div class="card-head"><div><h2>Daily check-in</h2><p>Optional: if weighing, use comparable morning conditions after the bathroom, before pre-workout, shakes, food, other drinks, photos, or training. A pause is reasonable if checking is distressing.</p></div></div>' +
-      '<div class="row wrap"><label class="field">Weight, lb<input id="weight" type="number" inputmode="decimal" min="90" max="300" step="0.1" value="' + esc(day.weight) + '"></label>' +
-      '<div class="field">Water, glasses<div class="stepper"><button type="button" data-water-step="-1" aria-label="Subtract one glass">−</button><input id="water" type="number" inputmode="numeric" min="0" max="30" step="1" value="' + esc(day.water) + '" aria-label="Water glasses"><button type="button" data-water-step="1" aria-label="Add one glass">+</button></div></div></div><label class="weight-timing"><input id="weight-standard" type="checkbox" ' + (day.weightTiming !== "other" ? 'checked' : '') + '> Taken before food, drinks, and exercise</label><p id="weight-timing-status" class="notification-status">' + weightTimingStatus(day) + '</p>' + renderWeeklyWeighIn(iso) + '</section>';
-
+    html += renderDailyWeight(day, iso);
     html += renderPhotos(day, iso) + '</div>';
     html += '<dialog id="workout-area" aria-labelledby="workout-dialog-title"><div class="focused-workout-nav"><div><h2 id="workout-dialog-title">' + esc(plan.title) + '</h2><span id="focused-workout-count"></span><span id="workout-sync" role="status">' + esc(state.sync) + '</span></div><button type="button" class="secondary" id="back-to-daily" autofocus>Close</button></div><p id="next-workout-set" class="notification-status"></p>';
     html += '<p class="notification-status">' + esc(plan.subtitle) + '</p>';
@@ -1159,6 +1152,15 @@
     html += '<section class="card"><div class="card-head"><div><h2>Day note</h2><p>Energy, sleep, soreness, schedule, or anything I should know</p></div></div>' +
       '<textarea id="day-note" placeholder="Optional note">' + esc(day.workout.notes) + '</textarea></section>';
     return html;
+  }
+
+  function renderDailyWeight(day, iso) {
+    var wednesday = dayKey(iso) === "Wed";
+    var body = '<p class="notification-status">Weigh after the bathroom, before food, drinks or training.</p>' +
+      '<div class="row wrap"><label class="field">Daily weight, lb<input id="weight" type="number" inputmode="decimal" min="90" max="300" step="0.1" value="' + esc(day.weight) + '"></label></div>' +
+      '<label class="weight-timing"><input id="weight-standard" type="checkbox" ' + (day.weightTiming !== "other" ? 'checked' : '') + '> Taken before food, drinks, and exercise</label>';
+    if (wednesday) return '<section class="card"><h2>Daily check-in</h2>' + body + renderWeeklyWeighIn(iso) + '</section>';
+    return '<details id="daily-weight-details" class="card daily-disclosure"' + (state.openDailyWeightDate === iso ? ' open' : '') + '><summary>Weigh in: Wednesday</summary>' + body + '</details>';
   }
 
   function statCard(label, value, unit, target) {
@@ -1176,6 +1178,7 @@
     var proteinValue = t.known.protein || !mealCount ? protein : "Unknown";
 
     var calories = Math.round(t.calories);
+    var fiber = t.known.fiber ? t.fiber : 0;
     var fiberPartial = t.known.fiber > 0 && t.known.fiber < mealCount;
     var sugarPartial = t.known.addedSugar > 0 && t.known.addedSugar < mealCount;
     var partialNote = fiberPartial && sugarPartial ? "Fiber and added sugar include only meals where they were logged."
@@ -1184,7 +1187,7 @@
     return '<section class="card daily-nutrition" aria-labelledby="daily-totals-title"><h2 id="daily-totals-title">Today</h2>' +
       renderTodayTotalRow("Protein", proteinStatus, proteinValue + " / " + proteinMin + " to " + proteinMax + " g", { fill: pct(protein, proteinMax) }) +
       renderTodayTotalRow("Calories", "logged estimate", calories + " cal", {}) +
-      renderDailyMeter("Fiber", t.known.fiber ? t.fiber : 0, 30, "g") +
+      renderDailyMeter("Fiber", fiber, 30, "g", { id: "daily-fiber-row", css: fiberNeedsNudge(state.selectedDate, fiber) ? " fiber-nudge" : "" }) +
       renderDailyMeter("Added sugar", t.known.addedSugar ? t.addedSugar : 0, 36, "g", { limit: true }) +
       renderWaterCard(day.water) +
       (partialNote ? '<p class="today-total-note">' + esc(partialNote) + '</p>' : '') + '</section>';
@@ -1192,14 +1195,21 @@
 
   function renderTodayTotalRow(label, status, value, options) {
     return '<section' + (options.id ? ' id="' + options.id + '"' : '') + ' class="nutrition-stat today-total-row' + (options.css || "") + '">' +
-      '<div class="today-total-heading"><p>' + esc(label) + ' <span>· ' + esc(status) + '</span></p><strong>' + esc(value) + '</strong></div>' +
+      '<div class="today-total-heading"><p>' + esc(label) + ' <span>· ' + esc(status) + '</span></p><strong>' + esc(value) + '</strong>' +
+      (options.waterControls ? '<div class="today-water-controls"><button type="button" class="secondary" data-water-step="-1" aria-label="Subtract one glass">−</button><button type="button" class="secondary" data-water-step="1" aria-label="Add one glass">+</button></div>' : '') + '</div>' +
       (options.fill == null ? '' : '<div class="progress-bar"><span style="width:' + options.fill + '%"></span></div>') + '</section>';
   }
 
   function renderPhotos(day, iso) {
     var official = dayKey(iso) === "Wed";
-    var html = '<section class="card"><div class="card-head"><div><h2>Progress photos</h2><p>' + (official ? "Optional photos. A checking break is reasonable; saved history stays available." : "Daily is optional. Wednesday before training is the official checkpoint.") + '</p></div></div><div class="photos">';
-    ["front", "side", "back"].forEach(function (side) {
+    var sides = ["front", "side", "back"];
+    var count = sides.filter(function (side) { return day.photos[side]; }).length;
+    var html = official
+      ? '<section class="card"><div class="card-head"><div><h2>Progress photos</h2><p>Optional photos. A checking break is reasonable; saved history stays available.</p></div></div>'
+      : '<details id="daily-photo-details" class="card daily-disclosure"' + (state.openDailyPhotosDate === iso ? ' open' : '') + '><summary>Add photo' +
+        (count ? ' <span class="notification-status">· ' + count + ' saved</span>' : '') + '</summary>';
+    html += '<div class="photos">';
+    sides.forEach(function (side) {
       var ref = day.photos[side];
       var revealed = state.revealedPhoto === iso + ":" + side;
       html += '<div class="photo-slot ' + (revealed ? "revealed" : "") + '" data-photo-container="' + side + '">';
@@ -1210,7 +1220,7 @@
       }
       html += '</div>';
     });
-    return html + '</div></section>';
+    return html + (official ? '</div></section>' : '</div></details>');
   }
 
   function photoRefValue(ref) { return typeof ref === "string" ? ref : ref && ref.id ? "r2:" + ref.id : ""; }
@@ -1454,7 +1464,7 @@
     var difference = Math.abs(target - value);
     var remaining = Math.round(difference * 10) / 10 || (difference > 0 ? "<0.1" : 0);
     var amount = remaining + " " + (unit === "glasses" && remaining === 1 ? "glass" : unit);
-    var css = "", status;
+    var css = options.css || "", status;
     if (options.limit) {
       css = value > target ? " over" : value >= target * 0.8 ? " near-limit" : " below-limit";
       status = value > target ? "Over by " + amount : amount + " left";
@@ -1462,12 +1472,23 @@
       status = value >= target ? "Goal met" : amount + " to go";
     }
     return renderTodayTotalRow(label, status, Math.round(value * 10) / 10 + " / " + target + " " + unit, {
-      fill: pct(value, target), css: css, id: options.id
+      fill: pct(value, target), css: css, id: options.id, waterControls: options.waterControls
     });
   }
 
   function renderWaterCard(value) {
-    return renderDailyMeter("Water", optionalNumber(value) ?? 0, optionalNumber(state.data.targets.water) ?? 10, "glasses", { id: "daily-water-card" });
+    return renderDailyMeter("Water", optionalNumber(value) ?? 0, optionalNumber(state.data.targets.water) ?? 10, "glasses", { id: "daily-water-card", waterControls: true });
+  }
+
+  function fiberNeedsNudge(iso, fiber, now = new Date()) {
+    if (fiber >= 15 || iso !== chicagoToday(now)) return false;
+    var hour = new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", hour: "numeric", hourCycle: "h23" }).format(now);
+    return Number(hour) >= 15;
+  }
+
+  function refreshFiberNudge() {
+    var row = document.getElementById("daily-fiber-row");
+    if (row) row.classList.toggle("fiber-nudge", fiberNeedsNudge(state.selectedDate, totals(getDay(state.selectedDate)).fiber));
   }
 
   function renderNutritionDetails(t, mealCount) {
@@ -1715,7 +1736,7 @@
       var completed = weeklyProgressWeight(addDays(startOfWeek(TODAY), -4), TODAY);
       var average = completed.average;
       var weightCopy = completed.source === "Daily average"
-        ? (average == null ? 'Build a consistent morning-weight trend, then reassess waist, photos and strength.' : 'Last completed week: ' + average.toFixed(1) + ' lb from ' + completed.count + ' morning readings. Reassess waist, photos and strength at the milestone. Daily average.')
+        ? (average == null ? 'Build a consistent morning-weight trend, then reassess photos and strength.' : 'Last completed week: ' + average.toFixed(1) + ' lb from ' + completed.count + ' morning readings. Reassess photos and strength at the milestone. Daily average.')
         : (completed.value == null ? 'Last completed week: Missing.' : 'Last completed week: ' + completed.value.toFixed(1) + ' lb · Wednesday weigh-in.');
       return '<section class="card"><div class="card-head"><div><p class="eyebrow">First milestone</p><h2>' + (completed.source === "Daily average" ? '150 lb weekly average' : '150 lb weekly weigh-in') + '</h2><p>' + weightCopy + '</p></div></div>' +
         metric("Strength sessions through today", pct(stats.strengthDone, stats.strengthPlanned), stats.strengthDone + " of " + stats.strengthPlanned + " planned") +
@@ -2137,18 +2158,26 @@
       event.currentTarget.setAttribute("aria-expanded", String(open));
     });
     document.getElementById("quick-log-food").addEventListener("click", function () { openMealDialog(false); });
-    ["weight", "water"].forEach(function (id) {
-      document.getElementById(id).addEventListener("change", function (event) {
-        var value = event.target.value;
-        getDay(state.selectedDate)[id] = value;
-        if (id === "water") document.getElementById("daily-water-card").outerHTML = renderWaterCard(value);
-        queueSave();
-      });
+    var dailyDate = state.selectedDate;
+    var weightDetails = document.getElementById("daily-weight-details");
+    var photoDetails = document.getElementById("daily-photo-details");
+    weightDetails?.addEventListener("toggle", function () {
+      if (weightDetails.isConnected) state.openDailyWeightDate = weightDetails.open ? dailyDate : null;
+    });
+    photoDetails?.addEventListener("toggle", function () {
+      if (!photoDetails.isConnected) return;
+      state.openDailyPhotosDate = photoDetails.open ? dailyDate : null;
+      if (!photoDetails.open && /:(front|side|back)$/.test(state.revealedPhoto)) {
+        state.revealedPhoto = null;
+        render();
+      }
+    });
+    document.getElementById("weight").addEventListener("change", function (event) {
+      getDay(dailyDate).weight = event.target.value;
+      queueSave();
     });
     document.getElementById("weight-standard").addEventListener("change", function (event) {
-      var day = getDay(state.selectedDate);
-      day.weightTiming = event.target.checked ? "morning" : "other";
-      document.getElementById("weight-timing-status").textContent = weightTimingStatus(day);
+      getDay(dailyDate).weightTiming = event.target.checked ? "morning" : "other";
       queueSave(false);
     });
     document.querySelectorAll("[data-weekly-weigh-in]").forEach(function (input) {
@@ -2163,7 +2192,16 @@
         queueSave(false);
       });
     });
-    document.querySelectorAll("[data-water-step]").forEach(function (button) { button.addEventListener("click", function () { var day = getDay(state.selectedDate); day.water = clamp(number(day.water) + Number(button.dataset.waterStep), 0, 30); queueSave(true); }); });
+    document.querySelectorAll("[data-water-step]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var step = Number(button.dataset.waterStep);
+        var day = getDay(dailyDate);
+        day.water = clamp(number(day.water) + step, 0, 30);
+        var restoreFocus = document.activeElement === button;
+        queueSave(true);
+        if (restoreFocus) document.querySelector('[data-water-step="' + step + '"]')?.focus({ preventScroll: true });
+      });
+    });
     document.getElementById("day-note").addEventListener("change", function (event) { getDay(state.selectedDate).workout.notes = event.target.value; queueSave(); });
     document.getElementById("session-rating").addEventListener("change", function (event) { getDay(state.selectedDate).workout.rating = event.target.value; queueSave(); });
     document.querySelectorAll("[data-exercise-done]").forEach(function (input) { input.addEventListener("change", function () { updateExercise(input.dataset.exerciseDone, "done", input.checked); }); });
@@ -2424,6 +2462,7 @@
 
   function togglePhotoReveal(side) {
     var key = state.selectedDate + ":" + side;
+    if (document.getElementById("daily-photo-details")?.open) state.openDailyPhotosDate = state.selectedDate;
     state.revealedPhoto = state.revealedPhoto === key ? null : key;
     render();
   }
@@ -3624,7 +3663,8 @@
   document.addEventListener("touchstart", handleDialogTouchStart, { passive: true, capture: true });
   document.addEventListener("touchmove", handleDialogTouchMove, { passive: false, capture: true });
   document.getElementById("toast").addEventListener("click", function (event) { clearTimeout(state.toastTimer); event.currentTarget.hidden = true; });
-  document.addEventListener("visibilitychange", function () { if (document.hidden && state.revealedPhoto) { state.revealedPhoto = null; render(); } if (!document.hidden) { syncCardioCompletion(); syncCardioReceipts(); if (document.getElementById("checkin-output")) { state.timingFetched = {}; refreshCardioTiming(); } if (state.exerciseTimer && state.exerciseTimer.running) acquireTimerWakeLock(); } });
+  document.addEventListener("visibilitychange", function () { if (document.hidden && state.revealedPhoto) { state.revealedPhoto = null; render(); } if (!document.hidden) { refreshFiberNudge(); syncCardioCompletion(); syncCardioReceipts(); if (document.getElementById("checkin-output")) { state.timingFetched = {}; refreshCardioTiming(); } if (state.exerciseTimer && state.exerciseTimer.running) acquireTimerWakeLock(); } });
+  setInterval(function () { if (!document.hidden) refreshFiberNudge(); }, 60000);
   window.addEventListener("pagehide", function () { state.revealedPhoto = null; releaseTimerWakeLock(); });
   if ("serviceWorker" in navigator && !localMode) navigator.serviceWorker.register("./sw.js").then(async function (registration) { state.serviceWorker = registration; await refreshNotificationState(); syncCardioReceipts(); render(); }).catch(function () {});
   if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", function (event) { var data = event.data || {}; if (data.type === "cardio-complete") completeCardioSession(data.date, data.sessionId, data.durationMinutes); if (data.type === "cardio-timing-ready") { syncCardioReceipts(); state.timingFetched = {}; if (document.getElementById("checkin-output")) refreshCardioTiming(); } });
