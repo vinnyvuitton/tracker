@@ -21,6 +21,7 @@
   var WEEK_FOUR_START = "2026-10-04";
   var WEEK_FIVE_START = "2026-10-11";
   var WEEK_SIX_START = "2026-10-18";
+  var FIRST_WEEKLY_WEIGH_IN = "2026-11-18";
   var SHORT_CARDIO_TRIAL_DATE = "2026-10-24";
   var EFFORT_OPTIONS = [
     { value: "much-too-easy", label: "Much too easy" },
@@ -622,9 +623,18 @@
     day.weightTimingNoteReview = reviewed.reviewedAt || "reviewed";
   }
 
-  function renderWaistInputs(day, iso) {
-    var readings = day.waist || {}, average = waistAverage(day);
-    return '<div class="waist-entry"><div class="card-head"><div><h3>Waist measurement</h3><p>' + (dayKey(iso) === "Wed" ? 'Wednesday checkpoint · Measure before food, drinks, and training.' : 'Optional today · Wednesday morning is the weekly checkpoint.') + '</p></div></div><div class="grid two"><label class="field">Waist, inches<input id="waist-first" type="number" inputmode="decimal" min="10" max="80" step="0.01" value="' + esc(readings.first || "") + '"></label><label class="field">Second reading, optional<input id="waist-second" type="number" inputmode="decimal" min="10" max="80" step="0.01" value="' + esc(readings.second || "") + '"></label></div><p id="waist-average" class="notification-status">' + (average == null ? 'No waist baseline logged yet.' : 'Recorded measurement: ' + average.toFixed(2) + ' in' + (String(readings.second || "").trim() ? ' · average of two readings' : ' · one reading')) + '</p><details class="form-guide"><summary>How to measure consistently</summary><p>Use a flexible tape just above your hip bones. Keep it level all the way around, snug without pressing into your skin. Relax your abdomen and read after a normal exhale. Remove and reposition the tape for a second reading; the dashboard averages both. Use the same spot each Wednesday, after the bathroom and before food, drinks, or training.</p></details></div>';
+  function weeklyWeighIn(iso) {
+    var entry = state.data.days[iso]?.weeklyWeighIn;
+    var weight = optionalNumber(entry?.weight), visceralFat = optionalNumber(entry?.visceralFat);
+    return weight == null && visceralFat == null ? null : { weight: weight, visceralFat: visceralFat };
+  }
+
+  function renderWeeklyWeighIn(iso) {
+    if (iso < FIRST_WEEKLY_WEIGH_IN || dayKey(iso) !== "Wed" || iso > TODAY) return "";
+    var entry = weeklyWeighIn(iso) || {};
+    return '<div><h3>Wednesday morning weigh-in</h3><p>Enter the weight and visceral fat rating from your smart scale.</p><div class="grid two">' +
+      '<label class="field">Weight, lb<input data-weekly-weigh-in="weight" type="number" inputmode="decimal" min="0.1" step="0.1" value="' + esc(entry.weight ?? "") + '"></label>' +
+      '<label class="field">Visceral fat rating<input data-weekly-weigh-in="visceralFat" type="number" inputmode="decimal" min="0" step="any" value="' + esc(entry.visceralFat ?? "") + '"></label></div></div>';
   }
 
   function openDashboardDialog(dialog) {
@@ -1137,12 +1147,14 @@
     html += '<div class="grid two daily-nutrition">' +
       nutritionStatCard("Protein", Math.round(t.protein), "g", state.data.targets.proteinMin, state.data.targets.proteinMax, day.meals.length > t.known.protein ? (t.known.protein ? "partial" : "unknown") : null) +
       nutritionStatCard("Calories", Math.round(t.calories), "cal", state.data.targets.calorieMin, state.data.targets.calorieMax) +
+      renderNutrientTotal("Fiber", "fiber", "At least 30 g per day", t, day.meals.length) +
+      renderNutrientTotal("Added sugar", "addedSugar", "No more than 36 g per day", t, day.meals.length) +
       '</div>';
 
     html += renderMeals(day, t) + renderPendingMeals(iso);
     html += '<section class="card"><div class="card-head"><div><h2>Daily check-in</h2><p>Optional: if weighing, use comparable morning conditions after the bathroom, before pre-workout, shakes, food, other drinks, photos, or training. A pause is reasonable if checking is distressing.</p></div></div>' +
       '<div class="row wrap"><label class="field">Weight, lb<input id="weight" type="number" inputmode="decimal" min="90" max="300" step="0.1" value="' + esc(day.weight) + '"></label>' +
-      '<div class="field">Water, glasses<div class="stepper"><button type="button" data-water-step="-1" aria-label="Subtract one glass">−</button><input id="water" type="number" inputmode="numeric" min="0" max="30" step="1" value="' + esc(day.water) + '" aria-label="Water glasses"><button type="button" data-water-step="1" aria-label="Add one glass">+</button></div></div></div><label class="weight-timing"><input id="weight-standard" type="checkbox" ' + (day.weightTiming !== "other" ? 'checked' : '') + '> Taken before food, drinks, and exercise</label><p id="weight-timing-status" class="notification-status">' + weightTimingStatus(day) + '</p>' + renderWaistInputs(day, iso) + '</section>';
+      '<div class="field">Water, glasses<div class="stepper"><button type="button" data-water-step="-1" aria-label="Subtract one glass">−</button><input id="water" type="number" inputmode="numeric" min="0" max="30" step="1" value="' + esc(day.water) + '" aria-label="Water glasses"><button type="button" data-water-step="1" aria-label="Add one glass">+</button></div></div></div><label class="weight-timing"><input id="weight-standard" type="checkbox" ' + (day.weightTiming !== "other" ? 'checked' : '') + '> Taken before food, drinks, and exercise</label><p id="weight-timing-status" class="notification-status">' + weightTimingStatus(day) + '</p>' + renderWeeklyWeighIn(iso) + '</section>';
 
     html += renderPhotos(day, iso) + '</div>';
     html += '<dialog id="workout-area" aria-labelledby="workout-dialog-title"><div class="focused-workout-nav"><div><h2 id="workout-dialog-title">' + esc(plan.title) + '</h2><span id="focused-workout-count"></span><span id="workout-sync" role="status">' + esc(state.sync) + '</span></div><button type="button" class="secondary" id="back-to-daily" autofocus>Close</button></div><p id="next-workout-set" class="notification-status"></p>';
@@ -1428,6 +1440,12 @@
     return html;
   }
 
+  function renderNutrientTotal(label, field, goal, totals, mealCount) {
+    var known = totals.known[field];
+    var value = known ? Math.round(totals[field] * 10) / 10 + ' <small>g</small>' : 'Unknown';
+    return '<section class="card nutrition-stat"><p class="eyebrow">' + label + '</p><div class="stat">' + value + '</div><p class="target-status">' + goal + (known && known < mealCount ? ' · Partial total' : '') + '</p></section>';
+  }
+
   function renderNutritionDetails(t, mealCount) {
     var known = t.known || {};
     var optional = function (field, unit) { return known[field] ? (field === "sodium" ? Math.round(t[field]) : Math.round(t[field] * 10) / 10) + " " + unit : "Not available"; };
@@ -1495,25 +1513,40 @@
 
   function favoriteById(id) { return (state.data.favorites || []).find(function (favorite) { return favorite.id === id; }); }
 
+  function weeklyProgressWeight(wednesday, through) {
+    if (wednesday >= FIRST_WEEKLY_WEIGH_IN) {
+      var weighIn = wednesday <= through ? weeklyWeighIn(wednesday) : null;
+      return { iso: wednesday, value: weighIn?.weight ?? null, source: "Wednesday weigh-in", visceralFat: weighIn?.visceralFat ?? null };
+    }
+    var values = [];
+    var saturday = addDays(wednesday, 3);
+    for (var iso = addDays(wednesday, -3); iso <= saturday && iso <= through; iso = addDays(iso, 1)) {
+      var value = morningWeight(state.data.days[iso]);
+      if (value) values.push(value);
+    }
+    var average = values.length ? values.reduce(function (sum, value) { return sum + value; }, 0) / values.length : null;
+    return { iso: wednesday, value: values.length > 1 ? average : null, source: "Daily average", count: values.length, average: average };
+  }
+
   function renderProgress() {
-    var dates = Object.keys(state.data.days).sort();
-    var weights = dates.filter(function (iso) { return morningWeight(state.data.days[iso]) > 0; });
-    var latestFullWeekEnd = addDays(startOfWeek(TODAY), -1);
-    var latestFullWeekStart = addDays(latestFullWeekEnd, -6);
-    var priorFullWeekEnd = addDays(latestFullWeekStart, -1);
-    var priorFullWeekStart = addDays(priorFullWeekEnd, -6);
-    var weeklyAverage = averageWeightBetween(latestFullWeekStart, latestFullWeekEnd);
-    var priorAverage = averageWeightBetween(priorFullWeekStart, priorFullWeekEnd);
-    var weeklyCount = periodStats(latestFullWeekStart, latestFullWeekEnd).weights.length;
-    var priorCount = periodStats(priorFullWeekStart, priorFullWeekEnd).weights.length;
-    var comparable = weeklyCount > 1 && priorCount > 1;
-    var averageChange = comparable ? weeklyAverage - priorAverage : 0;
+    var currentWednesday = addDays(startOfWeek(TODAY), 3);
+    var latest = weeklyProgressWeight(addDays(currentWednesday, -7), TODAY);
+    var prior = weeklyProgressWeight(addDays(currentWednesday, -14), TODAY);
+    var change = latest.value != null && prior.value != null ? latest.value - prior.value : null;
+    var latestWeight = latest.value != null ? latest.value.toFixed(1) + ' <small>lb</small>' : latest.count === 1 ? "Limited data" : latest.source === "Daily average" ? "No data" : "Missing";
     var html = header("Progress", "Trend over noise");
-    html += '<section class="card"><div class="grid two"><div><p class="eyebrow">Last full-week average</p><div class="stat">' + (weeklyCount > 1 ? weeklyAverage.toFixed(1) : weeklyCount === 1 ? "Limited data" : "No data") + (weeklyCount > 1 ? ' <small>lb</small>' : '') + '</div></div><div><p class="eyebrow">Week-over-week</p><div class="stat">' + (comparable ? (averageChange > 0 ? "+" : "") + averageChange.toFixed(1) : "No trend") + (comparable ? ' <small>lb</small>' : '') + '</div></div></div><p class="notification-status">' + esc(formatDate(latestFullWeekStart, { month: "short", day: "numeric" })) + '–' + esc(formatDate(latestFullWeekEnd, { month: "short", day: "numeric" })) + ' · ' + (weeklyCount === 1 ? 'Only one comparable morning reading; no weekly comparison. No extra weighing is required to follow the plan.' : weeklyCount === 0 ? 'No comparable morning readings. No extra weighing is required to follow the plan.' : weeklyCount + ' comparable morning readings. Daily changes are context, not the score.') + '</p></section>';
-    html += '<section class="card"><div class="card-head"><div><h2>Recent morning weights</h2><p>Weigh before drinks, training, and photos; judge only the weekly average</p></div></div><div class="weight-list">';
-    weights.slice(-8).forEach(function (iso) { html += '<div class="weight-chip"><small>' + esc(formatDate(iso, { month: "short", day: "numeric" })) + '</small><strong>' + number(state.data.days[iso].weight).toFixed(1) + '</strong></div>'; });
-    if (!weights.length) html += '<div class="empty">Your weight trend will appear here.</div>';
-    html += '</div></section>';
+    html += '<section class="card"><div class="grid two"><div><p class="eyebrow">Last full week · ' + latest.source + '</p><div class="stat">' + latestWeight + '</div></div>' +
+      '<div><p class="eyebrow">Week-over-week</p><div class="stat">' + (change == null ? "No trend" : (change > 0 ? "+" : "") + change.toFixed(1) + ' <small>lb</small>') + '</div></div></div><p class="notification-status">' +
+      esc(formatDate(addDays(latest.iso, -3), { month: "short", day: "numeric" })) + '–' + esc(formatDate(addDays(latest.iso, 3), { month: "short", day: "numeric" })) + '</p></section>';
+    html += '<section class="card"><div class="card-head"><div><h2>Recent morning weights</h2></div></div><ul class="waist-history">';
+    var firstWeek = startOfWeek(state.data.profile.startDate || TODAY);
+    for (var iso = currentWednesday; iso >= firstWeek && iso >= addDays(currentWednesday, -49); iso = addDays(iso, -7)) {
+      var entry = weeklyProgressWeight(iso, TODAY);
+      var reading = entry.value == null ? (entry.count === 1 ? "Limited data" : "Missing") : entry.value.toFixed(1) + " lb";
+      var rating = entry.visceralFat == null ? "" : " · Visceral fat rating " + entry.visceralFat;
+      html += '<li><strong>' + esc(formatDate(iso, { month: "short", day: "numeric", year: "numeric" })) + '</strong><span>' + entry.source + ' · ' + reading + rating + '</span></li>';
+    }
+    html += '</ul></section>';
     html += renderProgressChart();
     html += renderWaistHistory();
     html += renderReviewCheckpoints();
@@ -1521,21 +1554,12 @@
     return html;
   }
 
-  function averageWeightBetween(startIso, endIso) {
-    var values = [];
-    for (var iso = startIso; iso <= endIso; iso = addDays(iso, 1)) {
-      var day = state.data.days[iso];
-      if (morningWeight(day)) values.push(morningWeight(day));
-    }
-    return values.length ? values.reduce(function (sum, value) { return sum + value; }, 0) / values.length : 0;
-  }
-
   function renderWaistHistory() {
     var dates = Object.keys(state.data.days || {}).filter(function (iso) { return iso <= TODAY && waistAverage(state.data.days[iso]) != null; }).sort();
     var latest = dates.length ? waistAverage(state.data.days[dates[dates.length - 1]]) : null;
     var first = dates.length ? waistAverage(state.data.days[dates[0]]) : null;
-    var html = '<section class="card"><div class="card-head"><div><h2>Waist trend</h2><p>Same location and morning conditions each Wednesday</p></div></div>';
-    if (latest == null) return html + '<div class="empty">Log your first measurement in Morning check. That becomes your baseline.</div></section>';
+    var html = '<section class="card"><div class="card-head"><div><h2>Waist history</h2><p>Previously saved readings</p></div></div>';
+    if (latest == null) return html + '<div class="empty">No past waist readings.</div></section>';
     html += '<div class="stat">' + latest.toFixed(2) + ' <small>in</small></div><p class="notification-status">' + esc(formatDate(dates[dates.length - 1], { month: "short", day: "numeric" })) + (dates.length > 1 ? ' · ' + (latest - first > 0 ? '+' : '') + (latest - first).toFixed(2) + ' in since ' + esc(formatDate(dates[0], { month: "short", day: "numeric" })) : ' · First baseline') + '</p><details class="form-guide"><summary>Measurement history (' + dates.length + ')</summary><ul class="waist-history">';
     dates.slice().reverse().forEach(function (iso) {
       var readings = state.data.days[iso].waist;
@@ -1569,7 +1593,7 @@
     var points = [];
     for (var iso = start; iso <= end; iso = addDays(iso, 1)) {
       var day = state.data.days[iso];
-      if (metric === "weight") { if (morningWeight(day)) points.push({ iso: iso, value: morningWeight(day) }); continue; }
+      if (metric === "weight") { if (dayKey(iso) === "Wed") points.push(weeklyProgressWeight(iso, TODAY)); continue; }
       if (metric === "waist") { var waist = waistAverage(day); if (waist != null) points.push({ iso: iso, value: waist }); continue; }
       if (metric === "exercise") {
         var log = day && day.exercises && day.exercises[exerciseIdValue];
@@ -1619,34 +1643,39 @@
   function renderSvgChart(points, target, metric) {
     if (!points.length) return '<div class="empty chart-empty">No data in this timeframe yet.</div>';
     var width = 640, height = 250, padLeft = 58, padRight = 34, padY = 24;
-    var values = points.map(function (point) { return point.value; });
+    var values = points.flatMap(function (point) { return point.value == null ? [] : [point.value]; });
+    if (!values.length) return '<div class="empty chart-empty">Missing weekly weight data in this timeframe.</div>';
     var min = Math.min.apply(Math, values.concat(target ? [target] : []));
     var max = Math.max.apply(Math, values.concat(target ? [target] : []));
     if (min === max) { min = Math.max(0, min - 1); max += 1; }
     var x = function (index) { return padLeft + (points.length === 1 ? (width - padLeft - padRight) / 2 : index * (width - padLeft - padRight) / (points.length - 1)); };
     var y = function (value) { return padY + (max - value) * (height - padY * 2) / (max - min); };
-    var path = points.map(function (point, index) { return (index ? "L" : "M") + x(index).toFixed(1) + " " + y(point.value).toFixed(1); }).join(" ");
+    var path = points.map(function (point, index) { return point.value == null ? "" : (index && points[index - 1].value != null ? "L" : "M") + x(index).toFixed(1) + " " + y(point.value).toFixed(1); }).join(" ");
     var grid = "";
     for (var tick = 0; tick <= 4; tick++) {
       var tickValue = min + (max - min) * tick / 4, tickY = y(tickValue);
       grid += '<line class="chart-grid" x1="' + padLeft + '" x2="' + (width - padRight) + '" y1="' + tickY.toFixed(1) + '" y2="' + tickY.toFixed(1) + '"></line><text class="chart-label chart-y-label" x="' + (padLeft - 8) + '" y="' + (tickY + 4).toFixed(1) + '" text-anchor="end">' + esc(metric === "waist" ? tickValue.toFixed(2) : metric === "weight" || metric === "exercise" ? tickValue.toFixed(1) : Math.round(tickValue)) + '</text>';
     }
     var targetLine = target ? '<line class="chart-target" x1="' + padLeft + '" x2="' + (width - padRight) + '" y1="' + y(target).toFixed(1) + '" y2="' + y(target).toFixed(1) + '"></line><text class="chart-label" x="' + (width - padRight) + '" y="' + (y(target) - 7).toFixed(1) + '" text-anchor="end">target ' + esc(target) + '</text>' : '';
-    var dots = points.map(function (point, index) { return '<circle cx="' + x(index).toFixed(1) + '" cy="' + y(point.value).toFixed(1) + '" r="5" tabindex="0"><title>' + esc(formatDate(point.iso, { month: "short", day: "numeric" })) + ': ' + esc(formatMetricValue(metric, point.value)) + '</title></circle>'; }).join("");
+    var dots = points.map(function (point, index) {
+      if (point.value == null) return '<text class="chart-label" x="' + x(index).toFixed(1) + '" y="' + (height - 22) + '" text-anchor="middle"><title>' + esc(formatDate(point.iso, { month: "short", day: "numeric" })) + '</title>Missing</text>';
+      return '<circle cx="' + x(index).toFixed(1) + '" cy="' + y(point.value).toFixed(1) + '" r="5" tabindex="0"><title>' + esc(formatDate(point.iso, { month: "short", day: "numeric" })) + ': ' + esc(formatMetricValue(metric, point.value)) + (point.source ? ' · ' + point.source : '') + '</title></circle>'; }).join("");
     return '<div class="chart-wrap"><svg class="progress-chart" viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="Progress chart with numeric scale in ' + esc(metricUnit(metric)) + '">' + grid + targetLine + '<path d="' + path + '"></path>' + dots + '<text class="chart-label" x="' + padLeft + '" y="' + (height - 3) + '">' + esc(formatDate(points[0].iso, { month: "short", day: "numeric" })) + '</text><text class="chart-label" x="' + (width - padRight) + '" y="' + (height - 3) + '" text-anchor="end">' + esc(formatDate(points[points.length - 1].iso, { month: "short", day: "numeric" })) + '</text></svg></div>';
   }
 
   function renderProgressChart() {
     var windowRange = progressWindow();
     var exercises = progressExercises();
-    var options = [{ value: "weight", label: "Weight" }, { value: "waist", label: "Waist" }, { value: "exercise", label: "Exercise performance" }, { value: "workouts", label: "Workout completion" }, { value: "protein", label: "Protein" }, { value: "calories", label: "Calories" }, { value: "water", label: "Water" }];
+    var options = [{ value: "weight", label: "Weekly weight" }, { value: "waist", label: "Waist" }, { value: "exercise", label: "Exercise performance" }, { value: "workouts", label: "Workout completion" }, { value: "protein", label: "Protein" }, { value: "calories", label: "Calories" }, { value: "water", label: "Water" }];
     var points = progressSeries(state.progressMetric, state.progressExercise, windowRange.start, windowRange.end);
     var previous = state.progressRange === "all" ? [] : progressSeries(state.progressMetric, state.progressExercise, addDays(windowRange.start, -windowRange.days), addDays(windowRange.start, -1));
-    if (state.progressRange === "all" || Number(state.progressRange) >= 90) { points = weeklyAverages(points); previous = weeklyAverages(previous); }
-    var average = points.length ? points.reduce(function (sum, point) { return sum + point.value; }, 0) / points.length : 0;
+    if (state.progressMetric !== "weight" && (state.progressRange === "all" || Number(state.progressRange) >= 90)) { points = weeklyAverages(points); previous = weeklyAverages(previous); }
+    var recorded = points.filter(function (point) { return point.value != null; });
+    previous = previous.filter(function (point) { return point.value != null; });
+    var average = recorded.length ? recorded.reduce(function (sum, point) { return sum + point.value; }, 0) / recorded.length : 0;
     var previousAverage = previous.length ? previous.reduce(function (sum, point) { return sum + point.value; }, 0) / previous.length : 0;
     var difference = average - previousAverage;
-    var summary = points.length ? '<div class="chart-summary"><div><span>Latest</span><strong>' + esc(formatMetricValue(state.progressMetric, points[points.length - 1].value)) + '</strong></div><div><span>Average</span><strong>' + esc(formatMetricValue(state.progressMetric, average)) + '</strong></div><div><span>Low</span><strong>' + esc(formatMetricValue(state.progressMetric, Math.min.apply(Math, points.map(function (point) { return point.value; })))) + '</strong></div><div><span>High</span><strong>' + esc(formatMetricValue(state.progressMetric, Math.max.apply(Math, points.map(function (point) { return point.value; })))) + '</strong></div></div>' : '';
+    var summary = recorded.length ? '<div class="chart-summary"><div><span>Latest</span><strong>' + (points.at(-1).value == null ? "Missing" : esc(formatMetricValue(state.progressMetric, points.at(-1).value))) + '</strong></div><div><span>Average</span><strong>' + esc(formatMetricValue(state.progressMetric, average)) + '</strong></div><div><span>Low</span><strong>' + esc(formatMetricValue(state.progressMetric, Math.min.apply(Math, recorded.map(function (point) { return point.value; })))) + '</strong></div><div><span>High</span><strong>' + esc(formatMetricValue(state.progressMetric, Math.max.apply(Math, recorded.map(function (point) { return point.value; })))) + '</strong></div></div>' : '';
     return '<section class="card progress-visual"><div class="card-head"><div><p class="eyebrow">Explore your data</p><h2>Progress graph</h2><p>' + (previousAverage ? (difference >= 0 ? "+" : "") + difference.toFixed(1) + ' versus the preceding period' : 'Choose a metric and timeframe') + '</p></div></div>' +
       '<div class="range-tabs">' + PROGRESS_RANGES.map(function (range) { var label = range === "all" ? "All" : range === 30 ? "1 mo" : range === 90 ? "3 mo" : range + " d"; return '<button type="button" data-progress-range="' + range + '" class="' + (String(state.progressRange) === String(range) ? "active" : "") + '">' + label + '</button>'; }).join("") + '</div>' +
       '<div class="progress-filters"><label class="field">Metric<select id="progress-metric">' + options.map(function (option) { return '<option value="' + option.value + '" ' + (state.progressMetric === option.value ? "selected" : "") + '>' + option.label + '</option>'; }).join("") + '</select></label>' +
@@ -1659,9 +1688,12 @@
     var start = state.data.profile.baselineWeight;
     var latest = stats.latestWeight || start;
     if (TODAY >= WEEK_SIX_START) {
-      var completed = periodStats(addDays(startOfWeek(TODAY), -7), addDays(startOfWeek(TODAY), -1));
-      var average = completed.weights.length ? completed.weights.reduce(function (sum, value) { return sum + value; }, 0) / completed.weights.length : null;
-      return '<section class="card"><div class="card-head"><div><p class="eyebrow">First milestone</p><h2>150 lb weekly average</h2><p>' + (average == null ? 'Build a consistent morning-weight trend, then reassess waist, photos and strength.' : 'Last completed week: ' + average.toFixed(1) + ' lb from ' + completed.weights.length + ' morning readings. Reassess waist, photos and strength at the milestone.') + '</p></div></div>' +
+      var completed = weeklyProgressWeight(addDays(startOfWeek(TODAY), -4), TODAY);
+      var average = completed.average;
+      var weightCopy = completed.source === "Daily average"
+        ? (average == null ? 'Build a consistent morning-weight trend, then reassess waist, photos and strength.' : 'Last completed week: ' + average.toFixed(1) + ' lb from ' + completed.count + ' morning readings. Reassess waist, photos and strength at the milestone. Daily average.')
+        : (completed.value == null ? 'Last completed week: Missing.' : 'Last completed week: ' + completed.value.toFixed(1) + ' lb · Wednesday weigh-in.');
+      return '<section class="card"><div class="card-head"><div><p class="eyebrow">First milestone</p><h2>' + (completed.source === "Daily average" ? '150 lb weekly average' : '150 lb weekly weigh-in') + '</h2><p>' + weightCopy + '</p></div></div>' +
         metric("Strength sessions through today", pct(stats.strengthDone, stats.strengthPlanned), stats.strengthDone + " of " + stats.strengthPlanned + " planned") +
         metric("Cardio sessions through today", pct(stats.cardioDone, stats.cardioPlanned), stats.cardioDone + " of " + stats.cardioPlanned + " planned") +
         metric("Protein days", pct(stats.proteinDays, stats.loggedDays || 1), stats.proteinDays + " / " + stats.loggedDays + " logged days") +
@@ -1707,7 +1739,7 @@
 
   function renderWeekSixGuidance() {
     if (state.coaching) return renderWeeklyCoach(false);
-    return '<section class="card"><details class="form-guide"><summary>This week’s focus · food, recovery and progression</summary><p>Aim near the existing 1,850-calorie anchor within the 1,750–1,950 zone, with at least 135 g protein. Plan protein into regular meals; three meals around 40 g plus a 15–25 g protein snack is one way to reach the minimum. Keep lobby-machine coffee explicitly estimated and do not subtract treadmill calories.</p><p><strong>Verified shake:</strong> one 32 g scoop of your whey powder provides 120 calories and 24 g protein. Your saved 1.5-scoop portion provides 180 calories and 36 g protein. Use the corrected favorites for new logs.</p><p>Give bedtime 30 minutes more room where feasible, working toward seven or more hours. Record two consistent morning waist readings when ready. Tuesday’s missed session needs no catch-up workout.</p><p>Bench and row use a 26 lb trial with fewer reps and a 23 lb fallback. Shoulder press builds reps at 17 lb. For October 24, the recommended full-session trial changes only minutes 25–30 to 3.5 mph at incline setting 8, then returns to the standard plan. Keep all other work steady while prioritizing food consistency and sleep. Use the standard fallback before starting if readiness is poor. The express plan stays the same.</p><p>Strength training during dietary weight loss supports lean-tissue preservation. Research supports regular aerobic activity, but does not establish that continually raising intensity guarantees better fat loss. Judge the plan using weight averages, waist, photos and recovery.</p><p><a href="https://jamanetwork.com/journals/jamanetworkopen/fullarticle/2828487" target="_blank" rel="noopener noreferrer">Cardio research ↗</a> · <a href="https://bmjopensem.bmj.com/content/11/3/e002363" target="_blank" rel="noopener noreferrer">Strength research ↗</a> · <a href="https://jamanetwork.com/journals/jamainternalmedicine/fullarticle/2788694" target="_blank" rel="noopener noreferrer">Sleep research ↗</a></p></details></section>';
+    return '<section class="card"><details class="form-guide"><summary>This week’s focus · food, recovery and progression</summary><p>Aim near the existing 1,850-calorie anchor within the 1,750–1,950 zone, with at least 135 g protein. Plan protein into regular meals; three meals around 40 g plus a 15–25 g protein snack is one way to reach the minimum. Keep lobby-machine coffee explicitly estimated and do not subtract treadmill calories.</p><p><strong>Verified shake:</strong> one 32 g scoop of your whey powder provides 120 calories and 24 g protein. Your saved 1.5-scoop portion provides 180 calories and 36 g protein. Use the corrected favorites for new logs.</p><p>Give bedtime 30 minutes more room where feasible, working toward seven or more hours. Tuesday’s missed session needs no catch-up workout.</p><p>Bench and row use a 26 lb trial with fewer reps and a 23 lb fallback. Shoulder press builds reps at 17 lb. For October 24, the recommended full-session trial changes only minutes 25–30 to 3.5 mph at incline setting 8, then returns to the standard plan. Keep all other work steady while prioritizing food consistency and sleep. Use the standard fallback before starting if readiness is poor. The express plan stays the same.</p><p>Strength training during dietary weight loss supports lean-tissue preservation. Research supports regular aerobic activity, but does not establish that continually raising intensity guarantees better fat loss. Judge the plan using weight averages, waist, photos and recovery.</p><p><a href="https://jamanetwork.com/journals/jamanetworkopen/fullarticle/2828487" target="_blank" rel="noopener noreferrer">Cardio research ↗</a> · <a href="https://bmjopensem.bmj.com/content/11/3/e002363" target="_blank" rel="noopener noreferrer">Strength research ↗</a> · <a href="https://jamanetwork.com/journals/jamainternalmedicine/fullarticle/2788694" target="_blank" rel="noopener noreferrer">Sleep research ↗</a></p></details></section>';
   }
 
   function renderCheckin() {
@@ -1767,7 +1799,7 @@
 
   function renderMidweekCard() {
     var start = startOfWeek(TODAY), checkin = readMidweekCheckin(start);
-    return '<section class="card midweek-card"><div class="card-head"><div><p class="eyebrow">Wednesday · 8 pm Chicago</p><h2>Midweek check-in</h2><p>Review Mon–Wed before the rest of the week. Sunday remains the full review.</p></div></div><p class="notification-status">Review regular meals, hunger, energy, sleep, actual cardio effort and form. Measurements and photos are optional while taking a checking break.</p><details class="form-guide" ' + (dayKey(TODAY) === "Wed" ? 'open' : '') + '><summary>Midweek recovery</summary><div class="grid two">' + [
+    return '<section class="card midweek-card"><div class="card-head"><div><p class="eyebrow">Wednesday · 8 pm Chicago</p><h2>Midweek check-in</h2><p>Review Mon–Wed before the rest of the week. Sunday remains the full review.</p></div></div><p class="notification-status">Review regular meals, hunger, energy, sleep, actual cardio effort and form. Photos are optional while taking a checking break.</p><details class="form-guide" ' + (dayKey(TODAY) === "Wed" ? 'open' : '') + '><summary>Midweek recovery</summary><div class="grid two">' + [
       { key: "hunger", label: "Hunger, 1–10", min: 1, max: 10, step: 1 },
       { key: "energy", label: "Energy, 1–10", min: 1, max: 10, step: 1 },
       { key: "sleep", label: "Average sleep so far, hours", min: 0, max: 14, step: 0.25 },
@@ -1819,9 +1851,10 @@
 
   function buildCheckin(startIso, endIso, inProgress, midweek) {
     var stats = periodStats(startIso, endIso);
-    var average = stats.weights.length ? stats.weights.reduce(function (a, b) { return a + b; }, 0) / stats.weights.length : 0;
-    var priorStats = periodStats(addDays(startIso, -7), inProgress ? addDays(endIso, -7) : addDays(startIso, -1));
-    var priorAverage = priorStats.weights.length ? priorStats.weights.reduce(function (a, b) { return a + b; }, 0) / priorStats.weights.length : 0;
+    var weighInDate = addDays(startIso, 3);
+    var weighIn = weighInDate <= endIso ? weeklyWeighIn(weighInDate) : null;
+    var priorWeighIn = weeklyWeighIn(addDays(weighInDate, -7));
+    var change = weighIn?.weight != null && priorWeighIn?.weight != null ? weighIn.weight - priorWeighIn.weight : null;
     var notes = [], nutrition = [], calorieTotal = 0, proteinTotal = 0, nutritionDays = 0, proteinDays = 0, partialProtein = false;
     var training = [];
     for (var iso = startIso; iso <= endIso; iso = addDays(iso, 1)) {
@@ -1857,9 +1890,8 @@
       formatDate(startIso, { month: "short", day: "numeric" }) + " to " + formatDate(endIso, { month: "short", day: "numeric", year: "numeric" }),
       "",
       "Morning weights: " + (stats.weights.length ? stats.weights.map(function (w) { return w.toFixed(1); }).join(", ") + " lb" : "none logged"),
-      "Weekly average: " + (stats.weights.length > 1 ? average.toFixed(1) + " lb from " + stats.weights.length + " comparable readings" : stats.weights.length === 1 ? "not available — only one comparable morning reading" : "not available"),
-      "Week-over-week average change: " + (stats.weights.length > 1 && priorStats.weights.length > 1 ? ((average - priorAverage) > 0 ? "+" : "") + (average - priorAverage).toFixed(1) + " lb" : "not available"),
-      inProgress ? "Weight comparison uses the same weekdays last week; this is not a completed weekly trend." : "Weight comparison uses completed Sunday–Saturday weeks.",
+      "Weekly weigh-in: " + (weighIn ? weighInDate + " · " + (weighIn.weight == null ? "weight missing" : weighIn.weight.toFixed(1) + " lb") + " · visceral fat rating " + (weighIn.visceralFat ?? "missing") : "missing"),
+      "Week-over-week weigh-in change: " + (change == null ? "not available" : (change > 0 ? "+" : "") + change.toFixed(1) + " lb"),
       "Strength sessions: " + stats.strengthDone + " completed",
       "Cardio sessions: " + stats.cardioDone + " completed",
       "Protein target days (at least " + state.data.targets.proteinMin + " g): " + stats.proteinDays,
@@ -1889,7 +1921,7 @@
       "Notes:",
       notes.length ? notes.join("\n") : "No notes entered.",
       "",
-      midweek ? "Please retrieve and visually review every available saved progress photo for this week plus baseline and prior comparisons. Review actual Mon–Wed training, cardio effort, waist, nutrition, and recovery. Propose any Thu–Sat changes with reasons; use a Friday follow-up if an adjustment needs checking." : "Please retrieve and visually review every available saved progress photo for this week plus baseline and prior comparisons. Review my weight and waist trends, adherence, recovery, and exercise logs, then give me justified changes for next week."
+      midweek ? "Please retrieve and visually review every available saved progress photo for this week plus baseline and prior comparisons. Review actual Mon–Wed training, cardio effort, weekly weigh-in, nutrition, and recovery. Propose any Thu–Sat changes with reasons; use a Friday follow-up if an adjustment needs checking." : "Please retrieve and visually review every available saved progress photo for this week plus baseline and prior comparisons. Review my weekly weigh-ins, saved waist history, adherence, recovery, and exercise logs, then give me justified changes for next week."
     ].join("\n");
   }
 
@@ -1905,7 +1937,7 @@
       if (views.length) photoLines.push(label + ": " + views.join(", "));
     }
     var prior = Object.keys(state.data.days || {}).filter(function (iso) { return iso < startIso && waistAverage(state.data.days[iso]) != null; }).sort().pop();
-    return "Morning-trend exclusions:\n" + (excludedWeights.length ? excludedWeights.join("\n") : "None marked.") + "\n\nWaist measurements (inches; same location just above hip bones, normal exhale):\n" + (waistLines.length ? waistLines.join("\n") : "None logged; baseline still needed.") + (prior ? "\nPrevious reading: " + formatDate(prior, { month: "short", day: "numeric" }) + " · " + waistAverage(state.data.days[prior]).toFixed(2) + " in" : "") + "\n\nSaved progress photos:\n" + (photoLines.length ? photoLines.join("\n") : "None saved in this period.") + "\nPhoto originals are stored privately in the dashboard. This text export lists available views, not image attachments; retrieve originals for visual analysis.";
+    return "Morning-trend exclusions:\n" + (excludedWeights.length ? excludedWeights.join("\n") : "None marked.") + "\n\nSaved waist readings (inches):\n" + (waistLines.length ? waistLines.join("\n") : "None logged in this period.") + (prior ? "\nPrevious reading: " + formatDate(prior, { month: "short", day: "numeric" }) + " · " + waistAverage(state.data.days[prior]).toFixed(2) + " in" : "") + "\n\nSaved progress photos:\n" + (photoLines.length ? photoLines.join("\n") : "None saved in this period.") + "\nPhoto originals are stored privately in the dashboard. This text export lists available views, not image attachments; retrieve originals for visual analysis.";
   }
 
   function summarizeCardioTiming(day) {
@@ -2090,15 +2122,15 @@
       document.getElementById("weight-timing-status").textContent = weightTimingStatus(day);
       queueSave(false);
     });
-    ["waist-first", "waist-second"].forEach(function (id) {
-      document.getElementById(id).addEventListener("change", function () {
-        var first = document.getElementById("waist-first"), second = document.getElementById("waist-second");
-        first.setCustomValidity(second.value.trim() && !first.value.trim() ? "Enter the first reading before a second reading." : "");
-        if (!first.reportValidity() || !second.reportValidity()) return;
-        var day = getDay(state.selectedDate);
-        day.waist = { first: first.value.trim(), second: second.value.trim() };
-        var average = waistAverage(day);
-        document.getElementById("waist-average").textContent = average == null ? "No waist baseline logged yet." : "Recorded measurement: " + average.toFixed(2) + " in" + (second.value.trim() ? " · average of two readings" : " · one reading");
+    document.querySelectorAll("[data-weekly-weigh-in]").forEach(function (input) {
+      var iso = state.selectedDate;
+      input.addEventListener("change", function () {
+        if (iso < FIRST_WEEKLY_WEIGH_IN || dayKey(iso) !== "Wed" || iso > TODAY || input.validity?.valid === false) return;
+        var field = input.dataset.weeklyWeighIn;
+        var value = optionalNumber(input.value);
+        if (value != null && value < (field === "weight" ? 0.1 : 0)) return;
+        var day = getDay(iso);
+        day.weeklyWeighIn = Object.assign({ weight: null, visceralFat: null }, day.weeklyWeighIn, { [field]: value });
         queueSave(false);
       });
     });

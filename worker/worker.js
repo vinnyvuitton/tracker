@@ -683,7 +683,7 @@ async function sendDailyReminder(now, env) {
   const workoutNames = { Sun: "Recovery Day", Mon: "Upper A", Tue: "Lower A + Core", Wed: "Cardio 1", Thu: "Upper B", Fri: "Lower B + Core", Sat: "Cardio 2" };
   let message;
   if (type === "midweek") {
-    message = { title: "Wednesday workout check-in", body: coaching?.status === "approved" ? "Review regular eating, hunger, energy, sleep and cardio effort. Your Mon–Wed review can guide the rest of the week." : "Log your waist, photos, cardio effort, food, and recovery. Your Mon–Wed review can guide the rest of the week." };
+    message = { title: "Wednesday workout check-in", body: coaching?.status === "approved" ? "Review regular eating, hunger, energy, sleep and cardio effort. Your Mon–Wed review can guide the rest of the week." : "Review your weekly weigh-in, photos, cardio effort, food, and recovery. Your Mon–Wed review can guide the rest of the week." };
   }
   if (type === "workout") {
     if (day.workout && day.workout.completed) return;

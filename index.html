@@ -9,10 +9,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Workout 2.0">
   <title>Workout 2.0</title>
-  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=2.16.14">
-  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png?v=2.16.14">
-  <link rel="manifest" href="manifest.webmanifest?v=2.16.14">
-  <link rel="stylesheet" href="styles.css?v=2.16.14">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=2.16.15">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png?v=2.16.15">
+  <link rel="manifest" href="manifest.webmanifest?v=2.16.15">
+  <link rel="stylesheet" href="styles.css?v=2.16.15">
 </head>
 <body>
   <div id="app" aria-live="polite"></div>
@@ -90,13 +90,13 @@
           <label>Protein, g<input id="meal-result-protein" type="number" inputmode="numeric" min="0" step="1"></label>
           <label>Carbs, g<input id="meal-result-carbs" type="number" inputmode="numeric" min="0" step="1"></label>
           <label>Fat, g<input id="meal-result-fat" type="number" inputmode="numeric" min="0" step="1"></label>
+          <label>Fiber, g<input id="meal-result-fiber" type="number" inputmode="decimal" min="0" step="0.1"></label>
+          <label>Added sugar, g<input id="meal-result-added-sugar" type="number" inputmode="decimal" min="0" step="0.1"></label>
         </div>
         <details class="nutrition-entry-details">
           <summary>Nutrition details and estimate notes</summary>
           <div class="macro-grid">
-            <label>Fiber, g<input id="meal-result-fiber" type="number" inputmode="decimal" min="0" step="0.1"></label>
             <label>Saturated fat, g<input id="meal-result-saturated-fat" type="number" inputmode="decimal" min="0" step="0.1"></label>
-            <label>Added sugar, g<input id="meal-result-added-sugar" type="number" inputmode="decimal" min="0" step="0.1"></label>
             <label>Sodium, mg<input id="meal-result-sodium" type="number" inputmode="numeric" min="0" step="1"></label>
           </div>
           <p class="meal-detail-note">Leave a detail blank when it cannot be estimated responsibly.</p>
@@ -171,8 +171,8 @@
     </form>
   </dialog>
 
-  <script src="migration.js?v=2.16.14"></script>
-  <script src="entry-timing.js?v=2.16.14"></script>
-  <script src="app.js?v=2.16.14"></script>
+  <script src="migration.js?v=2.16.15"></script>
+  <script src="entry-timing.js?v=2.16.15"></script>
+  <script src="app.js?v=2.16.15"></script>
 </body>
 </html>
