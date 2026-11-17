@@ -1155,12 +1155,15 @@
   }
 
   function renderDailyWeight(day, iso) {
-    var wednesday = dayKey(iso) === "Wed";
-    var body = '<p class="notification-status">Weigh after the bathroom, before food, drinks or training.</p>' +
+    var helper = '<p class="notification-status">Weigh after the bathroom, before food, drinks or training.</p>';
+    if (dayKey(iso) === "Wed") {
+      var weekly = renderWeeklyWeighIn(iso);
+      return weekly ? '<section class="card"><h2>Daily check-in</h2>' + helper + weekly + '</section>' : '';
+    }
+    var body = helper + '<p class="notification-status">Weekly weigh in is Wednesday.</p>' +
       '<div class="row wrap"><label class="field">Daily weight, lb<input id="weight" type="number" inputmode="decimal" min="90" max="300" step="0.1" value="' + esc(day.weight) + '"></label></div>' +
       '<label class="weight-timing"><input id="weight-standard" type="checkbox" ' + (day.weightTiming !== "other" ? 'checked' : '') + '> Taken before food, drinks, and exercise</label>';
-    if (wednesday) return '<section class="card"><h2>Daily check-in</h2>' + body + renderWeeklyWeighIn(iso) + '</section>';
-    return '<details id="daily-weight-details" class="card daily-disclosure"' + (state.openDailyWeightDate === iso ? ' open' : '') + '><summary>Weigh in: Wednesday</summary>' + body + '</details>';
+    return '<details id="daily-weight-details" class="card daily-disclosure"' + (state.openDailyWeightDate === iso ? ' open' : '') + '><summary>Log weight (optional)</summary>' + body + '</details>';
   }
 
   function statCard(label, value, unit, target) {
@@ -2172,11 +2175,11 @@
         render();
       }
     });
-    document.getElementById("weight").addEventListener("change", function (event) {
+    document.getElementById("weight")?.addEventListener("change", function (event) {
       getDay(dailyDate).weight = event.target.value;
       queueSave();
     });
-    document.getElementById("weight-standard").addEventListener("change", function (event) {
+    document.getElementById("weight-standard")?.addEventListener("change", function (event) {
       getDay(dailyDate).weightTiming = event.target.checked ? "morning" : "other";
       queueSave(false);
     });
