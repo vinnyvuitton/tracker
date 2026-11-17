@@ -9,10 +9,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Workout 2.0">
   <title>Workout 2.0</title>
-  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=2.16.22">
-  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png?v=2.16.22">
-  <link rel="manifest" href="manifest.webmanifest?v=2.16.22">
-  <link rel="stylesheet" href="styles.css?v=2.16.22">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=2.16.23">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png?v=2.16.23">
+  <link rel="manifest" href="manifest.webmanifest?v=2.16.23">
+  <link rel="stylesheet" href="styles.css?v=2.16.23">
 </head>
 <body>
   <div id="app" aria-live="polite"></div>
@@ -58,121 +58,109 @@
     </form>
   </dialog>
 
-  <dialog id="meal-dialog">
+  <dialog id="meal-dialog" aria-labelledby="food-sheet-title">
     <form method="dialog" id="meal-form">
-      <button value="cancel" class="dialog-x" id="meal-close" autofocus aria-label="Close meal entry">×</button>
-      <div>
-        <h2>Log a meal</h2>
-        <p>Pick a favorite, describe a meal, or enter it manually.</p>
+      <header class="food-sheet-header">
+        <button type="button" id="food-sheet-back" class="food-neutral food-icon" aria-label="Back" hidden>←</button>
+        <h2 id="food-sheet-title">Log food</h2>
+        <button value="cancel" id="meal-close" class="food-neutral food-icon" autofocus aria-label="Close Log food">×</button>
+      </header>
+      <div id="food-tabs" class="food-tabs" role="tablist" aria-label="Food entry method">
+        <button type="button" id="food-tab-favorites" role="tab" data-food-tab="favorites" aria-controls="food-favorites" aria-selected="true">Favorites</button>
+        <button type="button" id="food-tab-describe" role="tab" data-food-tab="describe" aria-controls="food-describe" aria-selected="false" tabindex="-1">Describe</button>
+        <button type="button" id="food-tab-manual" role="tab" data-food-tab="manual" aria-controls="food-manual" aria-selected="false" tabindex="-1">Manual</button>
       </div>
-      <div id="meal-favorites-slot"></div>
-      <div id="meal-entry-options" class="row wrap">
-        <button type="button" id="manual-meal" class="secondary">Enter macros manually</button>
-        <button type="button" id="meal-advice-shortcut" class="secondary">Help me decide</button>
-      </div>
-      <div id="favorite-portion-adjustment" class="favorite-portion-adjustment" hidden>
-        <div><p class="eyebrow">Favorite portion</p><strong id="favorite-portion-name"></strong><p>1 is your usual portion. This adjustment applies only to the meal you’re logging now.</p></div>
-        <div class="quantity-stepper favorite-portion-stepper" aria-label="Favorite portion quantity">
-          <button type="button" data-favorite-portion="-0.25" aria-label="Decrease favorite portion">−</button>
-          <input id="favorite-portion-quantity" type="number" inputmode="decimal" min="0.25" max="50" step="0.25" value="1" aria-label="Favorite portion quantity">
-          <button type="button" data-favorite-portion="0.25" aria-label="Increase favorite portion">+</button>
-        </div>
+      <div class="food-sheet-content">
+        <section id="food-favorites" data-food-panel="favorites" role="tabpanel" aria-labelledby="food-tab-favorites">
+          <div id="meal-favorites-slot"></div>
+        </section>
+        <section id="food-describe" data-food-panel="describe" role="tabpanel" aria-labelledby="food-tab-describe" hidden>
+          <label>What did you have?
+            <textarea id="meal-notes" placeholder="Describe the food, portion and anything added."></textarea>
+          </label>
+          <div id="meal-photo-options">
+            <div class="photo-source-actions">
+              <button type="button" class="food-neutral" data-pick-file="meal-photo-camera">Take photo</button>
+              <button type="button" class="food-neutral" data-pick-file="meal-photo">Choose from library</button>
+            </div>
+            <input id="meal-photo-camera" class="visually-hidden" type="file" accept="image/*" capture="environment">
+            <input id="meal-photo" class="visually-hidden" type="file" accept="image/*">
+            <label class="food-check"><input id="keep-meal-photo" type="checkbox"> Save photo with this meal</label>
+          </div>
+          <div id="meal-photo-preview" class="meal-photo-preview" hidden><img id="meal-photo-preview-image" alt="Selected meal photo"><span id="meal-photo-status">Photo attached. Ready to estimate.</span></div>
+        </section>
+        <section id="food-manual" data-food-panel="manual" role="tabpanel" aria-labelledby="food-tab-manual" hidden>
+          <div id="meal-manual-fields"></div>
+        </section>
+        <section id="meal-result" data-food-panel="review" aria-label="Review food" hidden>
+          <div id="meal-review-fields">
+            <div id="meal-fields">
+              <label>Food name<input id="meal-result-name" autocomplete="off" placeholder="Food name"></label>
+              <div id="favorite-portion-adjustment" class="food-portion">
+                <span>Portion</span>
+                <div class="food-portion-controls" aria-label="Portion">
+                  <button type="button" class="food-neutral" data-favorite-portion="-0.5" aria-label="Decrease portion">−</button>
+                  <input id="favorite-portion-quantity" type="number" inputmode="decimal" min="0.5" max="50" step="0.5" value="1" aria-label="Portion quantity">
+                  <button type="button" class="food-neutral" data-favorite-portion="0.5" aria-label="Increase portion">+</button>
+                </div>
+              </div>
+              <div class="macro-grid">
+                <label>Calories<input id="meal-result-calories" type="number" inputmode="decimal" min="0" step="any"></label>
+                <label>Protein, g<input id="meal-result-protein" type="number" inputmode="decimal" min="0" step="any"></label>
+                <label>Carbs, g<input id="meal-result-carbs" type="number" inputmode="decimal" min="0" step="any"></label>
+                <label>Fat, g<input id="meal-result-fat" type="number" inputmode="decimal" min="0" step="any"></label>
+                <label>Fiber, g<input id="meal-result-fiber" type="number" inputmode="decimal" min="0" step="any"></label>
+                <label>Added sugar, g<input id="meal-result-added-sugar" type="number" inputmode="decimal" min="0" step="any"></label>
+              </div>
+            </div>
+          </div>
+          <button type="button" id="meal-when-toggle" class="food-time food-neutral" aria-expanded="false" aria-controls="meal-when"><span id="meal-when-label">Today, now</span><span>· change</span></button>
+          <div id="meal-when" class="food-when-fields" hidden>
+            <label>Date<input id="meal-date" type="date"></label>
+            <label>Time in Chicago<input id="meal-time" type="time"></label>
+          </div>
+          <details class="food-more-options">
+            <summary>More options</summary>
+            <div id="meal-confidence" class="food-estimate-note"></div>
+            <div class="food-extra-nutrition">
+              <label>Saturated fat, g<input id="meal-result-saturated-fat" type="number" inputmode="decimal" min="0" step="any"></label>
+              <label>Sodium, mg<input id="meal-result-sodium" type="number" inputmode="decimal" min="0" step="any"></label>
+            </div>
+            <p id="meal-included-items"></p>
+            <p id="meal-nutrition-basis"></p>
+            <p id="meal-assumptions"></p>
+            <div id="meal-existing-photo" class="existing-meal-photo" hidden></div>
+            <label class="food-check"><input id="save-meal-favorite" type="checkbox"> Save as a favorite</label>
+            <fieldset id="favorite-category-wrap" hidden>
+              <legend>Favorite category</legend>
+              <div class="category-options">
+                <label><input type="radio" name="favorite-category" value="breakfast"> Breakfast</label>
+                <label><input type="radio" name="favorite-category" value="lunch"> Lunch</label>
+                <label><input type="radio" name="favorite-category" value="dinner"> Dinner</label>
+                <label><input type="radio" name="favorite-category" value="snack"> Snack</label>
+              </div>
+              <p id="favorite-category-note"></p>
+            </fieldset>
+            <button type="button" id="duplicate-meal-edit" class="food-neutral" hidden>Duplicate meal</button>
+          </details>
+        </section>
+        <section id="food-manage" data-food-panel="manage" aria-label="Manage favorites" hidden>
+          <p class="food-manager-note">Name and category edits save automatically.</p>
+          <div id="food-favorite-manager"></div>
+        </section>
       </div>
       <p id="meal-error" class="error" role="alert"></p>
-      <div id="meal-result" hidden>
-        <div class="meal-confidence" id="meal-confidence"></div>
-        <div class="meal-review-actions">
-          <label>Meal name<input id="meal-result-name" autocomplete="off"></label>
-          <button type="button" id="save-meal" class="primary">Save meal</button>
-        </div>
-        <div class="macro-grid">
-          <label>Calories<input id="meal-result-calories" type="number" inputmode="numeric" min="0" step="1"></label>
-          <label>Protein, g<input id="meal-result-protein" type="number" inputmode="numeric" min="0" step="1"></label>
-          <label>Carbs, g<input id="meal-result-carbs" type="number" inputmode="numeric" min="0" step="1"></label>
-          <label>Fat, g<input id="meal-result-fat" type="number" inputmode="numeric" min="0" step="1"></label>
-          <label>Fiber, g<input id="meal-result-fiber" type="number" inputmode="decimal" min="0" step="0.1"></label>
-          <label>Added sugar, g<input id="meal-result-added-sugar" type="number" inputmode="decimal" min="0" step="0.1"></label>
-        </div>
-        <details class="nutrition-entry-details">
-          <summary>Nutrition details and estimate notes</summary>
-          <div class="macro-grid">
-            <label>Saturated fat, g<input id="meal-result-saturated-fat" type="number" inputmode="decimal" min="0" step="0.1"></label>
-            <label>Sodium, mg<input id="meal-result-sodium" type="number" inputmode="numeric" min="0" step="1"></label>
-          </div>
-          <p class="meal-detail-note">Leave a detail blank when it cannot be estimated responsibly.</p>
-          <p id="meal-included-items" class="meal-included-items"></p>
-          <p id="meal-nutrition-basis" class="meal-detail-note"></p>
-          <p id="meal-assumptions" class="meal-assumptions"></p>
-        </details>
-        <label class="keep-photo"><input id="save-meal-favorite" type="checkbox"> Save this as a favorite</label>
-        <fieldset id="favorite-category-wrap" class="favorite-category" hidden>
-          <legend>Choose one favorite category</legend>
-          <div class="category-options">
-            <label><input type="radio" name="favorite-category" value="breakfast"> Breakfast</label>
-            <label><input type="radio" name="favorite-category" value="lunch"> Lunch</label>
-            <label><input type="radio" name="favorite-category" value="dinner"> Dinner</label>
-            <label><input type="radio" name="favorite-category" value="snack"> Snack</label>
-          </div>
-          <p id="favorite-category-note" class="meal-detail-note"></p>
-        </fieldset>
-        <div class="dialog-actions">
-          <button type="button" id="duplicate-meal-edit" class="secondary" hidden>Duplicate meal</button>
-          <button type="button" id="meal-cancel" class="secondary">Cancel</button>
-        </div>
-      </div>
-      <label>Meal notes
-        <textarea id="meal-notes" placeholder="Example: Chipotle bowl, two scoops chicken, white rice, pinto beans, hot salsa, and cheese"></textarea>
-      </label>
-      <details class="form-guide" id="meal-photo-options">
-        <summary>Add a photo (optional)</summary>
-        <div class="photo-source-actions"><button type="button" class="secondary" data-pick-file="meal-photo-camera">Take photo</button><button type="button" class="secondary" data-pick-file="meal-photo">Choose from library</button></div>
-        <input id="meal-photo-camera" class="visually-hidden" type="file" accept="image/*" capture="environment">
-        <input id="meal-photo" class="visually-hidden" type="file" accept="image/*">
-        <label class="keep-photo"><input id="keep-meal-photo" type="checkbox"> Keep this meal photo privately after analysis</label>
-      </details>
-      <div id="meal-photo-preview" class="meal-photo-preview" hidden><img id="meal-photo-preview-image" alt="Selected meal photo preview"><span id="meal-photo-status">Photo attached—ready to analyze.</span></div>
-      <div id="meal-existing-photo" class="existing-meal-photo" hidden></div>
-      <div class="row wrap">
-        <button type="button" id="analyze-meal" class="primary">Estimate for me</button>
-      </div>
-      <details class="form-guide" id="meal-when">
-        <summary>Meal date and time</summary>
-        <label>Meal date<input id="meal-date" type="date"></label>
-        <label>Time eaten (Chicago, optional)<input id="meal-time" type="time"></label>
-      </details>
-      <button value="cancel" class="secondary">Close</button>
+      <footer class="food-sheet-footer">
+        <button type="button" id="food-manage-favorites" class="food-manage-link">Manage favorites</button>
+        <button type="button" id="analyze-meal" class="food-accent" hidden>Estimate for me</button>
+        <button type="button" id="manual-meal" class="food-neutral" hidden>Review</button>
+        <button type="button" id="save-meal" class="food-accent" hidden>Save</button>
+      </footer>
     </form>
   </dialog>
 
-  <dialog id="advice-dialog">
-    <form method="dialog" id="advice-form">
-      <button value="cancel" class="dialog-x" id="advice-close" autofocus aria-label="Close meal advice">×</button>
-      <div>
-        <p class="eyebrow">Before you eat</p>
-        <h2>Help me decide</h2>
-        <p>Ask what fits today, how much to have, or which option would work better.</p>
-      </div>
-      <div id="advice-conversation" class="advice-conversation" aria-live="polite"></div>
-      <label>Your question
-        <textarea id="advice-question" placeholder="Example: I’m thinking about this burrito. Should I eat the whole thing, and what would fit best for dinner afterward?"></textarea>
-      </label>
-      <label>Food or menu photo (optional)
-        <div class="photo-source-actions"><button type="button" class="secondary" data-pick-file="advice-photo-camera">Take photo</button><button type="button" class="secondary" data-pick-file="advice-photo">Choose from library</button></div>
-        <input id="advice-photo-camera" class="visually-hidden" type="file" accept="image/*" capture="environment">
-        <input id="advice-photo" class="visually-hidden" type="file" accept="image/*">
-      </label>
-      <div class="row wrap">
-        <button type="button" id="ask-meal-advice" class="primary">Ask for advice</button>
-        <button type="button" id="clear-meal-advice" class="secondary">Start over</button>
-      </div>
-      <p id="advice-error" class="error" role="alert"></p>
-      <button type="button" id="log-advice-meal" class="secondary" hidden>Review and log this meal</button>
-      <button value="cancel" class="secondary">Close</button>
-    </form>
-  </dialog>
-
-  <script src="migration.js?v=2.16.22"></script>
-  <script src="entry-timing.js?v=2.16.22"></script>
-  <script src="app.js?v=2.16.22"></script>
+  <script src="migration.js?v=2.16.23"></script>
+  <script src="entry-timing.js?v=2.16.23"></script>
+  <script src="app.js?v=2.16.23"></script>
 </body>
 </html>

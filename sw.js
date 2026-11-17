@@ -1,5 +1,5 @@
-const CACHE = "workout-2-shell-v56";
-const SHELL = ["./", "./index.html", "./styles.css?v=2.16.22", "./migration.js?v=2.16.22", "./entry-timing.js?v=2.16.22", "./app.js?v=2.16.22", "./manifest.webmanifest?v=2.16.22", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png"];
+const CACHE = "workout-2-shell-v57";
+const SHELL = ["./", "./index.html", "./styles.css?v=2.16.23", "./migration.js?v=2.16.23", "./entry-timing.js?v=2.16.23", "./app.js?v=2.16.23", "./manifest.webmanifest?v=2.16.23", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)));
