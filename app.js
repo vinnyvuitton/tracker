@@ -626,11 +626,15 @@
   }
 
   function renderWeeklyWeighIn(iso) {
-    if (iso < FIRST_WEEKLY_WEIGH_IN || dayKey(iso) !== "Wed" || iso > TODAY) return "";
+    if (iso < FIRST_WEEKLY_WEIGH_IN || dayKey(iso) !== "Wed") return "";
+    var upcoming = iso > TODAY;
     var entry = weeklyWeighIn(iso) || {};
-    return '<div><h3>Wednesday morning weigh-in</h3><p>Enter the weight and visceral fat rating from your smart scale.</p><div class="grid two">' +
-      '<label class="field">Weight, lb<input data-weekly-weigh-in="weight" type="number" inputmode="decimal" min="0.1" step="0.1" value="' + esc(entry.weight ?? "") + '"></label>' +
-      '<label class="field">Visceral fat rating<input data-weekly-weigh-in="visceralFat" type="number" inputmode="decimal" min="0" step="any" value="' + esc(entry.visceralFat ?? "") + '"></label></div></div>';
+    var description = upcoming ? "You can log this weigh-in on " + formatDate(iso, { weekday: "long", month: "long", day: "numeric" }) + "."
+      : "Enter the weight and visceral fat rating from your smart scale.";
+    var disabled = upcoming ? ' disabled' : '';
+    return '<div><h3>Wednesday morning weigh-in</h3><p>' + esc(description) + '</p><div class="grid two">' +
+      '<label class="field">Weight, lb<input data-weekly-weigh-in="weight" type="number" inputmode="decimal" min="0.1" step="0.1" value="' + esc(entry.weight ?? "") + '"' + disabled + '></label>' +
+      '<label class="field">Visceral fat rating<input data-weekly-weigh-in="visceralFat" type="number" inputmode="decimal" min="0" step="any" value="' + esc(entry.visceralFat ?? "") + '"' + disabled + '></label></div></div>';
   }
 
   function openDashboardDialog(dialog) {
