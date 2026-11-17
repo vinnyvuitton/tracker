@@ -103,6 +103,12 @@ export async function trainerReply(body, env, { role = "vinny", shopping = null,
   if (role === "mama") context = { role: "Mama's shopping helper", shoppingPreferences, week: body.week, list: shopping?.weeks?.[body.week]?.items || [], input: shopping?.weeks?.[body.week]?.input || [], mealOptions: shopping?.mealOptions || [], optionsStatus: "Food options only; actual products and quantities need review before the final list.", savedIdeas: shopping?.ideas?.slice(-20) || [] };
   else {
     const saved = await env.TRACKER_KV.get("mytracker_v2", "json");
+    const targets = saved?.payload?.targets;
+    const proteinTargets = targets ? {
+      target: targets.protein ?? null,
+      min: targets.proteinMin ?? null,
+      max: targets.proteinMax ?? null
+    } : null;
     const days = saved?.payload?.days || {};
     const recent = Object.keys(days).sort().slice(-7).map(date => {
       const day = days[date], correction = record?.weightTimingCorrections?.[date], timing = day.weightTimingNoteReview ? day.weightTiming : (typeof correction === "string" ? correction : correction?.timing) || day.weightTiming;
@@ -113,7 +119,7 @@ export async function trainerReply(body, env, { role = "vinny", shopping = null,
         training:{completed:day.workout?.completed,rating:day.workout?.rating,exercises:Object.entries(day.exercises||{}).slice(0,20).map(([id,log])=>({id,load:log.load,sets:log.sets,reps:log.reps,effort:log.loadFeel,done:log.done})),cardio:{status:day.cardio?.status,durationMinutes:day.cardio?.durationMinutes,result:Object.fromEntries(Object.entries(day.cardio?.result||{}).filter(([key,value])=>!/photo|image|base64/i.test(key)&&["number","boolean","string"].includes(typeof value)&&!String(value).startsWith("data:")).map(([key,value])=>[key,typeof value==="string"?clean(value,120):value])),inclineGradeVerified:false}}, notes: clean(day.workout?.notes,600) };
     });
     const lastTwo = value => Object.fromEntries(Object.entries(value || {}).sort(([a],[b]) => a.localeCompare(b)).slice(-2));
-    context = { approvedRecord: record, recordAvailable: Boolean(record), selectedDayContext:body.context?{date:clean(body.context.date,20),consumed:body.context.consumed||null,workout:body.context.workout||null}:null, recentLogs: recent, weeklyRecovery: lastTwo(saved?.payload?.weeklyCheckins), midweekRecovery: lastTwo(saved?.payload?.midweekCheckins), snapshotSavedAt: saved?.savedAt, shopping: shopping?.weeks?.[body.week] || null };
+    context = { approvedRecord: record, proteinTargets, recordAvailable: Boolean(record), selectedDayContext:body.context?{date:clean(body.context.date,20),consumed:body.context.consumed||null,workout:body.context.workout||null}:null, recentLogs: recent, weeklyRecovery: lastTwo(saved?.payload?.weeklyCheckins), midweekRecovery: lastTwo(saved?.payload?.midweekCheckins), snapshotSavedAt: saved?.savedAt, shopping: shopping?.weeks?.[body.week] || null };
   }
   const messages = (Array.isArray(body.turns) ? body.turns : []).slice(-4).map(t => ({ role: t.role === "assistant" ? "assistant" : "user", content: clean(t.content || t.message, 1500) }));
   const content = [{ type: "input_text", text: question }];

@@ -355,10 +355,12 @@ dialog label { display: grid; gap: 6px; color: var(--muted); font-size: 12px; }
 .today-total-heading span, .today-total-note { color: var(--muted); }
 .today-total-heading strong { text-align: right; font-variant-numeric: tabular-nums; }
 .today-total-row .progress-bar { height: 5px; margin-top: 5px; }
+.today-total-row.calorie-meter .progress-bar span { background: var(--muted); }
 .today-total-row.fiber-nudge .progress-bar span { background: #d7a65a; }
 #daily-water-card .today-total-heading { grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; }
 .today-water-controls { display: flex; gap: 4px; }
-.today-water-controls button { width: 44px; min-height: 44px; padding: 0; font-size: 1.125rem; }
+.today-water-controls button.secondary { position: relative; isolation: isolate; width: 44px; min-height: 44px; padding: 0; border: 0; background: transparent; font-size: 1.125rem; }
+.today-water-controls button.secondary::before { content: ""; position: absolute; inset: 4px; z-index: -1; border: 1px solid var(--line); border-radius: 9px; background: var(--panel-2); pointer-events: none; }
 .daily-disclosure { padding-block: 0; }
 .daily-disclosure[open] { padding-bottom: 16px; }
 .daily-disclosure > summary { min-height: 48px; padding-block: 12px; font-weight: 700; cursor: pointer; }

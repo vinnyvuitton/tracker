@@ -14,6 +14,7 @@
   var DUMBBELL_HANDLE_WEIGHT = 1;
   var LOAD_OPTIONS = buildLoadOptions();
   var MEAL_CATEGORIES = ["breakfast", "lunch", "dinner", "snack"];
+  var DEFAULT_PROTEIN_TARGETS = { protein: 150, proteinMin: 140, proteinMax: 160 };
   var NUTRITION_FIELDS = ["calories", "protein", "carbs", "fat", "fiber", "saturatedFat", "addedSugar", "sodium"];
   var PROGRESS_RANGES = [7, 14, 21, 30, 90, "all"];
   var WEEK_TWO_START = "2026-09-20";
@@ -560,7 +561,7 @@
     return {
       schemaVersion: 2,
       profile: { name: "Vinny", age: 35, height: "5 ft 6 in", baselineWeight: 150.6, startDate: "2026-09-10" },
-      targets: { calories: 1850, calorieMin: 1750, calorieMax: 1950, protein: 140, proteinMin: 135, proteinMax: 150, water: 10, checkpointWeight: 140, deadline: "2026-12-31" },
+      targets: Object.assign({ calories: 1850, calorieMin: 1750, calorieMax: 1950, water: 10, checkpointWeight: 140, deadline: "2026-12-31" }, DEFAULT_PROTEIN_TARGETS),
       days: {},
       pendingMeals: [],
       favorites: [],
@@ -1182,12 +1183,13 @@
 
   function renderTodayTotals(day, t) {
     var protein = Math.round(t.protein);
-    var proteinMin = number(state.data.targets.proteinMin);
-    var proteinMax = number(state.data.targets.proteinMax) || proteinMin;
+    var { protein: proteinTarget, proteinMin, proteinMax } = state.data.targets;
     var mealCount = day.meals.length;
-    var proteinStatus = protein >= proteinMin ? "Protein minimum met" : (proteinMin - protein) + " g to target zone";
-    if (t.known.protein < mealCount) proteinStatus = t.known.protein ? "Some meals have no protein value" : "No protein values entered";
-    var proteinValue = t.known.protein || !mealCount ? protein : "Unknown";
+    var aboveProteinRange = t.protein > proteinMax;
+    var proteinStatus = aboveProteinRange ? "" : t.protein < proteinMin ? Math.ceil(proteinMin - t.protein) + " g to good range" : "In good range";
+    if (!aboveProteinRange && t.known.protein < mealCount) proteinStatus = t.known.protein ? "Some meals have no protein value" : "No protein values entered";
+    if (proteinStatus) proteinStatus += " · " + proteinMin + " to " + proteinMax + " g";
+    var proteinValue = aboveProteinRange ? protein + " g" : (t.known.protein || !mealCount ? protein : "Unknown") + " / " + proteinTarget + " g";
 
     var calories = Math.round(t.calories);
     var fiber = t.known.fiber ? t.fiber : 0;
@@ -1197,8 +1199,8 @@
       : fiberPartial ? "Fiber includes only meals where it was logged."
       : sugarPartial ? "Added sugar includes only meals where it was logged." : "";
     return '<section class="card daily-nutrition" aria-labelledby="daily-totals-title"><h2 id="daily-totals-title">Today</h2>' +
-      renderTodayTotalRow("Protein", proteinStatus, proteinValue + " / " + proteinMin + " to " + proteinMax + " g", { fill: pct(protein, proteinMax) }) +
-      renderTodayTotalRow("Calories", "logged estimate", calories + " cal", {}) +
+      renderTodayTotalRow("Protein", proteinStatus, proteinValue, { fill: pct(protein, proteinTarget) }) +
+      renderTodayTotalRow("Calories", "logged estimate", calories + " cal", { fill: pct(calories, 1800), css: " calorie-meter" }) +
       renderDailyMeter("Fiber", fiber, 30, "g", { id: "daily-fiber-row", css: fiberNeedsNudge(state.selectedDate, fiber) ? " fiber-nudge" : "" }) +
       renderDailyMeter("Added sugar", t.known.addedSugar ? t.addedSugar : 0, 36, "g", { limit: true }) +
       renderWaterCard(day.water) +
@@ -1207,7 +1209,7 @@
 
   function renderTodayTotalRow(label, status, value, options) {
     return '<section' + (options.id ? ' id="' + options.id + '"' : '') + ' class="nutrition-stat today-total-row' + (options.css || "") + '">' +
-      '<div class="today-total-heading"><p>' + esc(label) + ' <span>· ' + esc(status) + '</span></p><strong>' + esc(value) + '</strong>' +
+      '<div class="today-total-heading"><p>' + esc(label) + (status ? ' <span>· ' + esc(status) + '</span>' : '') + '</p><strong>' + esc(value) + '</strong>' +
       (options.waterControls ? '<div class="today-water-controls"><button type="button" class="secondary" data-water-step="-1" aria-label="Subtract one glass">−</button><button type="button" class="secondary" data-water-step="1" aria-label="Add one glass">+</button></div>' : '') + '</div>' +
       (options.fill == null ? '' : '<div class="progress-bar"><span style="width:' + options.fill + '%"></span></div>') + '</section>';
   }
@@ -1796,7 +1798,7 @@
 
   function renderWeekSixGuidance() {
     if (state.coaching) return renderWeeklyCoach(false);
-    return '<section class="card"><details class="form-guide"><summary>This week’s focus · food, recovery and progression</summary><p>Aim near the existing 1,850-calorie anchor within the 1,750–1,950 zone, with at least 135 g protein. Plan protein into regular meals; three meals around 40 g plus a 15–25 g protein snack is one way to reach the minimum. Keep lobby-machine coffee explicitly estimated and do not subtract treadmill calories.</p><p><strong>Verified shake:</strong> one 32 g scoop of your whey powder provides 120 calories and 24 g protein. Your saved 1.5-scoop portion provides 180 calories and 36 g protein. Use the corrected favorites for new logs.</p><p>Give bedtime 30 minutes more room where feasible, working toward seven or more hours. Tuesday’s missed session needs no catch-up workout.</p><p>Bench and row use a 26 lb trial with fewer reps and a 23 lb fallback. Shoulder press builds reps at 17 lb. For October 24, the recommended full-session trial changes only minutes 25–30 to 3.5 mph at incline setting 8, then returns to the standard plan. Keep all other work steady while prioritizing food consistency and sleep. Use the standard fallback before starting if readiness is poor. The express plan stays the same.</p><p>Strength training during dietary weight loss supports lean-tissue preservation. Research supports regular aerobic activity, but does not establish that continually raising intensity guarantees better fat loss. Judge the plan using weight averages, waist, photos and recovery.</p><p><a href="https://jamanetwork.com/journals/jamanetworkopen/fullarticle/2828487" target="_blank" rel="noopener noreferrer">Cardio research ↗</a> · <a href="https://bmjopensem.bmj.com/content/11/3/e002363" target="_blank" rel="noopener noreferrer">Strength research ↗</a> · <a href="https://jamanetwork.com/journals/jamainternalmedicine/fullarticle/2788694" target="_blank" rel="noopener noreferrer">Sleep research ↗</a></p></details></section>';
+    return '<section class="card"><details class="form-guide"><summary>This week’s focus · food, recovery and progression</summary><p>Aim near the existing 1,850-calorie anchor within the 1,750–1,950 zone, with a protein target of ' + esc(state.data.targets.protein) + ' g and a good range of ' + esc(state.data.targets.proteinMin) + ' to ' + esc(state.data.targets.proteinMax) + ' g. Plan protein into regular meals; three meals around 40 g plus a 15–25 g protein snack is one way to reach the minimum. Keep lobby-machine coffee explicitly estimated and do not subtract treadmill calories.</p><p><strong>Verified shake:</strong> one 32 g scoop of your whey powder provides 120 calories and 24 g protein. Your saved 1.5-scoop portion provides 180 calories and 36 g protein. Use the corrected favorites for new logs.</p><p>Give bedtime 30 minutes more room where feasible, working toward seven or more hours. Tuesday’s missed session needs no catch-up workout.</p><p>Bench and row use a 26 lb trial with fewer reps and a 23 lb fallback. Shoulder press builds reps at 17 lb. For October 24, the recommended full-session trial changes only minutes 25–30 to 3.5 mph at incline setting 8, then returns to the standard plan. Keep all other work steady while prioritizing food consistency and sleep. Use the standard fallback before starting if readiness is poor. The express plan stays the same.</p><p>Strength training during dietary weight loss supports lean-tissue preservation. Research supports regular aerobic activity, but does not establish that continually raising intensity guarantees better fat loss. Judge the plan using weight averages, waist, photos and recovery.</p><p><a href="https://jamanetwork.com/journals/jamanetworkopen/fullarticle/2828487" target="_blank" rel="noopener noreferrer">Cardio research ↗</a> · <a href="https://bmjopensem.bmj.com/content/11/3/e002363" target="_blank" rel="noopener noreferrer">Strength research ↗</a> · <a href="https://jamanetwork.com/journals/jamainternalmedicine/fullarticle/2788694" target="_blank" rel="noopener noreferrer">Sleep research ↗</a></p></details></section>';
   }
 
   function renderCheckin() {
@@ -1958,7 +1960,7 @@
       nutrition.join("\n"),
       "Weekly nutrition totals: " + (nutritionDays ? Math.round(calorieTotal) + " calories · " + (proteinDays ? Math.round(proteinTotal) + " g protein" + (partialProtein ? " (partial)" : "") : "protein unknown") : "not available"),
       "Logged-day averages: " + (nutritionDays ? Math.round(calorieTotal / nutritionDays) + " calories · " + (proteinDays ? Math.round(proteinTotal / proteinDays) + " g protein" + (partialProtein ? " (known values across " + proteinDays + " days)" : "") : "protein unknown") : "not available"),
-      "Current target zones: " + state.data.targets.calorieMin + "–" + state.data.targets.calorieMax + " calories · " + state.data.targets.proteinMin + "–" + state.data.targets.proteinMax + " g protein",
+      "Current target zones: " + state.data.targets.calorieMin + "–" + state.data.targets.calorieMax + " calories · " + state.data.targets.proteinMin + " to " + state.data.targets.proteinMax + " g protein (target " + state.data.targets.protein + " g)",
       "",
       measurementCheckin(startIso, endIso),
       "",
@@ -2103,7 +2105,7 @@
     var calorieTarget = document.getElementById("calorie-target");
     if (calorieTarget) calorieTarget.addEventListener("change", function () { var value = clamp(number(calorieTarget.value), 1200, 4000); state.data.targets.calories = value; state.data.targets.calorieMin = value - 100; state.data.targets.calorieMax = value + 100; queueSave(true); });
     var proteinTarget = document.getElementById("protein-target");
-    if (proteinTarget) proteinTarget.addEventListener("change", function () { var value = clamp(number(proteinTarget.value), 50, 300); state.data.targets.protein = value; state.data.targets.proteinMin = Math.max(0, value - 5); state.data.targets.proteinMax = value + 10; queueSave(true); });
+    if (proteinTarget) proteinTarget.addEventListener("change", function () { var value = clamp(number(proteinTarget.value), 50, 300); state.data.targets.protein = value; state.data.targets.proteinMin = value - 10; state.data.targets.proteinMax = value + 10; queueSave(true); });
     if (state.view !== "today") {
       var checkinWeek = document.getElementById("checkin-week");
       if (checkinWeek) { refreshCardioTiming(); checkinWeek.addEventListener("change", function () { state.checkinWeekStart = checkinWeek.value; render(); }); }
@@ -3386,8 +3388,14 @@
     try {
       var response = await apiFetch("/data", { method: "GET" });
       var result = await response.json();
+      try {
+        result = await updateSavedProteinTargets(result);
+      } catch (error) {
+        if (error.message !== "conflict") throw error;
+        result = await updateSavedProteinTargets(await (await apiFetch("/data", { method: "GET" })).json());
+      }
       var raw = result.payload || defaultData();
-      var migrated = !(raw && raw.schemaVersion === 2);
+      var migrated = raw.schemaVersion !== 2;
       state.data = migrateData(raw);
       state.version = number(result.version);
       state.sync = "Saved";
@@ -3410,16 +3418,33 @@
     return ensureDataShape(WorkoutMigration.migrateData(raw, { defaultData: defaultData, defaultDay: defaultDay, addDays: addDays }));
   }
 
+  function hasPreviousProteinTargets(targets) {
+    return number(targets?.protein) === 140 && number(targets?.proteinMin) === 135 && number(targets?.proteinMax) === 150;
+  }
+
+  async function updateSavedProteinTargets(result) {
+    var raw = result.payload;
+    if (raw?.schemaVersion !== 2 || !hasPreviousProteinTargets(raw.targets)) return result;
+    var payload = Object.assign({}, raw, { targets: Object.assign({}, raw.targets, DEFAULT_PROTEIN_TARGETS) });
+    var response = await apiFetch("/data", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ payload: payload, expectedVersion: result.version }) });
+    return Object.assign({ payload: payload }, await response.json());
+  }
+
   function ensureDataShape(data) {
     data.profile = Object.assign(defaultData().profile, data.profile || {});
     if (data.profile.startDate === "2026-09-09") data.profile.startDate = "2026-09-10";
-    data.targets = Object.assign(defaultData().targets, data.targets || {});
+    var savedTargets = data.targets || {};
+    var defaults = defaultData().targets;
+    if (hasPreviousProteinTargets(savedTargets)) {
+      savedTargets = Object.assign({}, savedTargets, DEFAULT_PROTEIN_TARGETS);
+    }
+    data.targets = Object.assign({}, defaults, savedTargets);
     if (number(data.targets.calories) === 1700) data.targets.calories = 1850;
-    if (number(data.targets.protein) === 150) data.targets.protein = 140;
     data.targets.calorieMin = number(data.targets.calorieMin) === 1600 ? 1750 : number(data.targets.calorieMin) || data.targets.calories - 100;
     data.targets.calorieMax = number(data.targets.calorieMax) === 1800 ? 1950 : number(data.targets.calorieMax) || data.targets.calories + 100;
-    data.targets.proteinMin = number(data.targets.proteinMin) === 145 ? 135 : number(data.targets.proteinMin) || data.targets.protein - 5;
-    data.targets.proteinMax = number(data.targets.proteinMax) === 160 ? 150 : number(data.targets.proteinMax) || data.targets.protein + 10;
+    data.targets.protein = number(data.targets.protein) || defaults.protein;
+    data.targets.proteinMin = number(savedTargets.proteinMin) || data.targets.protein - 10;
+    data.targets.proteinMax = number(savedTargets.proteinMax) || data.targets.protein + 10;
     data.days = data.days || {};
     data.pendingMeals = Array.isArray(data.pendingMeals) ? data.pendingMeals : [];
     data.pendingMeals.forEach(function (meal) {
