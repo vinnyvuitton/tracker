@@ -1,3 +1,5 @@
+import "../workout-domain.js";
+const Domain = globalThis.WorkoutDomain;
 import { shoppingFetch, ShoppingRoom } from "./companion.js";
 import { readCoaching, saveCoaching, trainerReply } from "./trainer.js";
 import { foodGuide } from "./food-guide.js";
@@ -211,6 +213,11 @@ async function saveData(request, env, cors) {
     return json({ error: "Version conflict", currentVersion }, 409, cors);
   }
 
+  for (const [date, day] of Object.entries(body.payload.days || {})) {
+    var incline = day?.cardio?.result?.incline;
+    var previous = current?.payload?.days?.[date]?.cardio?.result?.incline;
+    if (!Domain.inclineValid(incline) && incline !== previous) return json({ error: "Incline must be 0 to 15.", date }, 400, cors);
+  }
   const savedAt = new Date().toISOString();
   const next = { version: currentVersion + 1, savedAt, payload: body.payload };
   if (current && utcDate(current.savedAt) !== utcDate(savedAt)) {
@@ -389,16 +396,19 @@ async function analyzeTreadmill(request, env, cors) {
   const schema = { type: "object", additionalProperties: false, properties: {
     durationMinutes: { type: ["number", "null"], minimum: 0 }, distanceMiles: { type: ["number", "null"], minimum: 0 },
     calories: { type: ["number", "null"], minimum: 0 }, averageSpeedMph: { type: ["number", "null"], minimum: 0 },
-    incline: { type: ["number", "null"], minimum: 0 }, notes: { type: "string" }
-  }, required: ["durationMinutes", "distanceMiles", "calories", "averageSpeedMph", "incline", "notes"] };
+    incline: { type: ["number", "null"], minimum: 0, maximum: 15 }, elapsedTimeReadable: { type: "boolean" }, displayedTimeType: { type: "string", enum: ["elapsed", "remaining", "unknown"] }, notes: { type: "string" }
+  }, required: ["durationMinutes", "distanceMiles", "calories", "averageSpeedMph", "incline", "elapsedTimeReadable", "displayedTimeType", "notes"] };
   const result = await env.AI.run(MEAL_MODEL, { messages: [
-    { role: "system", content: "Read only values visibly displayed on this treadmill results screen. Never infer a value that is not visible. Use null for anything absent or unclear. Return only the requested JSON." },
+    { role: "system", content: "Read only values visibly displayed on this treadmill results screen. Incline is a setting from 0 to 15; reject cumulative elevation or ambiguous units. Distinguish elapsed time from remaining time. Set elapsedTimeReadable false and durationMinutes null when the elapsed time is unclear, absent or a reset 00:00 display. Do not infer duration from distance or speed. Use null for anything absent or unclear. Return only the requested JSON." },
     { role: "user", content: [{ type: "text", text: "Extract the treadmill workout results for user review." }, { type: "image_url", image_url: { url: image } }] }
-  ], response_format: { type: "json_schema", json_schema: schema }, max_completion_tokens: 240, temperature: 0, chat_template_kwargs: { enable_thinking: false } });
+  ], response_format: { type: "json_schema", json_schema: schema }, max_completion_tokens: 320, temperature: 0, chat_template_kwargs: { enable_thinking: false } });
   const output = result && (result.response || result.choices && result.choices[0] && result.choices[0].message && result.choices[0].message.content);
   try {
     const parsed = typeof output === "object" ? output : JSON.parse(String(output || "").replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, ""));
-    return json({ durationMinutes: nullableNutrition(parsed.durationMinutes), distanceMiles: nullableNutrition(parsed.distanceMiles), calories: nullableNutrition(parsed.calories), averageSpeedMph: nullableNutrition(parsed.averageSpeedMph), incline: nullableNutrition(parsed.incline), notes: String(parsed.notes || "").slice(0, 300) }, 200, cors);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Invalid treadmill result");
+    const normalized = Domain.normalizeCardioOcr(parsed);
+    if (!["durationMinutes", "distanceMiles", "calories", "averageSpeedMph", "incline"].some(key => normalized[key] != null)) throw new Error("No readable treadmill values");
+    return json(normalized, 200, cors);
   } catch (_) { return json({ error: "Treadmill results could not be read" }, 502, cors); }
 }
 

@@ -1,3 +1,5 @@
+import "../workout-domain.js";
+const Domain = globalThis.WorkoutDomain;
 const MODEL = "gpt-6.1-sol";
 const COACHING_KEY = "approved-coaching:v1";
 const DRAFT_SCHEMA = {
@@ -104,22 +106,27 @@ export async function trainerReply(body, env, { role = "vinny", shopping = null,
   else {
     const saved = await env.TRACKER_KV.get("mytracker_v2", "json");
     const targets = saved?.payload?.targets;
+    const calorieTargets = targets ? { target: targets.calories ?? null, min: targets.calorieMin ?? null, max: targets.calorieMax ?? null } : null;
+    const goal = Domain.raceGoal(record?.goal);
     const proteinTargets = targets ? {
       target: targets.protein ?? null,
       min: targets.proteinMin ?? null,
       max: targets.proteinMax ?? null
     } : null;
+    const today = new Intl.DateTimeFormat("en-CA", {timeZone:"America/Chicago",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
     const days = saved?.payload?.days || {};
-    const recent = Object.keys(days).sort().slice(-7).map(date => {
-      const day = days[date], correction = record?.weightTimingCorrections?.[date], timing = day.weightTimingNoteReview ? day.weightTiming : (typeof correction === "string" ? correction : correction?.timing) || day.weightTiming;
+    const recent = Object.keys(days).filter(date => date <= today).sort().slice(-7).map(date => {
+      const day = days[date], timing = Domain.morningTiming(day, date, record);
       const meals=day.meals||[];
-      return { date, weight: day.weight, weightTiming: timing, morningTrendEligible: timing === "morning", waist:day.waist||null,
-        foodTotalsEstimated:meals.reduce((sum,meal)=>({calories:sum.calories+(Number(meal.calories)||0),protein:sum.protein+(Number(meal.protein)||0)}),{calories:0,protein:0}),
-        meals: meals.slice(-12).map(m => ({ name:clean(m.name,120), calories: m.calories, protein: m.protein, carbs:m.carbs, fat:m.fat, fiber:m.fiber??null, nutritionBasis: m.nutritionBasis, sourceIndependentlyVerified:false })), omittedMealDetails:Math.max(0,meals.length-12), waterGlasses:day.water,
-        training:{completed:day.workout?.completed,rating:day.workout?.rating,exercises:Object.entries(day.exercises||{}).slice(0,20).map(([id,log])=>({id,load:log.load,sets:log.sets,reps:log.reps,effort:log.loadFeel,done:log.done})),cardio:{status:day.cardio?.status,durationMinutes:day.cardio?.durationMinutes,result:Object.fromEntries(Object.entries(day.cardio?.result||{}).filter(([key,value])=>!/photo|image|base64/i.test(key)&&["number","boolean","string"].includes(typeof value)&&!String(value).startsWith("data:")).map(([key,value])=>[key,typeof value==="string"?clean(value,120):value])),inclineGradeVerified:false}}, notes: clean(day.workout?.notes,600) };
+      return { date, weight: day.weight, weightTiming: timing, morningTrendEligible: timing === "morning", weeklyWeighIn: day.weeklyWeighIn ? {date, weight: Domain.numeric(day.weeklyWeighIn.weight), visceralFat: Domain.numeric(day.weeklyWeighIn.visceralFat)} : null, waist:day.waist||null,
+        foodTotalsEstimated:Domain.nutritionTotals(meals),
+        meals: meals.slice(-12).map(m => ({ name:clean(m.name,120), calories: m.calories, protein: m.protein, carbs:m.carbs, fat:m.fat, fiber:Domain.numeric(m.fiber), addedSugar:Domain.numeric(m.addedSugar), nutritionBasis: m.nutritionBasis, sourceIndependentlyVerified:false })), omittedMealDetails:Math.max(0,meals.length-12), waterGlasses:day.water,
+        training:{completed:day.workout?.completed,rating:day.workout?.rating,exercises:Object.entries(day.exercises||{}).slice(0,20).map(([id,log])=>({id,load:log.load,sets:log.sets,reps:log.reps,effort:log.loadFeel,done:log.done})),cardio:{status:day.cardio?.status,durationMinutes:day.cardio?.durationMinutes,timerDurationMinutes:Domain.numeric(day.cardio?.durationMinutes),recordedTotalMinutes:Domain.numeric(day.cardio?.result?.durationMinutes),location:day.cardio?.location||null,result:Object.fromEntries(["durationMinutes","distanceMiles","calories","averageSpeedMph","incline"].map(key=>[key,Domain.numeric(day.cardio?.result?.[key])])),validationWarnings:Domain.cardioIssues(day.cardio?.result),inclineGradeVerified:false}}, notes: clean(day.workout?.notes,600) };
     });
     const lastTwo = value => Object.fromEntries(Object.entries(value || {}).sort(([a],[b]) => a.localeCompare(b)).slice(-2));
-    context = { approvedRecord: record, proteinTargets, recordAvailable: Boolean(record), selectedDayContext:body.context?{date:clean(body.context.date,20),consumed:body.context.consumed||null,workout:body.context.workout||null}:null, recentLogs: recent, weeklyRecovery: lastTwo(saved?.payload?.weeklyCheckins), midweekRecovery: lastTwo(saved?.payload?.midweekCheckins), snapshotSavedAt: saved?.savedAt, shopping: shopping?.weeks?.[body.week] || null };
+    const week = date => { const day = new Date(date + "T12:00:00Z").getUTCDay(); const start = new Date(date + "T12:00:00Z"); start.setUTCDate(start.getUTCDate() - day); return start.toISOString().slice(0,10); };
+    const weeks = [...new Set(Object.keys(days).filter(date => date <= today).map(week))].sort().slice(-3);
+    context = { interpretation: "Use weeklyProgress for weekly weight: before the Nov 18, 2026 cutover use a daily morning average with at least two eligible readings; from that week onward use only Wednesday weeklyWeighIn and otherwise report Missing. Extra daily weights are not substitutes. Nutrition totals sum known values only; null and whitespace are unknown, recorded zero is known, and partial totals do not establish full intake. Fiber and added sugar are included only where known. Timer minutes are planned, recordedTotalMinutes is the saved actual result, and location is explicit or unknown.", approvedRecord: record ? {...record,goal,calorieTargets,proteinTargets} : null, goal, calorieTargets, proteinTargets, weeklyProgress:weeks.map(start=>Domain.weeklyProgress(days,start,record,today)), recordAvailable: Boolean(record), selectedDayContext:body.context?{date:clean(body.context.date,20),consumed:body.context.consumed||null,workout:body.context.workout||null}:null, recentLogs: recent, weeklyRecovery: lastTwo(saved?.payload?.weeklyCheckins), midweekRecovery: lastTwo(saved?.payload?.midweekCheckins), snapshotSavedAt: saved?.savedAt, shopping: shopping?.weeks?.[body.week] || null };
   }
   const messages = (Array.isArray(body.turns) ? body.turns : []).slice(-4).map(t => ({ role: t.role === "assistant" ? "assistant" : "user", content: clean(t.content || t.message, 1500) }));
   const content = [{ type: "input_text", text: question }];

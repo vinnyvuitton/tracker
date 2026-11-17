@@ -1,5 +1,6 @@
 (function () {
   "use strict";
+  var Domain = globalThis.WorkoutDomain;
 
   var API_BASE = "https://vinny-workout-api.vinny-olsauskas.workers.dev";
   var STORAGE_KEY = "vinny_workout_2_data";
@@ -562,7 +563,7 @@
     return {
       schemaVersion: 2,
       profile: { name: "Vinny", age: 35, height: "5 ft 6 in", baselineWeight: 150.6, startDate: "2026-09-10" },
-      targets: Object.assign({ calories: 1850, calorieMin: 1750, calorieMax: 1950, water: 10, checkpointWeight: 140, deadline: "2026-12-31" }, DEFAULT_PROTEIN_TARGETS),
+      targets: Object.assign({ calories: 1800, calorieMin: 1700, calorieMax: 1900, water: 10, checkpointWeight: 140, deadline: "2026-12-31" }, DEFAULT_PROTEIN_TARGETS),
       days: {},
       pendingMeals: [],
       favorites: [],
@@ -919,10 +920,14 @@
       };
       if (datedCardio && plan.type === "Cardio" && Array.isArray(datedCardio.segments) && datedCardio.segments.length) {
         var savedSession = state.data.days && state.data.days[iso] && state.data.days[iso].cardio;
+        var condition = datedCardio.conditionalProgression;
+        var progressionReady = Boolean(condition && savedSession && savedSession.progressionReady === true);
+        if (progressionReady) datedCardio = Object.assign({}, datedCardio, condition.readySession);
         var walkOnly = savedSession && typeof savedSession.walkOnly === "boolean" ? savedSession.walkOnly : Boolean(datedCardio.walkOnlyDefault);
         return Object.assign({}, plan, { title: datedCardio.title, subtitle: datedCardio.subtitle,
           speedTrialAvailable: false, shortTrialAvailable: false, expressSegments: null,
           walkOnlyAvailable: true, walkOnlyEnabled: walkOnly,
+          progressionConfirmation: condition ? {label: condition.label, ready: progressionReady} : null,
           cardioSegments: walkOnly ? datedCardio.walkSegments : datedCardio.segments,
           completionMessage: datedCardio.completionMessage,
           sections: [{ label: "Treadmill", exercises: [Object.assign({}, plan.sections[0].exercises[0], {
@@ -1202,7 +1207,7 @@
       : sugarPartial ? "Added sugar includes only meals where it was logged." : "";
     return '<section class="card daily-nutrition" aria-labelledby="daily-totals-title"><h2 id="daily-totals-title">Today</h2>' +
       renderTodayTotalRow("Protein", proteinStatus, proteinValue, { fill: pct(protein, proteinTarget) }) +
-      renderTodayTotalRow("Calories", "logged estimate", calories + " cal", { fill: pct(calories, 1800), css: " calorie-meter" }) +
+      renderTodayTotalRow("Calories", "logged estimate", calories + " cal", { fill: pct(calories, number(state.data.targets.calories)), css: " calorie-meter" }) +
       renderDailyMeter("Fiber", fiber, 30, "g", { id: "daily-fiber-row", css: fiberNeedsNudge(state.selectedDate, fiber) ? " fiber-nudge" : "" }) +
       renderDailyMeter("Added sugar", t.known.addedSugar ? t.addedSugar : 0, 36, "g", { limit: true }) +
       renderWaterCard(day.water) +
@@ -1388,13 +1393,18 @@
     var complete = day.cardio && day.cardio.status === "complete";
     var fullDuration = plan.cardioSegments && plan.cardioSegments.length ? plan.cardioSegments[plan.cardioSegments.length - 1].end : duration;
     var expressDuration = plan.expressSegments && plan.expressSegments.length ? plan.expressSegments[plan.expressSegments.length - 1].end : 0;
-    var html = plan.locationChoice ? '<div class="cardio-mode" role="group" aria-label="Cardio location">' + [
+    var durations = Domain.cardioDurations(cardioSegmentsFor(plan), day.cardio && day.cardio.result);
+    var html = '<p class="notification-status">Planned work ' + (durations.plannedWorkMinutes ?? "unknown") + ' min · Cooldown ' + (durations.plannedCooldownMinutes ?? "unknown") + ' min · Planned total ' + (durations.plannedTotalMinutes ?? "unknown") + ' min</p>';
+    html += plan.locationChoice ? '<div class="cardio-mode" role="group" aria-label="Cardio location">' + [
       { value: "treadmill", label: "Treadmill" }, { value: "outdoors", label: "Outdoors" }
     ].map(function (choice) {
       var selected = choice.value === (plan.outdoorTrial ? "outdoors" : "treadmill");
       return '<button type="button" data-cardio-location="' + choice.value + '" aria-pressed="' + selected + '" class="' + (selected ? "active" : "") + '" ' + (cardioLocationLocked(state.selectedDate) ? "disabled" : "") + '>' + choice.label + '</button>';
     }).join("") + '</div><p class="notification-status">Choose before starting. This choice saves for this day.</p>' : '';
     html += plan.expressSegments ? '<div class="cardio-mode"><button type="button" data-cardio-mode="full" class="' + (state.cardioMode === "full" ? "active" : "") + '">Full · ' + fullDuration + ' min</button><button type="button" data-cardio-mode="express" class="' + (state.cardioMode === "express" ? "active" : "") + '">Express · ' + expressDuration + ' min</button></div>' : '';
+    if (plan.progressionConfirmation) {
+      html += '<label class="check-row"><input id="cardio-progression-ready" type="checkbox" ' + (plan.progressionConfirmation.ready ? 'checked ' : '') + (cardioLocationLocked(state.selectedDate) ? 'disabled ' : '') + '> ' + esc(plan.progressionConfirmation.label) + '</label>';
+    }
     if (plan.walkOnlyAvailable) {
       var walkOnlyLocked = cardioLocationLocked(state.selectedDate);
       html += '<div class="notice"><p>Keep full-sentence conversation, around 3–4/10 effort. Starting speeds are suggestions; slow down as needed. Stop jogging for pain or a changed stride. If unusually tired, use walking or rest.</p><label class="check-row"><input id="cardio-walk-only" type="checkbox" ' + (plan.walkOnlyEnabled ? 'checked ' : '') + (walkOnlyLocked ? 'disabled ' : '') + '> Walk only today · same ' + duration + ' minutes' + (plan.outdoorTrial ? '' : ', level incline') + '</label><p>Choose before starting.</p></div>';
@@ -1413,11 +1423,11 @@
     });
     if (plan.outdoorTrial) {
       var result = day.cardio && day.cardio.result || {};
-      return html + '</div><p class="notice">Use your own timer outdoors and follow the times above. Choose a route you can shorten and turn back when needed.</p><div class="treadmill-result"><strong>Route result</strong><div class="treadmill-fields"><label>Minutes<input data-cardio-result="durationMinutes" type="number" min="0" step="0.1" value="' + esc(result.durationMinutes == null ? "" : result.durationMinutes) + '"></label><label>Distance, mi<input data-cardio-result="distanceMiles" type="number" min="0" step="0.01" value="' + esc(result.distanceMiles == null ? "" : result.distanceMiles) + '"></label></div><small>Record elapsed time, including walk intervals and pauses. Keep travel to the route separate.</small></div>';
+      return html + '</div>' + renderCardioWarnings(result) + '<p class="notice">Use your own timer outdoors and follow the times above. Choose a route you can shorten and turn back when needed.</p><div class="treadmill-result"><strong>Route result</strong><div class="treadmill-fields"><label>Recorded total, min<input data-cardio-result="durationMinutes" type="number" min="0.1" step="0.1" value="' + esc(result.durationMinutes == null ? "" : result.durationMinutes) + '"></label><label>Distance, mi<input data-cardio-result="distanceMiles" type="number" min="0" step="0.01" value="' + esc(result.distanceMiles == null ? "" : result.distanceMiles) + '"></label></div><small>Record elapsed time, including walk intervals and pauses. Keep travel to the route separate.</small></div>';
     }
     html += '</div><div class="cardio-controls"><button class="primary" id="start-cardio" ' + (active ? "disabled" : "") + '>' + (active ? "Session alerts active" : complete ? "Start another " + duration + "-minute session" : "Start " + duration + "-minute session") + '</button>';
     if (active) html += '<button class="secondary" id="cancel-cardio">Cancel alerts</button>';
-    html += '</div><p class="notification-status">' + (complete ? "Session complete · " + number(day.cardio.durationMinutes || duration) + " minutes logged automatically." : state.notificationEnabled ? "You can switch to YouTube—push alerts will tell you every incline and speed change." : "Enable notifications first so alerts can reach you while YouTube is open.") + '</p>';
+    html += '</div><p class="notification-status">' + (complete ? "Timer complete · " + number(day.cardio.durationMinutes || duration) + " planned minutes. Recorded total is shown separately." : state.notificationEnabled ? "You can switch to YouTube—push alerts will tell you every incline and speed change." : "Enable notifications first so alerts can reach you while YouTube is open.") + '</p>';
     if (state.cardioCountdown && state.cardioCountdown.date === state.selectedDate) html += renderCardioCountdown();
     html += renderTreadmillResult(day);
     return html;
@@ -1431,10 +1441,16 @@
     else html += '<button type="button" class="secondary" data-add-photo="treadmill">Upload treadmill results photo</button>';
     if (day.cardio && day.cardio.result) {
       var result = day.cardio.result;
-      html += '<div class="treadmill-fields"><label>Minutes<input data-cardio-result="durationMinutes" type="number" step="0.1" value="' + esc(result.durationMinutes == null ? "" : result.durationMinutes) + '"></label><label>Distance, mi<input data-cardio-result="distanceMiles" type="number" step="0.01" value="' + esc(result.distanceMiles == null ? "" : result.distanceMiles) + '"></label><label>Screen calories<input data-cardio-result="calories" type="number" step="1" value="' + esc(result.calories == null ? "" : result.calories) + '"></label><label>Avg speed<input data-cardio-result="averageSpeedMph" type="number" step="0.1" value="' + esc(result.averageSpeedMph == null ? "" : result.averageSpeedMph) + '"></label><label>Incline shown<input data-cardio-result="incline" type="number" step="0.1" value="' + esc(result.incline == null ? "" : result.incline) + '"></label></div><small>Proposed from the photo—review and correct every value.</small>';
+      html += renderCardioWarnings(result);
+      html += '<div class="treadmill-fields"><label>Recorded total, min<input data-cardio-result="durationMinutes" type="number" min="0.1" step="0.1" value="' + esc(result.durationMinutes == null ? "" : result.durationMinutes) + '"></label><label>Distance, mi<input data-cardio-result="distanceMiles" type="number" step="0.01" value="' + esc(result.distanceMiles == null ? "" : result.distanceMiles) + '"></label><label>Screen calories<input data-cardio-result="calories" type="number" step="1" value="' + esc(result.calories == null ? "" : result.calories) + '"></label><label>Avg speed<input data-cardio-result="averageSpeedMph" type="number" step="0.1" value="' + esc(result.averageSpeedMph == null ? "" : result.averageSpeedMph) + '"></label><label>Incline shown<input data-cardio-result="incline" type="number" min="0" max="15" step="0.1" value="' + esc(result.incline == null ? "" : result.incline) + '"></label></div><small>Proposed from the photo—review and correct every value.</small>';
     } else html += '<small>Saved privately with this workout. A clear screen photo can propose reviewable results.</small>';
     html += '</div>';
     return html;
+  }
+
+  function renderCardioWarnings(result) {
+    var warnings = Domain.cardioIssues(result);
+    return warnings.length ? '<div class="notice" role="status">' + warnings.map(esc).join("<br>") + '</div>' : "";
   }
 
   function cardioSettingLabel(segment, outdoors) {
@@ -1635,9 +1651,8 @@
   }
 
   function renderReviewCheckpoints() {
-    if (state.coaching) return '<section class="card"><h2>Next checkpoints</h2><ul class="checkpoint-list">' + state.coaching.checkpoints.map(function (point) { return '<li><strong>' + esc(point.label) + '</strong><span>' + esc(point.note) + '</span></li>'; }).join("") + '</ul><p>' + esc(state.coaching.goal.nextStep) + '</p></section>';
-    if (TODAY >= WEEK_SIX_START) return '<section class="card"><div class="card-head"><div><h2>Next checkpoints</h2><p>Use completed-week weight averages, photos and recovery together.</p></div></div><ul class="checkpoint-list"><li><strong>October 21 · 8 pm Chicago</strong><span>Review Mon–Wed food, protein, sleep, and training. Decide whether Saturday’s optional speed step fits your recovery.</span></li><li><strong>October 25 · Weekly review</strong><span>Check the full week near the 1,850-calorie anchor. If verified intake and the weight trend support a change, choose one small adjustment. Collect another week if the picture is unclear.</span></li><li><strong>November 1 · Two-week direction</strong><span>Reassess the trend if October 25 was inconclusive. Avoid reacting to one morning’s number.</span></li><li><strong>November 4 · Photo checkpoint</strong><span>Repeat front, side and back photos with matching camera position, lighting, distance and waistband.</span></li></ul><p class="notification-status">First milestone: a sustained 150 lb weekly average. Reassess photos, strength and the next target from there.</p></section>';
-    return '<section class="card"><div class="card-head"><div><h2>Next checkpoints</h2><p>Judge the plan using weight averages, photos, and recovery together.</p></div></div><ul class="checkpoint-list"><li><strong>Wednesday · 8 pm Chicago</strong><span>Review Mon–Wed logs, actual cardio effort, photos, hunger, energy, and sleep. Adjust Thu–Sat if needed.</span></li><li><strong>October 18 · Process check</strong><span>Review consistent morning weights, the 1,850-calorie anchor, protein minimum, form, and recovery.</span></li><li><strong>October 25 · Results decision</strong><span>Assess two full weeks. Working weight-average range: 151.9–152.4 lb; a planning target, not a promised result. If weight stays flat, review intake accuracy and activity before changing the plan.</span></li><li><strong>November 4 · Photo checkpoint</strong><span>Repeat front, side, and back photos with matching position, lighting, camera distance, and waistband.</span></li></ul><p class="notification-status">First milestone: a 150 lb weekly average. Reassess appearance, strength, and recovery before deciding on 145 or 140.</p></section>';
+    var goal = Domain.raceGoal(state.coaching && state.coaching.goal);
+    return '<section class="card"><h2>Next checkpoints</h2><ul class="checkpoint-list"><li><strong>Wednesday evening</strong><span>Review training, shin comfort, food, energy, sleep and recovery.</span></li><li><strong>Sunday morning</strong><span>Review the completed week and confirm the next week before progressing.</span></li></ul><p>' + esc(goal.nextStep) + '</p></section>';
   }
 
   function progressWindow() {
@@ -1750,27 +1765,11 @@
 
   function renderGoalProgress() {
     var stats = periodStats(state.data.profile.startDate || "2026-09-10", TODAY);
-    if (state.coaching) return '<section class="card"><p class="eyebrow">Standing performance goal</p><h2>' + esc(state.coaching.goal.name) + '</h2><p>' + esc(state.coaching.goal.date) + ' · ' + esc(state.coaching.goal.distance) + '</p><p>' + esc(state.coaching.goal.nextStep) + '</p>' + metric("Strength sessions through today", pct(stats.strengthDone, stats.strengthPlanned), stats.strengthDone + " of " + stats.strengthPlanned + " planned") + metric("Cardio sessions through today", pct(stats.cardioDone, stats.cardioPlanned), stats.cardioDone + " of " + stats.cardioPlanned + " planned") + '<p class="notification-status">Food, sleep, energy, recovery and growing comfortable endurance guide the next step.</p></section>';
-    var start = state.data.profile.baselineWeight;
-    var latest = stats.latestWeight || start;
-    if (TODAY >= WEEK_SIX_START) {
-      var completed = weeklyProgressWeight(addDays(startOfWeek(TODAY), -4), TODAY);
-      var average = completed.average;
-      var weightCopy = completed.source === "Daily average"
-        ? (average == null ? 'Build a consistent morning-weight trend, then reassess photos and strength.' : 'Last completed week: ' + average.toFixed(1) + ' lb from ' + completed.count + ' morning readings. Reassess photos and strength at the milestone. Daily average.')
-        : (completed.value == null ? 'Last completed week: Missing.' : 'Last completed week: ' + completed.value.toFixed(1) + ' lb · Wednesday weigh-in.');
-      return '<section class="card"><div class="card-head"><div><p class="eyebrow">First milestone</p><h2>' + (completed.source === "Daily average" ? '150 lb weekly average' : '150 lb weekly weigh-in') + '</h2><p>' + weightCopy + '</p></div></div>' +
-        metric("Strength sessions through today", pct(stats.strengthDone, stats.strengthPlanned), stats.strengthDone + " of " + stats.strengthPlanned + " planned") +
-        metric("Cardio sessions through today", pct(stats.cardioDone, stats.cardioPlanned), stats.cardioDone + " of " + stats.cardioPlanned + " planned") +
-        metric("Protein days", pct(stats.proteinDays, stats.loggedDays || 1), stats.proteinDays + " / " + stats.loggedDays + " logged days") +
-        '<details class="form-guide"><summary>Original longer-term goal</summary><p>Your original saved goal is ' + esc(state.data.targets.checkpointWeight) + ' lb by ' + esc(formatDate(state.data.targets.deadline, { month: "long", day: "numeric", year: "numeric" })) + '. The recent trend does not support forecasting that deadline. Establish a sustainable downward trend before setting the next date.</p></details></section>';
-    }
-    var weightProgress = pct(start - latest, start - state.data.targets.checkpointWeight);
-    return '<section class="card"><div class="card-head"><div><p class="eyebrow">December 31 goal</p><h2>Lean and visibly defined</h2><p>Progress from ' + esc(formatDate(state.data.profile.startDate, { month: "short", day: "numeric" })) + ' through today. Planned totals grow as workout days arrive.</p></div></div>' +
-      metric("Weight checkpoint", weightProgress, latest.toFixed(1) + " / " + state.data.targets.checkpointWeight + " lb") +
+    var goal = Domain.raceGoal(state.coaching && state.coaching.goal);
+    return '<section class="card"><p class="eyebrow">Race goal</p><h2>' + esc(goal.name) + '</h2><p>' + esc(goal.dateLabel) + ' · ' + esc(goal.location) +
+      '</p><p>Time limit ' + esc(goal.timeLimit) + ' · ' + esc(goal.paceLimit) + '</p><p>' + esc(goal.objective) + '</p><p>' + esc(goal.nextStep) + '</p>' +
       metric("Strength sessions through today", pct(stats.strengthDone, stats.strengthPlanned), stats.strengthDone + " of " + stats.strengthPlanned + " planned") +
-      metric("Cardio sessions through today", pct(stats.cardioDone, stats.cardioPlanned), stats.cardioDone + " of " + stats.cardioPlanned + " planned") +
-      metric("Protein days", pct(stats.proteinDays, stats.loggedDays || 1), stats.proteinDays + " / " + stats.loggedDays + " logged days") + '</section>';
+      metric("Cardio sessions through today", pct(stats.cardioDone, stats.cardioPlanned), stats.cardioDone + " of " + stats.cardioPlanned + " planned") + '</section>';
   }
 
   function metric(label, percentage, copy) {
@@ -1781,7 +1780,7 @@
     var html = header("The Plan", state.coaching ? "Repeatable training · building toward the March 8K" : "September 10 to December 31");
     html += '<section class="card"><div class="notice">Four strength days, two cardio days, and one active recovery day. Progress reps before load; clean form and repeatability matter more than adding exercises.</div></section>';
     if (TODAY >= WEEK_SIX_START) html += state.coaching ? renderPlanFoodGuidance() : renderWeekSixGuidance();
-    else html += '<section class="card"><details class="form-guide"><summary>Why this week’s progression supports fat loss</summary><p>Your logged cardio effort was about 5–5.5/10 Wednesday and 4–4.5/10 Saturday. Try the increased work blocks at about 6/10, with a smooth walk and no leaning on the rails. The 65-minute duration stays the same.</p><p>At about 153 lb, the proposed full-session changes add roughly 20 calories Wednesday and 40 Saturday in a walking-equation estimate. These are estimates from the prescribed settings, not measured burn or a promise of weight loss. Keep the 1,850-calorie anchor; do not eat back treadmill calories.</p><p>Research across 116 trials links greater weekly moderate-to-vigorous aerobic duration with lower weight, waist, and body fat. It does not establish that a specific higher incline guarantees better fat loss. Strength training during dietary weight loss helps preserve lean tissue. We will judge this plan using actual effort, recovery, weight averages, waist, and standardized photos.</p><p><a href="https://jamanetwork.com/journals/jamanetworkopen/fullarticle/2828487" target="_blank" rel="noopener noreferrer">Cardio and fat-loss research ↗</a> · <a href="https://eprints.gla.ac.uk/361857/2/361857.pdf" target="_blank" rel="noopener noreferrer">Strength and muscle-preservation research ↗</a></p></details></section>';
+    else html += '<section class="card"><details class="form-guide"><summary>Why this week’s progression supports fat loss</summary><p>Your logged cardio effort was about 5–5.5/10 Wednesday and 4–4.5/10 Saturday. Try the increased work blocks at about 6/10, with a smooth walk and no leaning on the rails. The 65-minute duration stays the same.</p><p>At about 153 lb, the proposed full-session changes add roughly 20 calories Wednesday and 40 Saturday in a walking-equation estimate. These are estimates from the prescribed settings, not measured burn or a promise of weight loss. Keep the saved ' + esc(state.data.targets.calories) + '-calorie target; do not eat back treadmill calories.</p><p>Research across 116 trials links greater weekly moderate-to-vigorous aerobic duration with lower weight, waist, and body fat. It does not establish that a specific higher incline guarantees better fat loss. Strength training during dietary weight loss helps preserve lean tissue. We will judge this plan using actual effort, recovery, weight averages, waist, and standardized photos.</p><p><a href="https://jamanetwork.com/journals/jamanetworkopen/fullarticle/2828487" target="_blank" rel="noopener noreferrer">Cardio and fat-loss research ↗</a> · <a href="https://eprints.gla.ac.uk/361857/2/361857.pdf" target="_blank" rel="noopener noreferrer">Strength and muscle-preservation research ↗</a></p></details></section>';
     DAYS.forEach(function (key) {
       var plan = planForDate(addDays(startOfWeek(TODAY), DAYS.indexOf(key)));
       html += '<section class="card"><div class="card-head"><div><p class="eyebrow">' + DAY_NAMES[DAYS.indexOf(key)] + ' · ' + plan.type + '</p><h2>' + esc(plan.title) + '</h2><p>' + esc(plan.subtitle) + '</p></div></div>';
@@ -1805,7 +1804,7 @@
 
   function renderWeekSixGuidance() {
     if (state.coaching) return renderWeeklyCoach(false);
-    return '<section class="card"><details class="form-guide"><summary>This week’s focus · food, recovery and progression</summary><p>Aim near the existing 1,850-calorie anchor within the 1,750–1,950 zone, with a protein target of ' + esc(state.data.targets.protein) + ' g and a good range of ' + esc(state.data.targets.proteinMin) + ' to ' + esc(state.data.targets.proteinMax) + ' g. Plan protein into regular meals; three meals around 40 g plus a 15–25 g protein snack is one way to reach the minimum. Keep lobby-machine coffee explicitly estimated and do not subtract treadmill calories.</p><p><strong>Verified shake:</strong> one 32 g scoop of your whey powder provides 120 calories and 24 g protein. Your saved 1.5-scoop portion provides 180 calories and 36 g protein. Use the corrected favorites for new logs.</p><p>Give bedtime 30 minutes more room where feasible, working toward seven or more hours. Tuesday’s missed session needs no catch-up workout.</p><p>Bench and row use a 26 lb trial with fewer reps and a 23 lb fallback. Shoulder press builds reps at 17 lb. For October 24, the recommended full-session trial changes only minutes 25–30 to 3.5 mph at incline setting 8, then returns to the standard plan. Keep all other work steady while prioritizing food consistency and sleep. Use the standard fallback before starting if readiness is poor. The express plan stays the same.</p><p>Strength training during dietary weight loss supports lean-tissue preservation. Research supports regular aerobic activity, but does not establish that continually raising intensity guarantees better fat loss. Judge the plan using weight averages, waist, photos and recovery.</p><p><a href="https://jamanetwork.com/journals/jamanetworkopen/fullarticle/2828487" target="_blank" rel="noopener noreferrer">Cardio research ↗</a> · <a href="https://bmjopensem.bmj.com/content/11/3/e002363" target="_blank" rel="noopener noreferrer">Strength research ↗</a> · <a href="https://jamanetwork.com/journals/jamainternalmedicine/fullarticle/2788694" target="_blank" rel="noopener noreferrer">Sleep research ↗</a></p></details></section>';
+    return '<section class="card"><details class="form-guide"><summary>This week’s focus · food, recovery and progression</summary><p>Aim near the saved ' + esc(state.data.targets.calories) + '-calorie target within the ' + esc(state.data.targets.calorieMin) + ' to ' + esc(state.data.targets.calorieMax) + ' range, with a protein target of ' + esc(state.data.targets.protein) + ' g and a good range of ' + esc(state.data.targets.proteinMin) + ' to ' + esc(state.data.targets.proteinMax) + ' g. Plan protein into regular meals; three meals around 40 g plus a 15–25 g protein snack is one way to reach the minimum. Keep lobby-machine coffee explicitly estimated and do not subtract treadmill calories.</p><p><strong>Verified shake:</strong> one 32 g scoop of your whey powder provides 120 calories and 24 g protein. Your saved 1.5-scoop portion provides 180 calories and 36 g protein. Use the corrected favorites for new logs.</p><p>Give bedtime 30 minutes more room where feasible, working toward seven or more hours. Tuesday’s missed session needs no catch-up workout.</p><p>Bench and row use a 26 lb trial with fewer reps and a 23 lb fallback. Shoulder press builds reps at 17 lb. For October 24, the recommended full-session trial changes only minutes 25–30 to 3.5 mph at incline setting 8, then returns to the standard plan. Keep all other work steady while prioritizing food consistency and sleep. Use the standard fallback before starting if readiness is poor. The express plan stays the same.</p><p>Strength training during dietary weight loss supports lean-tissue preservation. Research supports regular aerobic activity, but does not establish that continually raising intensity guarantees better fat loss. Judge the plan using weight averages, waist, photos and recovery.</p><p><a href="https://jamanetwork.com/journals/jamanetworkopen/fullarticle/2828487" target="_blank" rel="noopener noreferrer">Cardio research ↗</a> · <a href="https://bmjopensem.bmj.com/content/11/3/e002363" target="_blank" rel="noopener noreferrer">Strength research ↗</a> · <a href="https://jamanetwork.com/journals/jamainternalmedicine/fullarticle/2788694" target="_blank" rel="noopener noreferrer">Sleep research ↗</a></p></details></section>';
   }
 
   function renderCheckin() {
@@ -1946,6 +1945,9 @@
       if (exerciseLines.length || (day.workout && day.workout.rating) || plan.type === "Cardio" && day.cardio && (day.cardio.mode || plan.outdoorTrial && day.cardio.result)) {
         var cardioResult = day.cardio && day.cardio.result;
         var resultLine = cardioResult ? (plan.outdoorTrial ? "\n  Route result: " : "\n  Treadmill result: ") + [cardioResult.durationMinutes != null ? cardioResult.durationMinutes + " min" : "", cardioResult.distanceMiles != null ? cardioResult.distanceMiles + " mi" : "", cardioResult.calories != null ? cardioResult.calories + " screen cal" : "", cardioResult.averageSpeedMph != null ? cardioResult.averageSpeedMph + " mph avg" : ""].filter(Boolean).join(" · ") : "";
+        var durationInfo = Domain.cardioDurations(cardioSegmentsFor(plan), cardioResult);
+        if (plan.type === "Cardio") resultLine += "\n  Planned work: " + (durationInfo.plannedWorkMinutes ?? "unknown") + " min · Cooldown: " + (durationInfo.plannedCooldownMinutes ?? "unknown") + " min · Recorded total: " + (durationInfo.recordedTotalMinutes ?? "unknown") + " min";
+        if (cardioResult) resultLine += Domain.cardioIssues(cardioResult).map(function (warning) { return "\n  Check result: " + warning; }).join("");
         var cardioChoiceLine = (plan.speedTrialAvailable || plan.shortTrialAvailable) && day.cardio && (day.cardio.mode || day.cardio.workSpeedTrial || typeof day.cardio.shortSpeedInclineTrial === "boolean") ? "\n  Cardio plan selected: " + (day.cardio.mode === "express" ? plan.shortTrialAvailable ? "Express · five-minute trial not used" : "Express · full-session speed option not used" : plan.shortTrialAvailable ? day.cardio.shortSpeedInclineTrial ? "Full · five-minute trial at minutes 25–30: 3.5 mph / incline setting 8; other blocks standard" : "Full · standard work-block speeds" : day.cardio.workSpeedTrial ? "Full · optional +0.1 mph during minutes 15–45; incline unchanged" : "Full · standard work-block speeds") : "";
         training.push(formatDate(iso, { weekday: "short", month: "short", day: "numeric" }) + " · " + plan.title + (day.workout.rating ? " · " + day.workout.rating : "") + (day.cardio && day.cardio.location ? "\n  Location: " + (day.cardio.location === "outdoors" ? "Outdoors" : "Treadmill") : "") + "\n" + exerciseLines.join("\n") + resultLine + cardioChoiceLine);
       }
@@ -1955,6 +1957,7 @@
       "VINNY WORKOUT 2.0 " + (midweek ? "MIDWEEK CHECK-IN" : "WEEKLY CHECK-IN") + (inProgress ? " · IN PROGRESS" : ""),
       formatDate(startIso, { month: "short", day: "numeric" }) + " to " + formatDate(endIso, { month: "short", day: "numeric", year: "numeric" }),
       "",
+      "Race goal: " + Domain.raceGoal().name + " · " + Domain.raceGoal().dateLabel + " · " + Domain.raceGoal().location + " · Time limit " + Domain.raceGoal().timeLimit + " (" + Domain.raceGoal().paceLimit + "). " + Domain.raceGoal().objective,
       "Morning weights: " + (stats.weights.length ? stats.weights.map(function (w) { return w.toFixed(1); }).join(", ") + " lb" : "none logged"),
       "Weekly weigh-in: " + (weighIn ? weighInDate + " · " + (weighIn.weight == null ? "weight missing" : weighIn.weight.toFixed(1) + " lb") + " · visceral fat rating " + (weighIn.visceralFat ?? "missing") : "missing"),
       "Week-over-week weigh-in change: " + (change == null ? "not available" : (change > 0 ? "+" : "") + change.toFixed(1) + " lb"),
@@ -1967,7 +1970,7 @@
       nutrition.join("\n"),
       "Weekly nutrition totals: " + (nutritionDays ? Math.round(calorieTotal) + " calories · " + (proteinDays ? Math.round(proteinTotal) + " g protein" + (partialProtein ? " (partial)" : "") : "protein unknown") : "not available"),
       "Logged-day averages: " + (nutritionDays ? Math.round(calorieTotal / nutritionDays) + " calories · " + (proteinDays ? Math.round(proteinTotal / proteinDays) + " g protein" + (partialProtein ? " (known values across " + proteinDays + " days)" : "") : "protein unknown") : "not available"),
-      "Current target zones: " + state.data.targets.calorieMin + "–" + state.data.targets.calorieMax + " calories · " + state.data.targets.proteinMin + " to " + state.data.targets.proteinMax + " g protein (target " + state.data.targets.protein + " g)",
+      "Current target zones: " + state.data.targets.calorieMin + " to " + state.data.targets.calorieMax + " calories (target " + state.data.targets.calories + ") · " + state.data.targets.proteinMin + " to " + state.data.targets.proteinMax + " g protein (target " + state.data.targets.protein + " g)",
       "",
       measurementCheckin(startIso, endIso),
       "",
@@ -2294,7 +2297,25 @@
       day.cardio.workSpeedTrial = false;
       queueSave(true);
     });
-    document.querySelectorAll("[data-cardio-result]").forEach(function (input) { input.addEventListener("change", function () { var day = getDay(state.selectedDate); day.cardio.result = day.cardio.result || {}; day.cardio.result[input.dataset.cardioResult] = optionalNumber(input.value); queueSave(false); }); });
+    var progressionReady = document.getElementById("cardio-progression-ready");
+    if (progressionReady) progressionReady.addEventListener("change", function () {
+      if (cardioLocationLocked(state.selectedDate)) return;
+      getDay(state.selectedDate).cardio.progressionReady = progressionReady.checked;
+      queueSave(true);
+    });
+    document.querySelectorAll("[data-cardio-result]").forEach(function (input) {
+      input.addEventListener("change", function () {
+        var field = input.dataset.cardioResult, value = optionalNumber(input.value);
+        var error = field === "incline" && !Domain.inclineValid(input.value) ? "Incline must be 0 to 15."
+          : field === "durationMinutes" && value != null && value <= 0 ? "Enter positive elapsed minutes or leave blank." : "";
+        input.setCustomValidity(error);
+        if (error) { input.reportValidity(); return; }
+        var day = getDay(state.selectedDate);
+        day.cardio.result = day.cardio.result || {};
+        day.cardio.result[field] = value;
+        queueSave(false);
+      });
+    });
   }
 
   function updateExercise(id, field, value) {
@@ -3002,7 +3023,7 @@
         try {
           var response = await apiFetch("/treadmill/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(typeof ref === "object" ? { photoId: ref.id } : { image: ref }) });
           getDay(state.selectedDate).cardio.result = await response.json();
-        } catch (ignore) { getDay(state.selectedDate).cardio.result = null; }
+        } catch (error) { showFeedback("Photo saved. Results could not be read; the previous result was kept.", "warning"); }
       }
       document.getElementById("photo-dialog").close();
       queueSave(true);
@@ -3334,10 +3355,10 @@
       var response = await apiFetch("/data", { method: "GET" });
       var result = await response.json();
       try {
-        result = await updateSavedProteinTargets(result);
+        result = await updateSavedNutritionTargets(result);
       } catch (error) {
         if (error.message !== "conflict") throw error;
-        result = await updateSavedProteinTargets(await (await apiFetch("/data", { method: "GET" })).json());
+        result = await updateSavedNutritionTargets(await (await apiFetch("/data", { method: "GET" })).json());
       }
       var raw = result.payload || defaultData();
       var migrated = raw.schemaVersion !== 2;
@@ -3367,10 +3388,12 @@
     return number(targets?.protein) === 140 && number(targets?.proteinMin) === 135 && number(targets?.proteinMax) === 150;
   }
 
-  async function updateSavedProteinTargets(result) {
+  async function updateSavedNutritionTargets(result) {
     var raw = result.payload;
-    if (raw?.schemaVersion !== 2 || !hasPreviousProteinTargets(raw.targets)) return result;
-    var payload = Object.assign({}, raw, { targets: Object.assign({}, raw.targets, DEFAULT_PROTEIN_TARGETS) });
+    if (raw?.schemaVersion !== 2) return result;
+    var targets = Domain.migrateNutritionTargets(raw.targets);
+    if (targets === raw.targets) return result;
+    var payload = Object.assign({}, raw, { targets: targets });
     var response = await apiFetch("/data", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ payload: payload, expectedVersion: result.version }) });
     return Object.assign({ payload: payload }, await response.json());
   }
@@ -3378,15 +3401,14 @@
   function ensureDataShape(data) {
     data.profile = Object.assign(defaultData().profile, data.profile || {});
     if (data.profile.startDate === "2026-09-09") data.profile.startDate = "2026-09-10";
-    var savedTargets = data.targets || {};
+    var savedTargets = Domain.migrateNutritionTargets(data.targets || {});
     var defaults = defaultData().targets;
     if (hasPreviousProteinTargets(savedTargets)) {
       savedTargets = Object.assign({}, savedTargets, DEFAULT_PROTEIN_TARGETS);
     }
     data.targets = Object.assign({}, defaults, savedTargets);
-    if (number(data.targets.calories) === 1700) data.targets.calories = 1850;
-    data.targets.calorieMin = number(data.targets.calorieMin) === 1600 ? 1750 : number(data.targets.calorieMin) || data.targets.calories - 100;
-    data.targets.calorieMax = number(data.targets.calorieMax) === 1800 ? 1950 : number(data.targets.calorieMax) || data.targets.calories + 100;
+    data.targets.calorieMin = number(data.targets.calorieMin) || data.targets.calories - 100;
+    data.targets.calorieMax = number(data.targets.calorieMax) || data.targets.calories + 100;
     data.targets.protein = number(data.targets.protein) || defaults.protein;
     data.targets.proteinMin = number(savedTargets.proteinMin) || data.targets.protein - 10;
     data.targets.proteinMax = number(savedTargets.proteinMax) || data.targets.protein + 10;
@@ -3438,8 +3460,9 @@
   function renderWeeklyCoach(compact, collapsed) {
     var coach = state.coaching;
     if (!coach) return "";
+    var goal = Domain.raceGoal(coach.goal);
     var reviewStatus = /^\d{4}-\d{2}-\d{2}$/.test(coach.reviewDue || "") && coach.reviewDue >= TODAY ? "Next review: " + coach.reviewDue + "." : "Check-ins: Wednesday evenings and Sunday mornings (Chicago).";
-    return '<section class="card weekly-coach">' + (collapsed ? '<details class="form-guide"><summary>Coaching notes</summary>' : '') + '<p class="eyebrow">Weekly Coach · approved ' + esc(coach.approvedAt) + '</p><h2>' + esc(coach.title) + '</h2><p>' + esc(coach.summary) + '</p><details' + (compact ? '' : ' open') + '><summary>Food options, recovery and the race goal</summary><p>' + esc(coach.targetStatus) + '</p>' + coach.meals.map(function (meal) { return '<h3>' + esc(meal.occasion) + '</h3><ul>' + meal.options.map(function (option) { return '<li>' + esc(option) + '</li>'; }).join('') + '</ul>'; }).join('') + '<p>' + esc(coach.shake) + '</p><p>' + esc(coach.sleep) + '</p><p>' + esc(coach.support) + '</p><p><strong>' + esc(coach.goal.name) + ' · ' + esc(coach.goal.date) + '</strong></p><p>' + esc(coach.goal.nextStep) + '</p><p>' + esc(coach.groceryStatus) + '</p></details><div class="row wrap"><a class="button" href="shopping/">Open shared shopping</a><a class="button secondary" href="shopping/#ask">Ask TrainerGPT</a></div><p class="notification-status">' + esc(reviewStatus) + ' Saved history stays available.</p>' + (collapsed ? '</details>' : '') + '</section>';
+    return '<section class="card weekly-coach">' + (collapsed ? '<details class="form-guide"><summary>Coaching notes</summary>' : '') + '<p class="eyebrow">Weekly Coach · approved ' + esc(coach.approvedAt) + '</p><h2>' + esc(coach.title) + '</h2><p>' + esc(coach.summary) + '</p><details' + (compact ? '' : ' open') + '><summary>Food options, recovery and the race goal</summary><p>' + esc(coach.targetStatus) + '</p>' + coach.meals.map(function (meal) { return '<h3>' + esc(meal.occasion) + '</h3><ul>' + meal.options.map(function (option) { return '<li>' + esc(option) + '</li>'; }).join('') + '</ul>'; }).join('') + '<p>' + esc(coach.shake) + '</p><p>' + esc(coach.sleep) + '</p><p>' + esc(coach.support) + '</p><p><strong>' + esc(goal.name) + ' · ' + esc(goal.dateLabel) + ' · ' + esc(goal.location) + '</strong></p><p>' + esc(goal.timeLimit) + ' · ' + esc(goal.paceLimit) + ' · ' + esc(goal.objective) + '</p><p>' + esc(goal.nextStep) + '</p><p>' + esc(coach.groceryStatus) + '</p></details><div class="row wrap"><a class="button" href="shopping/">Open shared shopping</a><a class="button secondary" href="shopping/#ask">Ask TrainerGPT</a></div><p class="notification-status">' + esc(reviewStatus) + ' Saved history stays available.</p>' + (collapsed ? '</details>' : '') + '</section>';
   }
 
   function renderFoodGuideCard() {
