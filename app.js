@@ -899,6 +899,8 @@
     var key = DAYS.includes(override) ? override : dayKey(iso), plan = PLAN[key];
     if (state.coaching && state.coaching.status === "approved" && iso >= state.coaching.weekStart) {
       var datedCardio = state.coaching.cardioSessions && state.coaching.cardioSessions[iso];
+      var cardioProgression = state.coaching.cardioProgression;
+      if (!datedCardio && cardioProgression && iso >= cardioProgression.from) datedCardio = cardioProgression.session;
       if (!datedCardio && state.coaching.cardioDefaults && iso >= state.coaching.cardioDefaults.from) datedCardio = state.coaching.cardioDefaults.session;
       if (datedCardio && datedCardio.mode === "outdoor" && plan.type === "Cardio") return {
         type: "Cardio",
@@ -927,11 +929,14 @@
         });
       }
       var reviewed = weekSixStrengthPlan(key), changes = state.coaching.plan[key];
-      if (reviewed && changes) return Object.assign({}, reviewed, { subtitle: "Hold this week’s loads · controlled reps and manageable recovery", sections: reviewed.sections.map(function (section) {
+      var progression = state.coaching.strengthProgression;
+      var progressions = progression && iso >= progression.from && progression.plan?.[key];
+      if (reviewed && changes) return Object.assign({}, reviewed, { subtitle: progressions ? "Progress selected lifts · keep two clean reps in reserve" : "Hold this week’s loads · controlled reps and manageable recovery", sections: reviewed.sections.map(function (section) {
         return Object.assign({}, section, { exercises: section.exercises.map(function (exercise) {
           var updated = Object.assign({}, exercise, changes[exercise.name] || {});
           var noteUpdates = state.coaching.exerciseNotes;
           if (noteUpdates && iso >= noteUpdates.from && noteUpdates.byName && noteUpdates.byName[updated.name]) updated.coachingNote = noteUpdates.byName[updated.name];
+          if (progressions?.[updated.name]) Object.assign(updated, progressions[updated.name]);
           if (updated.equipment && updated.equipment.type === "bodyweight") delete updated.weeklyLoad;
           return updated;
         }) });
