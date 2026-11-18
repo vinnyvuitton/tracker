@@ -199,8 +199,70 @@
     return {date: date, source: "Daily average", value: values.length >= 2 ? Math.round(values.reduce(function (a, b) { return a + b; }, 0) / values.length * 10) / 10 : null, sampleSize: values.length};
   }
 
+  function strengthRepOutcome(log, exercise) {
+    var match = /^(\d+)\s+sets?\s+(?:of\s+)?(\d+)(?:\s*(?:to|[–—-])\s*(\d+))?/i.exec(exercise?.prescription || "");
+    if (!match || /\b(?:sec(?:onds?)?|min(?:utes?)?)\b/i.test(exercise.prescription)) return {};
+    var count = Number(match[1]), min = Number(match[2]), max = Number(match[3] || match[2]);
+    var sets = Array.isArray(log.sets) && log.sets.length ? log.sets : String(log.reps || "").split(/[,/]/);
+    var reps = Array.from({length: count}, function (_, index) { return numeric(sets[index]); });
+    return {
+      hit: reps.length > 0 && reps.every(function (value) { return Number.isInteger(value) && value >= max; }),
+      missed: reps.some(function (value) { return Number.isInteger(value) && value >= 0 && value < min; })
+    };
+  }
+
+  function strengthLoad(exercise, id, date, days, planForDate, loadOptions) {
+    if (exercise?.equipment?.type !== "dumbbell") return {publishedLoadLb: null, adjustedLoadLb: null, reason: null};
+    var published = numeric(exercise.weeklyLoad), start = numeric(exercise.equipment.start);
+    var fallback = {publishedLoadLb: published, adjustedLoadLb: published ?? start, reason: null};
+    var sessions = Object.keys(days || {}).filter(function (iso) {
+      if (iso >= date) return false;
+      var log = days[iso]?.exercises?.[id];
+      return log && (log.done || log.loadFeel || (Array.isArray(log.sets) && log.sets.some(function (rep) { return numeric(rep) != null; })) ||
+        String(log.reps || "").split(/[,/]/).some(function (rep) { return numeric(rep) != null; }));
+    }).sort().slice(-2).reverse().map(function (iso) {
+      var plan = planForDate(iso);
+      var previous = plan?.sections?.flatMap(function (section) { return section.exercises; }).find(function (item) {
+        return item.name === exercise.name;
+      });
+      var log = days[iso].exercises[id];
+      var comparable = previous && previous.equipment?.type === "dumbbell" &&
+        previous.equipment.dumbbells === exercise.equipment.dumbbells;
+      return {log: log, comparable: comparable, reps: comparable ? strengthRepOutcome(log, previous) : {}};
+    });
+    var latest = sessions[0], prior = sessions[1];
+    if (!latest?.comparable) return fallback;
+    var weight = numeric(latest.log.load);
+    var weights = loadOptions.filter(function (option) { return option.weight > 1; }).map(function (option) { return option.weight; });
+    var index = weights.indexOf(weight);
+    if (index < 0) return fallback;
+    var sameLoad = prior?.comparable && numeric(prior.log.load) === weight;
+    var feel = latest.log.loadFeel;
+    var easy = function (session) { return ["slightly-easy", "much-too-easy", "too-light"].includes(session?.log.loadFeel); };
+    var step = 0, why = "";
+    if (feel === "too-hard" || feel === "too-heavy") {
+      step = -1; why = "rated too hard";
+    } else if (feel !== "right" && feel !== "slightly-hard") {
+      if (sameLoad && latest.reps.missed && prior.reps.missed) {
+        step = -1; why = "missed reps twice";
+      } else if (latest.reps.hit && feel === "much-too-easy") {
+        step = 1; why = "rated much too easy";
+      } else if (sameLoad && latest.reps.hit && prior.reps.hit && easy(latest) && easy(prior)) {
+        step = 1; why = "rated easy twice";
+      }
+    }
+    var candidate = weights[Math.min(weights.length - 1, Math.max(0, index + step))];
+    var target = step < 0 || published == null ? candidate : Math.max(published, candidate);
+    var reason = null;
+    if (target !== weight) {
+      reason = (target > weight ? "Up" : "Down") + " from " + weight + ": " +
+        (target > candidate ? "published plan takes priority" : why);
+    }
+    return {publishedLoadLb: published, adjustedLoadLb: target, reason: reason};
+  }
+
   root.WorkoutDomain = Object.freeze({
-    numeric: numeric, plainText: plainText, raceGoal: raceGoal,
+    strengthLoad: strengthLoad, numeric: numeric, plainText: plainText, raceGoal: raceGoal,
     migrateNutritionTargets: migrateNutritionTargets, inclineValid: inclineValid,
     cardioIssues: cardioIssues, normalizeCardioOcr: normalizeCardioOcr,
     cardioDurations: cardioDurations, nutritionTotals: nutritionTotals,

@@ -782,7 +782,12 @@
     }).find(Boolean) || null;
   }
 
-  function recommendedLoad(exercise, id) {
+  function strengthTarget(exercise, id, date) {
+    return Domain.strengthLoad(exercise, id, date, state.data.days, planForDate, LOAD_OPTIONS);
+  }
+
+  function recommendedLoad(exercise, id, date) {
+    if ((date || state.selectedDate) >= "2026-11-18") return strengthTarget(exercise, id, date || state.selectedDate).adjustedLoadLb;
     if (state.coaching && state.selectedDate >= state.coaching.weekStart && exercise.weeklyLoad) return exercise.weeklyLoad;
     // The check-in sets this week's starting loads; effort-based changes resume afterward.
     if (exercise.weeklyLoad && state.selectedDate >= WEEK_FOUR_START && state.selectedDate < addDays(WEEK_FOUR_START, 7)) return exercise.weeklyLoad;
@@ -1325,7 +1330,7 @@
     exercisesForPlan(plan).forEach(function (exercise) {
       if (!exercise.equipment || exercise.equipment.type !== "dumbbell") return;
       var id = exerciseId(exercise.name), log = day.exercises[id] || {};
-      var option = loadOption(number(log.load) || recommendedLoad(exercise, id));
+      var option = loadOption(state.selectedDate >= "2026-11-18" ? recommendedLoad(exercise, id) : number(log.load) || recommendedLoad(exercise, id));
       if (option) option.plates.forEach(function (plate) { plates[plate] = true; });
     });
     var plateList = Object.keys(plates).map(Number).sort(function (a, b) { return a - b; }).map(function (plate) { return plate + " lb"; }).join(" · ");
@@ -1335,12 +1340,15 @@
   function renderExerciseLog(plan, exercise, id, log, firstLabel, secondLabel, firstPlaceholder, secondPlaceholder) {
     var history = renderExerciseHistory(plan, exercise, id) + renderExerciseCoaching(exercise);
     if (plan.type === "Strength" && exercise.equipment && exercise.equipment.type === "dumbbell") {
-      var recommended = recommendedLoad(exercise, id);
+      var target = state.selectedDate >= "2026-11-18" ? strengthTarget(exercise, id, state.selectedDate) : null;
+      var recommended = target ? target.adjustedLoadLb : recommendedLoad(exercise, id);
       var selected = number(log.load) || recommended;
+      var displayedLoad = target ? recommended : selected;
+      var reason = target?.reason ? '<span class="notification-status">' + esc(target.reason) + '</span>' : '';
       var options = LOAD_OPTIONS.filter(function (option) { return option.weight > 1; }).map(function (option) {
         return '<option value="' + option.weight + '" ' + (option.weight === selected ? "selected" : "") + '>≈ ' + option.weight + ' lb ' + (exercise.equipment.dumbbells === 2 ? "each" : "total") + '</option>';
       }).join("");
-      return history + '<div class="load-guide"><strong>Recommended: approximately ' + selected + ' lb ' + (exercise.equipment.dumbbells === 2 ? "per dumbbell" : "on one dumbbell") + '</strong><span>' + esc(plateText(selected, exercise.equipment.dumbbells)) + '</span></div>' +
+      return history + '<div class="load-guide"><strong>Recommended: approximately ' + displayedLoad + ' lb ' + (exercise.equipment.dumbbells === 2 ? "per dumbbell" : "on one dumbbell") + '</strong><span>' + esc(plateText(displayedLoad, exercise.equipment.dumbbells)) + '</span>' + reason + '</div>' +
         '<div class="exercise-log"><label class="field">Load used<select data-exercise-load="' + id + '">' + options + '</select></label></div>' +
         renderSetInputs(exercise, id, log) + renderEffortButtons(id, log);
     }
@@ -1850,14 +1858,17 @@
     if (TODAY >= WEEK_SIX_START) html += state.coaching ? renderPlanFoodGuidance() : renderWeekSixGuidance();
     else html += '<section class="card"><details class="form-guide"><summary>Why this week’s progression supports fat loss</summary><p>Your logged cardio effort was about 5–5.5/10 Wednesday and 4–4.5/10 Saturday. Try the increased work blocks at about 6/10, with a smooth walk and no leaning on the rails. The 65-minute duration stays the same.</p><p>At about 153 lb, the proposed full-session changes add roughly 20 calories Wednesday and 40 Saturday in a walking-equation estimate. These are estimates from the prescribed settings, not measured burn or a promise of weight loss. Keep the saved ' + esc(state.data.targets.calories) + '-calorie target; do not eat back treadmill calories.</p><p>Research across 116 trials links greater weekly moderate-to-vigorous aerobic duration with lower weight, waist, and body fat. It does not establish that a specific higher incline guarantees better fat loss. Strength training during dietary weight loss helps preserve lean tissue. We will judge this plan using actual effort, recovery, weight averages, waist, and standardized photos.</p><p><a href="https://jamanetwork.com/journals/jamanetworkopen/fullarticle/2828487" target="_blank" rel="noopener noreferrer">Cardio and fat-loss research ↗</a> · <a href="https://eprints.gla.ac.uk/361857/2/361857.pdf" target="_blank" rel="noopener noreferrer">Strength and muscle-preservation research ↗</a></p></details></section>';
     DAYS.forEach(function (key) {
-      var plan = planForDate(addDays(startOfWeek(TODAY), DAYS.indexOf(key)));
+      var planDate = addDays(startOfWeek(TODAY), DAYS.indexOf(key));
+      var plan = planForDate(planDate);
       html += '<section class="card"><div class="card-head"><div><p class="eyebrow">' + DAY_NAMES[DAYS.indexOf(key)] + ' · ' + plan.type + '</p><h2>' + esc(plan.title) + '</h2><p>' + esc(plan.subtitle) + '</p></div></div>';
       plan.sections.forEach(function (section) {
         html += '<div class="section-label">' + esc(section.label) + '</div>';
         section.exercises.forEach(function (exercise) {
           html += '<div class="exercise"><div class="exercise-name">' + esc(exercise.displayName || exercise.name) + equipmentBadge(exercise) + '</div><div class="exercise-prescription">' + esc(exercise.prescription) + '</div>';
           if (exercise.equipment && exercise.equipment.type === "dumbbell") {
-            var suggestedLoad = exercise.weeklyLoad || exercise.equipment.start;
+            var suggestedLoad = planDate >= "2026-11-18"
+              ? strengthTarget(exercise, exerciseId(exercise.name), planDate).adjustedLoadLb
+              : exercise.weeklyLoad || exercise.equipment.start;
             html += '<p class="exercise-tip">Starting point: ≈ ' + suggestedLoad + ' lb ' + (exercise.equipment.dumbbells === 2 ? "per dumbbell. " : "on one dumbbell. ") + esc(plateText(suggestedLoad, exercise.equipment.dumbbells)) + '</p>';
           }
           html += renderExerciseCoaching(exercise, true);
@@ -2415,7 +2426,7 @@
     day.exercises[id][field] = value;
     if (field === "done") delete day.exercises[id].autoCompleted;
     var planned = exercisesForPlan(planForDate(state.selectedDate));
-    if (field === "done" && value && !day.exercises[id].load) {
+    if ((field === "done" || field === "loadFeel" && state.selectedDate >= "2026-11-18") && value && !day.exercises[id].load) {
       var exercise = planned.find(function (item) { return exerciseId(item.name) === id; });
       if (exercise && exercise.equipment && exercise.equipment.type === "dumbbell") day.exercises[id].load = recommendedLoad(exercise, id);
       if (exercise && exercise.equipment && exercise.equipment.type === "bodyweight") day.exercises[id].load = exercise.equipment.start;
@@ -2435,6 +2446,9 @@
     if (String(sets[index] ?? "") === String(value)) return;
     sets[index] = value;
     day.exercises[id].sets = sets;
+    if (date >= "2026-11-18" && number(value) > 0 && !day.exercises[id].load && exercise?.equipment?.type === "dumbbell") {
+      day.exercises[id].load = recommendedLoad(exercise, id, date);
+    }
     day.exercises[id].reps = sets.filter(function (item) { return item !== ""; }).join(", ");
     var requiredEntries = exercise && exercise.name === "Side Plank" ? 4 : prescribedSetCount(exercise || { prescription: "1 set" });
     var prescribedSetsComplete = sets.slice(0, requiredEntries).length === requiredEntries && sets.slice(0, requiredEntries).every(function (item) {
@@ -2444,7 +2458,7 @@
     if (prescribedSetsComplete && !day.exercises[id].done) {
       day.exercises[id].done = true;
       day.exercises[id].autoCompleted = true;
-      if (!day.exercises[id].load && exercise && exercise.equipment && exercise.equipment.type === "dumbbell") day.exercises[id].load = recommendedLoad(exercise, id);
+      if (!day.exercises[id].load && exercise && exercise.equipment && exercise.equipment.type === "dumbbell") day.exercises[id].load = recommendedLoad(exercise, id, date);
       if (!day.exercises[id].load && exercise && exercise.equipment && exercise.equipment.type === "bodyweight") day.exercises[id].load = exercise.equipment.start;
       completionChanged = true;
     } else if (!prescribedSetsComplete && day.exercises[id].done && day.exercises[id].autoCompleted) {
