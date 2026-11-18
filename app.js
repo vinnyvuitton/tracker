@@ -1110,9 +1110,10 @@
     return '<details class="form-guide"><summary>Show form guide</summary><p>' + esc(exercise.tip) + '</p><a href="' + url + '" target="_blank" rel="noopener noreferrer">Find a verified ACE demonstration ↗</a></details>';
   }
 
-  function renderExerciseCoaching(exercise, inPlan) {
+  function renderExerciseCoaching(exercise, inPlan, cardioScreen) {
     if (!exercise.coachingNote) return "";
-    return '<div class="exercise-coaching' + (inPlan ? ' in-plan' : '') + '"><strong>Coach note</strong><span>' + esc(exercise.coachingNote) + '</span></div>';
+    var note = cardioScreen ? exercise.coachingNote.replace(/ for this first test\b/i, "") : exercise.coachingNote;
+    return '<div class="exercise-coaching' + (inPlan ? ' in-plan' : '') + '"><strong>Coach note</strong><span>' + esc(note) + '</span></div>';
   }
 
   function render() {
@@ -1392,15 +1393,11 @@
         exercisePosition++;
         var id = exerciseId(exercise.name);
         var log = day.exercises[id] || {};
-        var firstLabel = plan.type === "Strength" ? "Load used" : plan.type === "Cardio" ? "Adjustments made" : "Setup used";
-        var secondLabel = plan.type === "Strength" ? "Reps completed" : plan.type === "Cardio" ? "Minutes completed" : "Notes";
-        var firstPlaceholder = plan.type === "Strength" ? "Choose below" : plan.type === "Cardio" ? (plan.outdoorTrial ? "Example: 4 jogs, effort 3/10" : "Example: incline 5 felt right") : "Optional";
-        var secondPlaceholder = plan.type === "Strength" ? "Example: 12, 12, 11" : plan.type === "Cardio" ? (plan.outdoorTrial ? "Trail minutes, e.g. 20" : String(cardioDuration(plan))) : "Optional";
         var strength = plan.type === "Strength";
         var name = esc(exercise.displayName || exercise.name);
         var doneCheckbox = '<input type="checkbox" data-exercise-done="' + id + '"' +
           (log.done ? " checked" : "") + ' aria-label="Complete ' + name + '">';
-        var logHtml = renderExerciseLog(plan, exercise, id, log, firstLabel, secondLabel, firstPlaceholder, secondPlaceholder);
+        var logHtml = renderExerciseLog(plan, exercise, id, log);
         if (strength) {
           var open = id === openId, progress = strengthSetProgress(exercise, log);
           html += '<div class="exercise strength-exercise" data-strength-exercise="' + id + '"' +
@@ -1524,11 +1521,12 @@
       '</div>' + renderStrengthMore(exercise, entries, reason, setup);
   }
 
-  function renderExerciseLog(plan, exercise, id, log, firstLabel, secondLabel, firstPlaceholder, secondPlaceholder) {
+  function renderExerciseLog(plan, exercise, id, log) {
     if (plan.type === "Strength") return renderStrengthLog(plan, exercise, id, log);
-    var history = renderExerciseHistory(plan, exercise, id) + renderExerciseCoaching(exercise);
-    if (plan.type === "Recovery") return history + '<div class="exercise-log">' + (log.load ? '<p class="previous-load">Earlier entry: ' + esc(log.load) + '</p>' : '') + '<label class="field">' + (exercise.name === "Easy Walk" ? "Walk notes (optional)" : "Notes (optional)") + '<input data-exercise-reps="' + id + '" value="' + esc(log.reps || "") + '" placeholder="Optional"></label></div>';
-    return history + '<div class="exercise-log"><label class="field">' + firstLabel + '<input data-exercise-load="' + id + '" value="' + esc(log.load || "") + '" placeholder="' + firstPlaceholder + '"></label><label class="field">' + secondLabel + '<input data-exercise-reps="' + id + '" inputmode="numeric" value="' + esc(log.reps || "") + '" placeholder="' + secondPlaceholder + '"></label></div>';
+    var coaching = renderExerciseCoaching(exercise, false, plan.type === "Cardio");
+    if (plan.type === "Recovery") return renderExerciseHistory(plan, exercise, id) + coaching + '<div class="exercise-log">' + (log.load ? '<p class="previous-load">Earlier entry: ' + esc(log.load) + '</p>' : '') + '<label class="field">' + (exercise.name === "Easy Walk" ? "Walk notes (optional)" : "Notes (optional)") + '<input data-exercise-reps="' + id + '" value="' + esc(log.reps || "") + '" placeholder="Optional"></label></div>';
+    var placeholder = plan.outdoorTrial ? "Example: 4 jogs, effort 3/10" : "Example: incline 5 felt right";
+    return coaching + '<div class="exercise-log"><label class="field">Adjustments made<input data-exercise-load="' + id + '" value="' + esc(log.load || "") + '" placeholder="' + placeholder + '"></label></div>';
   }
 
   function renderExerciseHistory(plan, exercise, id) {
@@ -1548,7 +1546,10 @@
     } else if (plan.type === "Strength" && (log.reps || log.sets)) {
       var values = Array.isArray(log.sets) ? log.sets : String(log.reps).split(/[,/]+/);
       parts.push(values.map(function (value) { return String(value == null ? "" : value).trim() || "—"; }).join(" / ") + (/sec|second/i.test(exercise.prescription) ? " sec" : " reps"));
-    } else if (log.reps) parts.push(String(log.reps) + (plan.type === "Cardio" ? " min" : ""));
+    } else if (log.reps) {
+      if (plan.type === "Cardio" && !parts.length) return "";
+      parts.push(String(log.reps) + (plan.type === "Cardio" ? " min" : ""));
+    }
     if (!parts.length) parts.push(log.done ? "Completed · amounts not recorded" : "Amounts not recorded");
     return '<div class="exercise-history"><strong>' + (lastWeek ? 'Last week' : 'No entry last week · Last recorded') + ' · ' + esc(formatDate(previous.iso, { month: "short", day: "numeric" })) + '</strong><span>' + esc(parts.join(" · ")) + '</span></div>';
   }
@@ -1647,15 +1648,23 @@
       }
       return html + '</div>' + renderCardioWarnings(result) + '<p class="notice">Use your own timer outdoors and follow the times above. Choose a route you can shorten and turn back when needed.</p><div class="treadmill-result"><strong>Route result</strong><div class="treadmill-fields"><label>Recorded total, min<input data-cardio-result="durationMinutes" type="number" min="0.1" step="0.1" value="' + esc(result.durationMinutes == null ? "" : result.durationMinutes) + '"></label><label>Distance, mi<input data-cardio-result="distanceMiles" type="number" min="0" step="0.01" value="' + esc(result.distanceMiles == null ? "" : result.distanceMiles) + '"></label></div><small>Record elapsed time, including walk intervals and pauses. Keep travel to the route separate.</small></div>';
     }
-    html += '</div><div class="cardio-controls"><button class="primary" id="start-cardio" ' + (active ? "disabled" : "") + '>' + (active ? "Session alerts active" : complete ? "Start another " + duration + "-minute session" : "Start " + duration + "-minute session") + '</button>';
-    if (active) html += '<button class="secondary" id="cancel-cardio">Cancel alerts</button>';
-    html += '</div><p class="notification-status">' + (complete ? "Timer complete · " + number(day.cardio.durationMinutes || duration) + " planned minutes. Recorded total is shown separately." : state.notificationEnabled ? "You can switch to YouTube—push alerts will tell you every incline and speed change." : "Enable notifications first so alerts can reach you while YouTube is open.") + '</p>';
+    html += '</div>';
+    if (!complete) {
+      html += '<div class="cardio-controls"><button class="primary" id="start-cardio" ' + (active ? "disabled" : "") + '>' + (active ? "Session alerts active" : "Start " + duration + "-minute session") + '</button>';
+      if (active) html += '<button class="secondary" id="cancel-cardio">Cancel alerts</button>';
+      html += '</div>';
+    }
+    html += '<p class="notification-status">' + (complete ? "Timer complete · " + number(day.cardio.durationMinutes || duration) + " planned minutes. Recorded total is shown separately." : state.notificationEnabled ? "You can switch to YouTube—push alerts will tell you every incline and speed change." : "Enable notifications first so alerts can reach you while YouTube is open.") + '</p>';
     if (state.cardioCountdown && state.cardioCountdown.date === state.selectedDate) html += renderCardioCountdown();
-    html += renderTreadmillResult(day);
+    html += renderTreadmillResult(day, plan);
     return html;
   }
 
-  function renderTreadmillResult(day) {
+  function recordedMinutesInput(value) {
+    return '<label>Recorded total, min<input data-cardio-result="durationMinutes" type="number" min="0.1" step="0.1" value="' + esc(value ?? "") + '"></label>';
+  }
+
+  function renderTreadmillResult(day, plan) {
     var treadmillRef = day.photos && day.photos.treadmill;
     var html = '';
     html += '<div class="treadmill-result"><strong>Workout result</strong>';
@@ -1664,15 +1673,41 @@
     if (day.cardio && day.cardio.result) {
       var result = day.cardio.result;
       html += renderCardioWarnings(result);
-      html += '<div class="treadmill-fields"><label>Recorded total, min<input data-cardio-result="durationMinutes" type="number" min="0.1" step="0.1" value="' + esc(result.durationMinutes == null ? "" : result.durationMinutes) + '"></label><label>Distance, mi<input data-cardio-result="distanceMiles" type="number" step="0.01" value="' + esc(result.distanceMiles == null ? "" : result.distanceMiles) + '"></label><label>Screen calories<input data-cardio-result="calories" type="number" step="1" value="' + esc(result.calories == null ? "" : result.calories) + '"></label><label>Avg speed<input data-cardio-result="averageSpeedMph" type="number" step="0.1" value="' + esc(result.averageSpeedMph == null ? "" : result.averageSpeedMph) + '"></label><label>Incline shown<input data-cardio-result="incline" type="number" min="0" max="15" step="0.1" value="' + esc(result.incline == null ? "" : result.incline) + '"></label></div><small>Review and correct any saved reading.</small>';
-    } else html += '<small>Saved privately with this workout. A clear screen photo can propose reviewable results.</small>';
+      html += '<div class="treadmill-fields">' + recordedMinutesInput(result.durationMinutes) + '<label>Distance, mi<input data-cardio-result="distanceMiles" type="number" step="0.01" value="' + esc(result.distanceMiles == null ? "" : result.distanceMiles) + '"></label><label>Screen calories<input data-cardio-result="calories" type="number" step="1" value="' + esc(result.calories == null ? "" : result.calories) + '"></label><label>Avg speed<input data-cardio-result="averageSpeedMph" type="number" step="0.1" value="' + esc(result.averageSpeedMph == null ? "" : result.averageSpeedMph) + '"></label><label>Incline shown<input data-cardio-result="incline" type="number" min="0" max="15" step="0.1" value="' + esc(result.incline == null ? "" : result.incline) + '"></label></div><small>Review and correct any saved reading.</small>';
+    } else {
+      if (plan) {
+        var legacyMinutes = exercisesForPlan(plan).map(function (exercise) {
+          return Domain.numeric(day.exercises[exerciseId(exercise.name)]?.reps);
+        }).find(function (minutes) { return minutes > 0; });
+        html += '<div class="treadmill-fields">' + recordedMinutesInput(legacyMinutes) + '</div>';
+      }
+      html += '<small>Saved privately with this workout. A clear screen photo can propose reviewable results.</small>';
+    }
     html += '</div>';
     return html;
   }
 
+  function unreadableElapsedWarning(warning) {
+    return warning === "Elapsed time could not be read. Leave it blank until confirmed.";
+  }
+
+  function hasStaleElapsedWarning(result) {
+    return Domain.numeric(result?.durationMinutes) > 0 &&
+      Array.isArray(result.validationWarnings) && result.validationWarnings.some(unreadableElapsedWarning);
+  }
+
+  function clearStaleElapsedWarning(result) {
+    if (!hasStaleElapsedWarning(result)) return;
+    result.validationWarnings = result.validationWarnings.filter(function (warning) { return !unreadableElapsedWarning(warning); });
+  }
+
   function renderCardioWarnings(result) {
     var warnings = Domain.cardioIssues(result);
-    return warnings.length ? '<div class="notice" role="status">' + warnings.map(esc).join("<br>") + '</div>' : "";
+    var confirmed = Domain.numeric(result?.durationMinutes) > 0;
+    return warnings.length ? '<div class="notice" data-cardio-warnings role="status"' +
+      (confirmed && warnings.every(unreadableElapsedWarning) ? ' hidden' : '') + '>' + warnings.map(function (warning) {
+        return '<div' + (unreadableElapsedWarning(warning) ? ' data-unreadable-elapsed' + (confirmed ? ' hidden' : '') : '') + '>' + esc(warning) + '</div>';
+      }).join("") + '</div>' : "";
   }
 
   function cardioSettingLabel(segment, outdoors) {
@@ -2611,6 +2646,13 @@
       queueSave(true);
     });
     document.querySelectorAll("[data-cardio-result]").forEach(function (input) {
+      if (input.dataset.cardioResult === "durationMinutes") input.addEventListener("input", function () {
+        var warnings = document.querySelector("#workout-area [data-cardio-warnings]");
+        var unreadable = warnings?.querySelector("[data-unreadable-elapsed]");
+        if (!unreadable) return;
+        unreadable.hidden = Domain.numeric(input.value) > 0;
+        warnings.hidden = !warnings.querySelector(":scope > :not([hidden])");
+      });
       input.addEventListener("change", function () {
         var field = input.dataset.cardioResult, value = optionalNumber(input.value);
         var error = field === "incline" && !Domain.inclineValid(input.value) ? "Incline must be 0 to 15."
@@ -2620,6 +2662,12 @@
         var day = getDay(state.selectedDate);
         day.cardio.result = day.cardio.result || {};
         day.cardio.result[field] = value;
+        if (field === "durationMinutes" && hasStaleElapsedWarning(day.cardio.result)) {
+          clearStaleElapsedWarning(day.cardio.result);
+          var warnings = document.querySelector("#workout-area [data-cardio-warnings]");
+          warnings?.querySelector("[data-unreadable-elapsed]")?.remove();
+          if (warnings && !warnings.children.length) warnings.hidden = true;
+        }
         day.cardio.resultLocation = planForDate(state.selectedDate).outdoorTrial ? "outdoors" : "treadmill";
         queueSave(false);
       });
@@ -3695,6 +3743,12 @@
   }
 
   function queueSave(redraw) {
+    var day = state.data.days[state.selectedDate];
+    if (hasStaleElapsedWarning(day?.cardio?.result)) {
+      var cachedDay;
+      try { cachedDay = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null")?.days?.[state.selectedDate]; } catch (_) {}
+      if (JSON.stringify(day) !== JSON.stringify(cachedDay)) clearStaleElapsedWarning(day.cardio.result);
+    }
     entryTimingTracker.stamp(state.data);
     state.sync = "Saving";
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.data));
