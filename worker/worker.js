@@ -214,6 +214,11 @@ async function saveData(request, env, cors) {
   }
 
   for (const [date, day] of Object.entries(body.payload.days || {})) {
+    const bodyFat = day?.weeklyWeighIn?.bodyFatPercent;
+    const previousBodyFat = current?.payload?.days?.[date]?.weeklyWeighIn?.bodyFatPercent;
+    if (bodyFat != null && bodyFat !== previousBodyFat && Domain.bodyFatEstimate(bodyFat) == null) {
+      return json({ error: "Enter a body fat percentage from 3 to 60, with up to one decimal place.", date }, 400, cors);
+    }
     var incline = day?.cardio?.result?.incline;
     var previous = current?.payload?.days?.[date]?.cardio?.result?.incline;
     if (!Domain.inclineValid(incline) && incline !== previous) return json({ error: "Incline must be 0 to 15.", date }, 400, cors);
@@ -407,7 +412,7 @@ async function analyzeTreadmill(request, env, cors) {
     const parsed = typeof output === "object" ? output : JSON.parse(String(output || "").replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, ""));
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Invalid treadmill result");
     const normalized = Domain.normalizeCardioOcr(parsed);
-    if (!["durationMinutes", "distanceMiles", "calories", "averageSpeedMph", "incline"].some(key => normalized[key] != null)) throw new Error("No readable treadmill values");
+    if (!normalized.validationWarnings.length && !["durationMinutes", "distanceMiles", "calories", "averageSpeedMph", "incline"].some(key => normalized[key] != null)) throw new Error("No readable treadmill values");
     return json(normalized, 200, cors);
   } catch (_) { return json({ error: "Treadmill results could not be read" }, 502, cors); }
 }

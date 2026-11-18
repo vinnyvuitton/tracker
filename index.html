@@ -9,10 +9,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Workout 2.0">
   <title>Workout 2.0</title>
-  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=2.16.24">
-  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png?v=2.16.24">
-  <link rel="manifest" href="manifest.webmanifest?v=2.16.24">
-  <link rel="stylesheet" href="styles.css?v=2.16.24">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=2.16.25">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png?v=2.16.25">
+  <link rel="manifest" href="manifest.webmanifest?v=2.16.25">
+  <link rel="stylesheet" href="styles.css?v=2.16.25">
 </head>
 <body>
   <div id="app" aria-live="polite"></div>
@@ -55,6 +55,40 @@
         <button type="button" class="secondary" id="photo-cancel">Cancel</button>
         <button type="submit" id="photo-submit">Save photo</button>
       </div>
+    </form>
+  </dialog>
+
+  <dialog id="treadmill-review" aria-labelledby="treadmill-review-title">
+    <form method="dialog" id="treadmill-review-form">
+      <h2 id="treadmill-review-title">Review treadmill results</h2>
+      <p>Check the readings against your photo. Leave unknown values blank.</p>
+      <details><summary>View photo</summary><img id="treadmill-review-photo" alt="Selected treadmill screen" style="max-width:100%;max-height:240px;object-fit:contain"></details>
+      <ul id="treadmill-review-warnings" role="status"></ul>
+      <div class="grid two">
+        <label class="field">Elapsed minutes<input name="durationMinutes" type="number" min="0.001" step="any"></label>
+        <label class="field">Distance, mi<input name="distanceMiles" type="number" min="0" step="any"></label>
+        <label class="field">Screen calories<input name="calories" type="number" min="0" step="any"></label>
+        <label class="field">Average speed, mph<input name="averageSpeedMph" type="number" min="0" step="any"></label>
+        <label class="field">Incline<input name="incline" type="number" min="0" max="15" step="any"></label>
+      </div>
+      <div class="row wrap"><button type="button" class="secondary" data-close-cardio-dialog="treadmill-review">Cancel</button><button type="submit">Confirm</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="outdoor-cardio" aria-labelledby="outdoor-cardio-title">
+    <form method="dialog" id="outdoor-cardio-form">
+      <h2 id="outdoor-cardio-title">Log outdoor cardio</h2>
+      <div class="grid two">
+        <label class="field">Activity<select name="activity"><option value="walk">Walk</option><option value="run">Run</option></select></label>
+        <label class="field">Date<input name="date" type="date" required></label>
+        <label class="field">Time (Chicago)<input name="time" type="time" required></label>
+        <label class="field">Distance, mi<input name="distanceMiles" type="number" min="0.001" step="any" required></label>
+        <label class="field">Elapsed minutes<input name="durationMinutes" type="number" min="0.001" step="any" required></label>
+      </div>
+      <p id="outdoor-cardio-pace" class="notification-status" aria-live="polite"></p>
+      <label class="field">Notes (optional)<textarea name="notes" maxlength="500"></textarea></label>
+      <p id="outdoor-cardio-error" class="error" role="alert"></p>
+      <div class="row wrap"><button type="button" class="secondary" data-close-cardio-dialog="outdoor-cardio">Cancel</button><button type="submit">Save</button></div>
     </form>
   </dialog>
 
@@ -159,9 +193,9 @@
     </form>
   </dialog>
 
-  <script src="workout-domain.js?v=2.16.24"></script>
-  <script src="migration.js?v=2.16.24"></script>
-  <script src="entry-timing.js?v=2.16.24"></script>
-  <script src="app.js?v=2.16.24"></script>
+  <script src="workout-domain.js?v=2.16.25"></script>
+  <script src="migration.js?v=2.16.25"></script>
+  <script src="entry-timing.js?v=2.16.25"></script>
+  <script src="app.js?v=2.16.25"></script>
 </body>
 </html>

@@ -625,7 +625,8 @@
   function weeklyWeighIn(iso) {
     var entry = state.data.days[iso]?.weeklyWeighIn;
     var weight = optionalNumber(entry?.weight), visceralFat = optionalNumber(entry?.visceralFat);
-    return weight == null && visceralFat == null ? null : { weight: weight, visceralFat: visceralFat };
+    var bodyFatPercent = Domain.bodyFatEstimate(entry?.bodyFatPercent);
+    return weight == null && visceralFat == null && bodyFatPercent == null ? null : { weight: weight, visceralFat: visceralFat, bodyFatPercent: bodyFatPercent };
   }
 
   function renderWeeklyWeighIn(iso) {
@@ -637,7 +638,8 @@
     var disabled = upcoming ? ' disabled' : '';
     return '<div><h3>Wednesday morning weigh-in</h3><p>' + esc(description) + '</p><div class="grid two">' +
       '<label class="field">Weight, lb<input data-weekly-weigh-in="weight" type="number" inputmode="decimal" min="0.1" step="0.1" value="' + esc(entry.weight ?? "") + '"' + disabled + '></label>' +
-      '<label class="field">Visceral fat rating<input data-weekly-weigh-in="visceralFat" type="number" inputmode="decimal" min="0" step="any" value="' + esc(entry.visceralFat ?? "") + '"' + disabled + '></label></div></div>';
+      '<label class="field">Visceral fat rating<input data-weekly-weigh-in="visceralFat" type="number" inputmode="decimal" min="0" step="any" value="' + esc(entry.visceralFat ?? "") + '"' + disabled + '></label>' +
+      '<label class="field">Body fat % (optional)<input data-weekly-weigh-in="bodyFatPercent" type="number" inputmode="decimal" min="3" max="60" step="0.1" value="' + esc(entry.bodyFatPercent ?? "") + '"' + disabled + '><small>Scale estimate</small></label></div></div>';
   }
 
   function openDashboardDialog(dialog) {
@@ -1160,6 +1162,10 @@
     html += renderTodayTotals(day, t);
 
     html += renderMeals(day, t) + renderPendingMeals(iso);
+    if (iso <= TODAY) {
+      html += '<section class="card"><button type="button" id="log-outdoor-cardio" data-log-outdoor-cardio class="secondary">Log cardio</button>' +
+        Domain.outdoorActivities(day.cardio).map(function (entry) { return '<p>' + esc(outdoorLabel(entry)) + '</p>'; }).join("") + '</section>';
+    }
     html += renderDailyWeight(day, iso);
     html += renderPhotos(day, iso) + '</div>';
     html += '<dialog id="workout-area" aria-labelledby="workout-dialog-title"><div class="focused-workout-nav"><div><h2 id="workout-dialog-title">' + esc(plan.title) + '</h2><span id="focused-workout-count"></span><span id="workout-sync" role="status">' + esc(state.sync) + '</span></div><button type="button" class="secondary" id="back-to-daily" autofocus>Close</button></div><p id="next-workout-set" class="notification-status"></p>';
@@ -1423,6 +1429,14 @@
     });
     if (plan.outdoorTrial) {
       var result = day.cardio && day.cardio.result || {};
+      var savedRoute = day.cardio?.priorOutdoorRoute;
+      if (state.selectedDate >= FIRST_WEEKLY_WEIGH_IN) {
+        if (Domain.cardioResultLocation(day.cardio) === "outdoors") savedRoute = day.cardio.result;
+        var route = savedRoute ? '<p>Previously recorded route · ' + esc(savedRoute.durationMinutes ?? "Unknown") +
+          ' min · ' + esc(savedRoute.distanceMiles ?? "Unknown") + ' mi</p>' : '';
+        var logButton = state.selectedDate <= TODAY ? '<button type="button" class="secondary" data-log-outdoor-cardio>Log cardio</button>' : '';
+        return html + '</div><p class="notice">Use your own timer outdoors and follow the times above.</p>' + route + logButton;
+      }
       return html + '</div>' + renderCardioWarnings(result) + '<p class="notice">Use your own timer outdoors and follow the times above. Choose a route you can shorten and turn back when needed.</p><div class="treadmill-result"><strong>Route result</strong><div class="treadmill-fields"><label>Recorded total, min<input data-cardio-result="durationMinutes" type="number" min="0.1" step="0.1" value="' + esc(result.durationMinutes == null ? "" : result.durationMinutes) + '"></label><label>Distance, mi<input data-cardio-result="distanceMiles" type="number" min="0" step="0.01" value="' + esc(result.distanceMiles == null ? "" : result.distanceMiles) + '"></label></div><small>Record elapsed time, including walk intervals and pauses. Keep travel to the route separate.</small></div>';
     }
     html += '</div><div class="cardio-controls"><button class="primary" id="start-cardio" ' + (active ? "disabled" : "") + '>' + (active ? "Session alerts active" : complete ? "Start another " + duration + "-minute session" : "Start " + duration + "-minute session") + '</button>';
@@ -1438,11 +1452,11 @@
     var html = '';
     html += '<div class="treadmill-result"><strong>Workout result</strong>';
     if (treadmillRef) html += '<div class="treadmill-photo ' + (state.revealedPhoto === state.selectedDate + ":treadmill" ? "revealed" : "") + '" data-photo-container="treadmill"><img alt="Treadmill results" data-photo-ref="' + esc(photoRefValue(treadmillRef)) + '"><span class="photo-load-status" data-photo-status>Loading photo…</span><button type="button" class="treadmill-reveal" data-reveal-photo="treadmill">' + (state.revealedPhoto === state.selectedDate + ":treadmill" ? "Hide result" : "Reveal result") + '</button><button type="button" class="photo-retry" data-retry-photo="treadmill" hidden>Retry photo</button><button type="button" class="treadmill-remove" data-remove-photo="treadmill" aria-label="Remove treadmill result">×</button></div>';
-    else html += '<button type="button" class="secondary" data-add-photo="treadmill">Upload treadmill results photo</button>';
+    html += '<button type="button" class="secondary" data-add-photo="treadmill">' + (treadmillRef ? 'Replace treadmill photo' : 'Upload treadmill results photo') + '</button>';
     if (day.cardio && day.cardio.result) {
       var result = day.cardio.result;
       html += renderCardioWarnings(result);
-      html += '<div class="treadmill-fields"><label>Recorded total, min<input data-cardio-result="durationMinutes" type="number" min="0.1" step="0.1" value="' + esc(result.durationMinutes == null ? "" : result.durationMinutes) + '"></label><label>Distance, mi<input data-cardio-result="distanceMiles" type="number" step="0.01" value="' + esc(result.distanceMiles == null ? "" : result.distanceMiles) + '"></label><label>Screen calories<input data-cardio-result="calories" type="number" step="1" value="' + esc(result.calories == null ? "" : result.calories) + '"></label><label>Avg speed<input data-cardio-result="averageSpeedMph" type="number" step="0.1" value="' + esc(result.averageSpeedMph == null ? "" : result.averageSpeedMph) + '"></label><label>Incline shown<input data-cardio-result="incline" type="number" min="0" max="15" step="0.1" value="' + esc(result.incline == null ? "" : result.incline) + '"></label></div><small>Proposed from the photo—review and correct every value.</small>';
+      html += '<div class="treadmill-fields"><label>Recorded total, min<input data-cardio-result="durationMinutes" type="number" min="0.1" step="0.1" value="' + esc(result.durationMinutes == null ? "" : result.durationMinutes) + '"></label><label>Distance, mi<input data-cardio-result="distanceMiles" type="number" step="0.01" value="' + esc(result.distanceMiles == null ? "" : result.distanceMiles) + '"></label><label>Screen calories<input data-cardio-result="calories" type="number" step="1" value="' + esc(result.calories == null ? "" : result.calories) + '"></label><label>Avg speed<input data-cardio-result="averageSpeedMph" type="number" step="0.1" value="' + esc(result.averageSpeedMph == null ? "" : result.averageSpeedMph) + '"></label><label>Incline shown<input data-cardio-result="incline" type="number" min="0" max="15" step="0.1" value="' + esc(result.incline == null ? "" : result.incline) + '"></label></div><small>Review and correct any saved reading.</small>';
     } else html += '<small>Saved privately with this workout. A clear screen photo can propose reviewable results.</small>';
     html += '</div>';
     return html;
@@ -1598,7 +1612,7 @@
   function weeklyProgressWeight(wednesday, through) {
     if (wednesday >= FIRST_WEEKLY_WEIGH_IN) {
       var weighIn = wednesday <= through ? weeklyWeighIn(wednesday) : null;
-      return { iso: wednesday, value: weighIn?.weight ?? null, source: "Wednesday weigh-in", visceralFat: weighIn?.visceralFat ?? null };
+      return { iso: wednesday, value: weighIn?.weight ?? null, source: "Wednesday weigh-in", visceralFat: weighIn?.visceralFat ?? null, bodyFatPercent: weighIn?.bodyFatPercent ?? null };
     }
     var values = [];
     var saturday = addDays(wednesday, 3);
@@ -1619,16 +1633,28 @@
     var html = header("Progress", "Trend over noise");
     html += '<section class="card"><div class="grid two"><div><p class="eyebrow">Last full week · ' + latest.source + '</p><div class="stat">' + latestWeight + '</div></div>' +
       '<div><p class="eyebrow">Week-over-week</p><div class="stat">' + (change == null ? "No trend" : (change > 0 ? "+" : "") + change.toFixed(1) + ' <small>lb</small>') + '</div></div></div><p class="notification-status">' +
-      esc(formatDate(addDays(latest.iso, -3), { month: "short", day: "numeric" })) + '–' + esc(formatDate(addDays(latest.iso, 3), { month: "short", day: "numeric" })) + '</p></section>';
+      esc(formatDate(addDays(latest.iso, -3), { month: "short", day: "numeric" })) + '–' + esc(formatDate(addDays(latest.iso, 3), { month: "short", day: "numeric" })) + esc(bodyFatLabel(latest)) + '</p></section>';
     html += '<section class="card"><div class="card-head"><div><h2>Recent morning weights</h2></div></div><ul class="waist-history">';
     var firstWeek = startOfWeek(state.data.profile.startDate || TODAY);
     for (var iso = currentWednesday; iso >= firstWeek && iso >= addDays(currentWednesday, -49); iso = addDays(iso, -7)) {
       var entry = weeklyProgressWeight(iso, TODAY);
       var reading = entry.value == null ? (entry.count === 1 ? "Limited data" : "Missing") : entry.value.toFixed(1) + " lb";
       var rating = entry.visceralFat == null ? "" : " · Visceral fat rating " + entry.visceralFat;
-      html += '<li><strong>' + esc(formatDate(iso, { month: "short", day: "numeric", year: "numeric" })) + '</strong><span>' + entry.source + ' · ' + reading + rating + '</span></li>';
+      html += '<li><strong>' + esc(formatDate(iso, { month: "short", day: "numeric", year: "numeric" })) + '</strong><span>' + entry.source + ' · ' + reading + rating + bodyFatLabel(entry) + '</span></li>';
     }
     html += '</ul></section>';
+    var week = periodStats(startOfWeek(TODAY), TODAY);
+    html += '<section class="card"><h2>Cardio this week</h2><p>' + week.cardioDone + (week.cardioDone === 1 ? ' completed cardio day' : ' completed cardio days') + '</p><p>' +
+      esc(cardioTotalsLabel(week.cardioMinutes)) + '</p></section>';
+    var outdoorDates = Object.keys(state.data.days).filter(function (date) {
+      return date <= TODAY && Domain.outdoorActivities(state.data.days[date].cardio).length;
+    }).sort().reverse();
+    if (outdoorDates.length) html += '<section class="card"><h2>Outdoor cardio history</h2><ul class="waist-history">' +
+      outdoorDates.map(function (date) {
+        return Domain.outdoorActivities(state.data.days[date].cardio).map(function (entry) {
+          return '<li><strong>' + esc(formatDate(date, {month: "short", day: "numeric", year: "numeric"})) + '</strong><span>' + esc(outdoorLabel(entry)) + '</span></li>';
+        }).join("");
+      }).join("") + '</ul></section>';
     html += renderProgressChart();
     html += renderWaistHistory();
     html += renderReviewCheckpoints();
@@ -1740,7 +1766,7 @@
     var targetLine = target ? '<line class="chart-target" x1="' + padLeft + '" x2="' + (width - padRight) + '" y1="' + y(target).toFixed(1) + '" y2="' + y(target).toFixed(1) + '"></line><text class="chart-label" x="' + (width - padRight) + '" y="' + (y(target) - 7).toFixed(1) + '" text-anchor="end">target ' + esc(target) + '</text>' : '';
     var dots = points.map(function (point, index) {
       if (point.value == null) return '<text class="chart-label" x="' + x(index).toFixed(1) + '" y="' + (height - 22) + '" text-anchor="middle"><title>' + esc(formatDate(point.iso, { month: "short", day: "numeric" })) + '</title>Missing</text>';
-      return '<circle cx="' + x(index).toFixed(1) + '" cy="' + y(point.value).toFixed(1) + '" r="5" tabindex="0"><title>' + esc(formatDate(point.iso, { month: "short", day: "numeric" })) + ': ' + esc(formatMetricValue(metric, point.value)) + (point.source ? ' · ' + point.source : '') + '</title></circle>'; }).join("");
+      return '<circle cx="' + x(index).toFixed(1) + '" cy="' + y(point.value).toFixed(1) + '" r="5" tabindex="0"><title>' + esc(formatDate(point.iso, { month: "short", day: "numeric" })) + ': ' + esc(formatMetricValue(metric, point.value)) + (point.source ? ' · ' + point.source : '') + esc(bodyFatLabel(point)) + '</title></circle>'; }).join("");
     return '<div class="chart-wrap"><svg class="progress-chart" viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="Progress chart with numeric scale in ' + esc(metricUnit(metric)) + '">' + grid + targetLine + '<path d="' + path + '"></path>' + dots + '<text class="chart-label" x="' + padLeft + '" y="' + (height - 3) + '">' + esc(formatDate(points[0].iso, { month: "short", day: "numeric" })) + '</text><text class="chart-label" x="' + (width - padRight) + '" y="' + (height - 3) + '" text-anchor="end">' + esc(formatDate(points[points.length - 1].iso, { month: "short", day: "numeric" })) + '</text></svg></div>';
   }
 
@@ -1769,7 +1795,7 @@
     return '<section class="card"><p class="eyebrow">Race goal</p><h2>' + esc(goal.name) + '</h2><p>' + esc(goal.dateLabel) + ' · ' + esc(goal.location) +
       '</p><p>Time limit ' + esc(goal.timeLimit) + ' · ' + esc(goal.paceLimit) + '</p><p>' + esc(goal.objective) + '</p><p>' + esc(goal.nextStep) + '</p>' +
       metric("Strength sessions through today", pct(stats.strengthDone, stats.strengthPlanned), stats.strengthDone + " of " + stats.strengthPlanned + " planned") +
-      metric("Cardio sessions through today", pct(stats.cardioDone, stats.cardioPlanned), stats.cardioDone + " of " + stats.cardioPlanned + " planned") + '</section>';
+      '<p>Completed cardio days through today: ' + stats.cardioDone + '</p>' + '</section>';
   }
 
   function metric(label, percentage, copy) {
@@ -1885,12 +1911,11 @@
   }
 
   function periodStats(startIso, endIso) {
-    var result = { loggedDays: 0, strengthDone: 0, strengthPlanned: 0, cardioDone: 0, cardioPlanned: 0, proteinDays: 0, calorieDays: 0, weights: [], latestWeight: 0 };
+    var result = { loggedDays: 0, strengthDone: 0, strengthPlanned: 0, cardioDone: 0, proteinDays: 0, calorieDays: 0, weights: [], latestWeight: 0, cardioMinutes: {treadmill: 0, outdoors: 0, unknown: 0} };
     for (var iso = startIso; iso <= endIso; iso = addDays(iso, 1)) {
       var day = state.data.days[iso];
       var plan = planForDate(iso);
       if (plan.type === "Strength") result.strengthPlanned++;
-      if (plan.type === "Cardio") result.cardioPlanned++;
       if (!day) continue;
       var t = totals(day);
       var hasLog = number(day.weight) || day.meals.length || Object.keys(day.exercises || {}).length || day.workout.notes || day.steps;
@@ -1898,17 +1923,18 @@
       if (t.protein >= state.data.targets.proteinMin) result.proteinDays++;
       if (t.calories >= state.data.targets.calorieMin && t.calories <= state.data.targets.calorieMax) result.calorieDays++;
       if (morningWeight(day)) { result.weights.push(morningWeight(day)); result.latestWeight = morningWeight(day); }
-      if (sessionComplete(day, plan)) {
-        if (plan.type === "Strength") result.strengthDone++;
-        if (plan.type === "Cardio") result.cardioDone++;
-      }
+      var minutes = Domain.recordedCardio(day.cardio);
+      Object.keys(minutes).forEach(function (location) { result.cardioMinutes[location] += minutes[location]; });
+      if (plan.type === "Strength" && sessionComplete(day, plan)) result.strengthDone++;
+      if (Domain.cardioComplete(day.cardio)) result.cardioDone++;
     }
     return result;
   }
 
   function sessionComplete(day, plan) {
     if (!day) return false;
-    if (day.workout && day.workout.completed) return true;
+    if (plan.type === "Cardio") return Domain.cardioComplete(day.cardio);
+    if (day.workout?.completed) return true;
     var planned = exercisesForPlan(plan);
     var completed = planned.filter(function (exercise) { return day.exercises && day.exercises[exerciseId(exercise.name)] && day.exercises[exerciseId(exercise.name)].done; }).length;
     return planned.length > 0 && completed / planned.length >= 0.5;
@@ -1935,16 +1961,19 @@
       nutrition.push(formatDate(iso, { weekday: "short", month: "short", day: "numeric" }) + ": " + (hasNutrition ? Math.round(t.calories) + " calories · " + proteinText : "No nutrition data logged") + " · weight " + (day && number(day.weight) ? number(day.weight).toFixed(1) + " lb" : "not logged") + " · water " + (day ? number(day.water) : 0) + " glasses");
       if (!day) continue;
       if (day.workout && day.workout.notes) notes.push(formatDate(iso, { weekday: "short" }) + ": " + day.workout.notes);
-      var exerciseLines = [];
+      var exerciseLines = Domain.outdoorActivities(day.cardio).map(function (entry) { return "  " + outdoorLabel(entry); });
+      var priorRoute = day.cardio?.priorOutdoorRoute;
+      if (priorRoute) exerciseLines.push("  Previously recorded route: " + (priorRoute.durationMinutes ?? "unknown") +
+        " min · " + (priorRoute.distanceMiles ?? "unknown") + " mi");
       var plan = planForDate(iso);
       exercisesForPlan(plan).forEach(function (exercise) {
         var log = day.exercises && day.exercises[exerciseId(exercise.name)];
         if (!log || (!log.done && !log.load && !log.reps)) return;
         exerciseLines.push("  " + (log.done ? "✓ " : "• ") + (exercise.displayName || exercise.name) + (log.load ? " | " + log.load : "") + (log.reps ? " | " + log.reps : ""));
       });
-      if (exerciseLines.length || (day.workout && day.workout.rating) || plan.type === "Cardio" && day.cardio && (day.cardio.mode || plan.outdoorTrial && day.cardio.result)) {
+      if (exerciseLines.length || (day.workout && day.workout.rating) || day.cardio?.result || plan.type === "Cardio" && day.cardio && (day.cardio.mode || plan.outdoorTrial && day.cardio.result)) {
         var cardioResult = day.cardio && day.cardio.result;
-        var resultLine = cardioResult ? (plan.outdoorTrial ? "\n  Route result: " : "\n  Treadmill result: ") + [cardioResult.durationMinutes != null ? cardioResult.durationMinutes + " min" : "", cardioResult.distanceMiles != null ? cardioResult.distanceMiles + " mi" : "", cardioResult.calories != null ? cardioResult.calories + " screen cal" : "", cardioResult.averageSpeedMph != null ? cardioResult.averageSpeedMph + " mph avg" : ""].filter(Boolean).join(" · ") : "";
+        var resultLine = cardioResult ? (Domain.cardioResultLocation(day.cardio) === "outdoors" || (Domain.cardioResultLocation(day.cardio) === "unknown" && plan.outdoorTrial) ? "\n  Route result: " : "\n  Treadmill result: ") + [cardioResult.durationMinutes != null ? cardioResult.durationMinutes + " min" : "", cardioResult.distanceMiles != null ? cardioResult.distanceMiles + " mi" : "", cardioResult.calories != null ? cardioResult.calories + " screen cal" : "", cardioResult.averageSpeedMph != null ? cardioResult.averageSpeedMph + " mph avg" : ""].filter(Boolean).join(" · ") : "";
         var durationInfo = Domain.cardioDurations(cardioSegmentsFor(plan), cardioResult);
         if (plan.type === "Cardio") resultLine += "\n  Planned work: " + (durationInfo.plannedWorkMinutes ?? "unknown") + " min · Cooldown: " + (durationInfo.plannedCooldownMinutes ?? "unknown") + " min · Recorded total: " + (durationInfo.recordedTotalMinutes ?? "unknown") + " min";
         if (cardioResult) resultLine += Domain.cardioIssues(cardioResult).map(function (warning) { return "\n  Check result: " + warning; }).join("");
@@ -1959,10 +1988,11 @@
       "",
       "Race goal: " + Domain.raceGoal().name + " · " + Domain.raceGoal().dateLabel + " · " + Domain.raceGoal().location + " · Time limit " + Domain.raceGoal().timeLimit + " (" + Domain.raceGoal().paceLimit + "). " + Domain.raceGoal().objective,
       "Morning weights: " + (stats.weights.length ? stats.weights.map(function (w) { return w.toFixed(1); }).join(", ") + " lb" : "none logged"),
-      "Weekly weigh-in: " + (weighIn ? weighInDate + " · " + (weighIn.weight == null ? "weight missing" : weighIn.weight.toFixed(1) + " lb") + " · visceral fat rating " + (weighIn.visceralFat ?? "missing") : "missing"),
+      "Weekly weigh-in: " + (weighIn ? weighInDate + " · " + (weighIn.weight == null ? "weight missing" : weighIn.weight.toFixed(1) + " lb") + " · visceral fat rating " + (weighIn.visceralFat ?? "missing") + bodyFatLabel(weighIn) : "missing"),
       "Week-over-week weigh-in change: " + (change == null ? "not available" : (change > 0 ? "+" : "") + change.toFixed(1) + " lb"),
       "Strength sessions: " + stats.strengthDone + " completed",
       "Cardio sessions: " + stats.cardioDone + " completed",
+      "Recorded cardio: " + cardioTotalsLabel(stats.cardioMinutes),
       "Protein target days (at least " + state.data.targets.proteinMin + " g): " + stats.proteinDays,
       "Calorie target days: " + stats.calorieDays,
       "",
@@ -2207,9 +2237,15 @@
     document.querySelectorAll("[data-weekly-weigh-in]").forEach(function (input) {
       var iso = state.selectedDate;
       input.addEventListener("change", function () {
-        if (iso < FIRST_WEEKLY_WEIGH_IN || dayKey(iso) !== "Wed" || iso > TODAY || input.validity?.valid === false) return;
+        if (iso < FIRST_WEEKLY_WEIGH_IN || dayKey(iso) !== "Wed" || iso > TODAY) return;
         var field = input.dataset.weeklyWeighIn;
         var value = optionalNumber(input.value);
+        if (field === "bodyFatPercent") {
+          value = Domain.bodyFatEstimate(input.value);
+          var invalid = input.validity?.badInput || (input.value !== "" && value == null);
+          input.setCustomValidity(invalid ? "Enter a body fat percentage from 3 to 60, with up to one decimal place." : "");
+          if (invalid) { input.reportValidity(); return; }
+        } else if (input.validity?.valid === false) return;
         if (value != null && value < (field === "weight" ? 0.1 : 0)) return;
         var day = getDay(iso);
         day.weeklyWeighIn = Object.assign({ weight: null, visceralFat: null }, day.weeklyWeighIn, { [field]: value });
@@ -2245,6 +2281,9 @@
     document.querySelectorAll("[data-timer-start]").forEach(function (button) { button.addEventListener("click", function () { toggleExerciseTimer(button.dataset.timerStart); }); });
     document.querySelectorAll("[data-timer-reset]").forEach(function (button) { button.addEventListener("click", function () { resetExerciseTimer(button.dataset.timerReset); }); });
     document.querySelectorAll("[data-timer-duration]").forEach(function (select) { select.addEventListener("change", function () { setExerciseTimerDuration(select.dataset.timerDuration, Number(select.value)); }); });
+    document.querySelectorAll("[data-log-outdoor-cardio]").forEach(function (button) {
+      button.addEventListener("click", openOutdoorCardio);
+    });
     document.querySelectorAll("[data-add-photo]").forEach(function (button) { button.addEventListener("click", function () { openPhotoDialog(button.dataset.addPhoto); }); });
     document.querySelectorAll("[data-reveal-photo]").forEach(function (button) { button.addEventListener("click", function () { togglePhotoReveal(button.dataset.revealPhoto); }); });
     document.querySelectorAll("[data-remove-photo]").forEach(function (button) { button.addEventListener("click", function () { removePhoto(button.dataset.removePhoto); }); });
@@ -2269,6 +2308,7 @@
         var locationChoice = button.dataset.cardioLocation;
         if (!["treadmill", "outdoors"].includes(locationChoice) || !planForDate(state.selectedDate).locationChoice || cardioLocationLocked(state.selectedDate)) return;
         var day = getDay(state.selectedDate);
+        if (day.cardio.result) day.cardio.resultLocation = Domain.cardioResultLocation(day.cardio);
         day.cardio.location = locationChoice;
         queueSave(true);
       });
@@ -2313,6 +2353,7 @@
         var day = getDay(state.selectedDate);
         day.cardio.result = day.cardio.result || {};
         day.cardio.result[field] = value;
+        day.cardio.resultLocation = planForDate(state.selectedDate).outdoorTrial ? "outdoors" : "treadmill";
         queueSave(false);
       });
     });
@@ -2993,6 +3034,8 @@
 
   function openPhotoDialog(side) {
     state.pendingPhotoSide = side;
+    state.photoRequest = {};
+    document.getElementById("photo-submit").textContent = side === "treadmill" ? "Analyze photo" : "Save photo";
     document.getElementById("photo-title").textContent = side === "treadmill" ? "Add treadmill results photo" : "Add " + side + " photo";
     document.getElementById("photo-help").textContent = side === "treadmill" ? "Photograph the full treadmill screen. Keep every extracted value reviewable before adding it to your notes." : "Use the same lighting, distance, posture, and clothing each time.";
     document.getElementById("photo-error").textContent = "";
@@ -3007,8 +3050,20 @@
     if (!file) { document.getElementById("photo-error").textContent = "Take a photo or choose one from your library."; return; }
     var button = document.getElementById("photo-submit");
     button.disabled = true;
-    button.textContent = "Saving...";
+    var side = state.pendingPhotoSide, date = state.selectedDate, request = state.photoRequest;
+    var picker = document.getElementById("photo-dialog");
+    button.textContent = side === "treadmill" ? "Reading photo..." : "Saving...";
     try {
+      if (side === "treadmill") {
+        var photo = await blobToDataUrl(await compressImage(file, 720, 960, 0.65));
+        if (photo.length > 350000) throw new Error("Choose a smaller treadmill photo.");
+        if (request !== state.photoRequest || !picker.open) return;
+        var response = await apiFetch("/treadmill/analyze", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({image: photo}) });
+        var result = await response.json();
+        if (request !== state.photoRequest || !picker.open) return;
+        openTreadmillReview(date, photo, result);
+        return;
+      }
       var blob = await compressImage(file);
       var ref;
       if (localMode) {
@@ -3019,20 +3074,99 @@
         ref = { id: id };
       }
       getDay(state.selectedDate).photos[state.pendingPhotoSide] = ref;
-      if (state.pendingPhotoSide === "treadmill" && !localMode) {
-        try {
-          var response = await apiFetch("/treadmill/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(typeof ref === "object" ? { photoId: ref.id } : { image: ref }) });
-          getDay(state.selectedDate).cardio.result = await response.json();
-        } catch (error) { showFeedback("Photo saved. Results could not be read; the previous result was kept.", "warning"); }
-      }
       document.getElementById("photo-dialog").close();
       queueSave(true);
     } catch (error) {
-      document.getElementById("photo-error").textContent = error.message || "Photo could not be saved.";
+      if (request === state.photoRequest && picker.open) document.getElementById("photo-error").textContent = error.message || "Photo could not be saved.";
     } finally {
       button.disabled = false;
-      button.textContent = "Save photo";
+      button.textContent = state.pendingPhotoSide === "treadmill" ? "Analyze photo" : "Save photo";
     }
+  }
+
+  function openTreadmillReview(date, photo, result) {
+    var form = document.getElementById("treadmill-review-form");
+    form.reset();
+    state.treadmillDraft = {date: date, photo: photo};
+    document.getElementById("treadmill-review-photo").src = photo;
+    var warnings = Domain.cardioIssues(result);
+    if (result.durationMinutes == null && !warnings.some(function (warning) { return /time/i.test(warning); })) {
+      warnings.push("Elapsed time could not be read.");
+    }
+    document.getElementById("treadmill-review-warnings").innerHTML = warnings.map(function (warning) { return "<li>" + esc(warning) + "</li>"; }).join("");
+    ["durationMinutes", "distanceMiles", "calories", "averageSpeedMph", "incline"].forEach(function (field) {
+      form.elements[field].value = result[field] ?? "";
+    });
+    document.getElementById("photo-dialog").close();
+    openDashboardDialog(document.getElementById("treadmill-review"));
+  }
+
+  function confirmTreadmillReview(form) {
+    var draft = state.treadmillDraft;
+    if (!draft || !form.reportValidity()) return;
+    var result = {};
+    ["durationMinutes", "distanceMiles", "calories", "averageSpeedMph", "incline"].forEach(function (field) {
+      result[field] = Domain.numeric(form.elements[field].value);
+    });
+    var day = getDay(draft.date);
+    // One private snapshot write commits the compressed image and result as a pair.
+    if (day.cardio.result && Domain.cardioResultLocation(day.cardio) === "outdoors") {
+      day.cardio.priorOutdoorRoute = day.cardio.result;
+    }
+    day.photos.treadmill = draft.photo;
+    day.cardio.result = result;
+    day.cardio.resultLocation = "treadmill";
+    state.treadmillDraft = null;
+    document.getElementById("treadmill-review").close();
+    queueSave(true);
+  }
+
+  function bodyFatLabel(entry) {
+    return entry.bodyFatPercent == null ? "" : " · Body fat " + entry.bodyFatPercent.toFixed(1) + "% (scale estimate)";
+  }
+
+  function outdoorPaceLabel(seconds) {
+    return Math.floor(seconds / 60) + ":" + String(seconds % 60).padStart(2, "0") + " / mi";
+  }
+
+  function outdoorLabel(entry) {
+    var activity = entry.activity === "run" ? "Outdoor run" : "Outdoor walk";
+    return activity + " · " + entry.time + " Chicago · " + entry.distanceMiles + " mi · " + entry.durationMinutes +
+      " min · " + outdoorPaceLabel(entry.paceSecondsPerMile) + (entry.notes ? " · " + entry.notes : "");
+  }
+
+  function cardioTotalsLabel(minutes) {
+    function format(value) { return Number(value.toFixed(2)) + " min"; }
+    return "Outdoors " + format(minutes.outdoors) + " · Treadmill " + format(minutes.treadmill) +
+      (minutes.unknown ? " · Location unknown " + format(minutes.unknown) : "") +
+      " · Total " + format(minutes.outdoors + minutes.treadmill + minutes.unknown);
+  }
+
+  function outdoorFormEntry(form) {
+    return Domain.outdoorActivity(Object.fromEntries(new FormData(form)));
+  }
+
+  function openOutdoorCardio() {
+    var form = document.getElementById("outdoor-cardio-form");
+    form.reset();
+    form.elements.date.value = state.selectedDate;
+    form.elements.date.max = TODAY;
+    document.getElementById("outdoor-cardio-pace").textContent = "";
+    document.getElementById("outdoor-cardio-error").textContent = "";
+    openDashboardDialog(document.getElementById("outdoor-cardio"));
+  }
+
+  function saveOutdoorCardio(form) {
+    var date = form.elements.date.value;
+    var entry = outdoorFormEntry(form);
+    if (!form.reportValidity() || !entry || !/^\d{4}-\d{2}-\d{2}$/.test(date) || date > TODAY) {
+      document.getElementById("outdoor-cardio-error").textContent = "Enter a past or current date, a time, and positive distance and duration.";
+      return;
+    }
+    var cardio = getDay(date).cardio;
+    cardio.outdoorEntries = (cardio.outdoorEntries || []).concat(entry);
+    document.getElementById("outdoor-cardio").close();
+    queueSave(true);
   }
 
   async function removePhoto(side) {
@@ -3184,7 +3318,7 @@
       var result = await response.json();
       var day = getDay(state.selectedDate);
       var previousCardio = day.cardio;
-      day.cardio = { sessionId: result.id, startedAt: result.startedAt, status: "active", durationMinutes: duration, completedAt: "", result: day.cardio && day.cardio.result || null, workSpeedTrial: Boolean(plan.speedTrialAvailable && day.cardio && day.cardio.workSpeedTrial), shortSpeedInclineTrial: Boolean(plan.shortTrialAvailable && plan.shortTrialEnabled && state.cardioMode !== "express"), mode: state.cardioMode, location: "treadmill", walkOnly: Boolean(plan.walkOnlyAvailable && plan.walkOnlyEnabled) };
+      day.cardio = { ...day.cardio, resultLocation: day.cardio.result ? Domain.cardioResultLocation(day.cardio) : undefined, sessionId: result.id, startedAt: result.startedAt, status: "active", durationMinutes: duration, completedAt: "", result: day.cardio && day.cardio.result || null, workSpeedTrial: Boolean(plan.speedTrialAvailable && day.cardio && day.cardio.workSpeedTrial), shortSpeedInclineTrial: Boolean(plan.shortTrialAvailable && plan.shortTrialEnabled && state.cardioMode !== "express"), mode: state.cardioMode, location: "treadmill", walkOnly: Boolean(plan.walkOnlyAvailable && plan.walkOnlyEnabled) };
       entryTimingTracker.inherit(previousCardio, day.cardio);
       state.cardioCountdown = { date: state.selectedDate, startedAt: result.startedAt, first: first, remaining: number(result.countdownSeconds) || 5, go: false };
       startCardioStatusPolling();
@@ -3241,7 +3375,7 @@
     try { if (day.cardio && day.cardio.sessionId) await apiFetch("/notifications/cardio/" + encodeURIComponent(day.cardio.sessionId), { method: "DELETE" }); } catch (ignore) {}
     clearCardioCountdown();
     var previousCardio = day.cardio;
-    day.cardio = { sessionId: "", startedAt: "", status: "cancelled", durationMinutes: 0, completedAt: "", result: day.cardio && day.cardio.result || null, workSpeedTrial: Boolean(day.cardio && day.cardio.workSpeedTrial), shortSpeedInclineTrial: Boolean(day.cardio && day.cardio.shortSpeedInclineTrial), mode: day.cardio && day.cardio.mode || state.cardioMode };
+    day.cardio = { ...day.cardio, sessionId: "", startedAt: "", status: "cancelled", durationMinutes: 0, completedAt: "", result: day.cardio && day.cardio.result || null, workSpeedTrial: Boolean(day.cardio && day.cardio.workSpeedTrial), shortSpeedInclineTrial: Boolean(day.cardio && day.cardio.shortSpeedInclineTrial), mode: day.cardio && day.cardio.mode || state.cardioMode };
     entryTimingTracker.inherit(previousCardio, day.cardio);
     queueSave(true);
   }
@@ -3646,6 +3780,24 @@
     document.body.scrollTop = 0;
   }); });
   document.getElementById("access-form").addEventListener("submit", submitAccess);
+  document.getElementById("photo-dialog").addEventListener("close", function () { state.photoRequest = null; });
+  document.getElementById("treadmill-review").addEventListener("close", function () {
+    state.treadmillDraft = null;
+    document.getElementById("treadmill-review-photo").removeAttribute("src");
+  });
+  document.querySelectorAll("[data-close-cardio-dialog]").forEach(function (button) {
+    button.addEventListener("click", function () { document.getElementById(button.dataset.closeCardioDialog).close(); });
+  });
+  document.getElementById("treadmill-review-form").addEventListener("submit", function (event) {
+    event.preventDefault(); confirmTreadmillReview(event.currentTarget);
+  });
+  document.getElementById("outdoor-cardio-form").addEventListener("submit", function (event) {
+    event.preventDefault(); saveOutdoorCardio(event.currentTarget);
+  });
+  document.getElementById("outdoor-cardio-form").addEventListener("input", function (event) {
+    var entry = outdoorFormEntry(event.currentTarget);
+    document.getElementById("outdoor-cardio-pace").textContent = entry ? "Pace " + outdoorPaceLabel(entry.paceSecondsPerMile) : "";
+  });
   document.getElementById("photo-form").addEventListener("submit", function (event) { event.preventDefault(); savePhoto(); });
   document.getElementById("photo-cancel").addEventListener("click", function () { document.getElementById("photo-dialog").close(); clearPhotoInputs("photo-input", "photo-camera-input"); document.getElementById("photo-error").textContent = ""; });
   document.getElementById("analyze-meal").addEventListener("click", analyzeMeal);

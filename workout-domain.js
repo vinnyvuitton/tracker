@@ -142,11 +142,54 @@
     return value.toISOString().slice(0, 10);
   }
 
+  function bodyFatEstimate(value) {
+    var amount = numeric(value);
+    return amount != null && amount >= 3 && amount <= 60 && Number.isInteger(amount * 10) ? amount : null;
+  }
+
+  function outdoorActivity(input) {
+    var distance = numeric(input?.distanceMiles), duration = numeric(input?.durationMinutes);
+    if (!["walk", "run"].includes(input?.activity) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(input.time || "") ||
+        !(distance > 0) || !(duration > 0) || !Number.isSafeInteger(Math.round(duration / distance * 60))) return null;
+    return {
+      location: "outdoors", activity: input.activity, time: input.time,
+      distanceMiles: distance, durationMinutes: duration,
+      paceSecondsPerMile: Math.round(duration / distance * 60),
+      notes: typeof input.notes === "string" ? input.notes.trim().slice(0, 500) : ""
+    };
+  }
+
+  function outdoorActivities(cardio) {
+    return Array.isArray(cardio?.outdoorEntries) ? cardio.outdoorEntries.map(outdoorActivity).filter(Boolean) : [];
+  }
+
+  function cardioComplete(cardio) {
+    return cardio?.status === "complete" || outdoorActivities(cardio).length > 0;
+  }
+
+  function cardioResultLocation(cardio) {
+    var location = cardio?.resultLocation || cardio?.location;
+    return location === "treadmill" || location === "outdoors" ? location : "unknown";
+  }
+
+  function recordedCardio(cardio) {
+    var result = { treadmill: 0, outdoors: 0, unknown: 0 };
+    var minutes = numeric(cardio?.result?.durationMinutes);
+    if (minutes > 0) {
+      var location = cardioResultLocation(cardio);
+      result[location] += minutes;
+    }
+    var priorRoute = numeric(cardio?.priorOutdoorRoute?.durationMinutes);
+    if (priorRoute > 0) result.outdoors += priorRoute;
+    outdoorActivities(cardio).forEach(function (entry) { result.outdoors += entry.durationMinutes; });
+    return result;
+  }
+
   function weeklyProgress(days, week, coaching, through) {
     var date = addDays(week, 3);
     var entry = date <= through && days && days[date] && days[date].weeklyWeighIn;
     if (date >= FIRST_WEEKLY_WEIGH_IN) {
-      return {date: date, source: "Wednesday weigh-in", value: numeric(entry && entry.weight), visceralFat: numeric(entry && entry.visceralFat)};
+      return {date: date, source: "Wednesday weigh-in", value: numeric(entry && entry.weight), visceralFat: numeric(entry && entry.visceralFat), ...(bodyFatEstimate(entry && entry.bodyFatPercent) == null ? {} : {bodyFatPercent: bodyFatEstimate(entry.bodyFatPercent)})};
     }
     var values = [];
     for (var dayDate = week; dayDate <= addDays(week, 6) && dayDate <= through; dayDate = addDays(dayDate, 1)) {
@@ -161,6 +204,8 @@
     migrateNutritionTargets: migrateNutritionTargets, inclineValid: inclineValid,
     cardioIssues: cardioIssues, normalizeCardioOcr: normalizeCardioOcr,
     cardioDurations: cardioDurations, nutritionTotals: nutritionTotals,
-    morningTiming: morningTiming, weeklyProgress: weeklyProgress
+    morningTiming: morningTiming, weeklyProgress: weeklyProgress, bodyFatEstimate: bodyFatEstimate,
+    outdoorActivity: outdoorActivity, outdoorActivities: outdoorActivities, recordedCardio: recordedCardio,
+    cardioComplete: cardioComplete, cardioResultLocation: cardioResultLocation
   });
 })(globalThis);
