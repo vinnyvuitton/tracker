@@ -174,6 +174,7 @@
     coaching: null,
     view: "today",
     workoutFocus: false,
+    openStrengthExercise: undefined,
     openMealDiaryDate: null,
     openDailyWeightDate: null,
     openDailyPhotosDate: null,
@@ -825,24 +826,70 @@
     return old;
   }
 
-  function renderSetRow(exerciseId, index, label, unit, value, exerciseName) {
-    var inputId = "set-" + exerciseId + "-" + index;
-    return '<div class="workout-set-row"><div><label for="' + esc(inputId) + '">' + esc(label) + '</label><small class="set-row-status"></small></div>' +
-      '<input id="' + esc(inputId) + '" data-exercise-set="' + esc(exerciseId) + '" data-set-index="' + index + '" inputmode="numeric" placeholder="' + esc(unit) + '" value="' + esc(value) + '" aria-label="' + esc(exerciseName + " " + label + " " + unit) + '">' +
-      '<button type="button" class="secondary" data-set-action>' + (number(value) > 0 ? 'Update' : 'Log set') + '</button></div>';
+  function hasStrengthSet(value) {
+    return Domain.numeric(value) != null;
+  }
+
+  function renderSetRow(id, index, label, unit, value, exerciseName, next) {
+    var inputId = "set-" + id + "-" + index;
+    var logged = hasStrengthSet(value);
+    return '<div class="workout-set-row"' + (next ? ' data-next-set' : '') + (logged ? ' data-logged-set' : '') +
+      '><div><label for="' + esc(inputId) + '">' + esc(label) + '</label><small class="set-row-status visually-hidden" id="' + esc(inputId) + '-status">' +
+      (next ? "Up next" : logged ? "Logged" : "") + '</small></div>' +
+      '<input id="' + esc(inputId) + '" data-exercise-set="' + esc(id) + '" data-set-index="' + index + '" aria-describedby="' + esc(inputId) + '-status" inputmode="numeric" placeholder="' + esc(unit) + '" value="' + esc(value) + '" aria-label="' + esc(exerciseName + " " + label + " " + unit) + '"></div>';
   }
 
   function renderSetInputs(exercise, id, log) {
+    var sidePlank = exercise.name === "Side Plank";
     var unit = /sec|second/i.test(exercise.prescription) ? "Sec" : "Reps";
-    return '<div class="set-entry"><div class="workout-set-rows">' + exerciseSets(log, exercise).map(function (value, index) {
-      return renderSetRow(id, index, "Set " + (index + 1), unit, value, exercise.name);
-    }).join("") + '</div><button type="button" class="ghost add-set" data-add-set="' + id + '">+ Add set</button></div>';
+    var sets = sidePlank ? sidePlankSets(log) : exerciseSets(log, exercise);
+    var next = sets.findIndex(function (value) { return !hasStrengthSet(value); });
+    return '<div class="set-entry"><div class="workout-set-rows">' + sets.map(function (value, index) {
+      var label = sidePlank ? "Set " + (Math.floor(index / 2) + 1) + (index % 2 ? " R" : " L") : "Set " + (index + 1);
+      return renderSetRow(id, index, label, unit, value, exercise.name, index === next);
+    }).join("") + '</div><button type="button" class="primary strength-log-set" data-set-action' + (next < 0 ? ' disabled' : '') +
+      '>Log set</button></div>';
   }
 
-  function renderEffortButtons(id, log) {
-    return '<div class="effort-buttons" aria-label="How did this exercise feel?">' + EFFORT_OPTIONS.map(function (option) {
+  function strengthEffortLabel(value) {
+    return {"much-too-easy": "Way easy", "slightly-easy": "Easy", right: "Just right", "slightly-hard": "Hard", "too-hard": "Too hard", "too-light": "Easy", "too-heavy": "Too hard"}[value];
+  }
+
+  function strengthSetProgress(exercise, log) {
+    var sidePlank = exercise.name === "Side Plank";
+    var required = sidePlank ? 4 : prescribedSetCount(exercise);
+    var sets = (sidePlank ? sidePlankSets(log) : exerciseSets(log, exercise)).slice(0, required);
+    var logged = sets.filter(hasStrengthSet).length;
+    return {required: required, logged: logged, nextIndex: sets.findIndex(function (value) { return !hasStrengthSet(value); }), rated: Boolean(log.loadFeel)};
+  }
+
+  function strengthEffortVisible(exercise, log) {
+    var progress = strengthSetProgress(exercise, log);
+    return progress.rated || progress.logged === progress.required;
+  }
+
+  function strengthRowFinished(log, progress) {
+    // A manual Done check can skip the rating. A check set by logging reps leaves it open.
+    return (log.done && !log.autoCompleted) || (progress.rated && progress.logged === progress.required);
+  }
+
+  function strengthRowSummary(exercise, id, log, progress) {
+    var count = progress.logged + " of " + progress.required;
+    if (strengthRowFinished(log, progress)) {
+      return count + " sets · " + (strengthEffortLabel(log.loadFeel) || log.loadFeel || "Done");
+    }
+    if (exercise.equipment?.type === "dumbbell") return recommendedLoad(exercise, id) + " lb · " + count + " sets";
+    return exercise.prescription + " · " + count;
+  }
+
+  function renderEffortButtons(exercise, id, log) {
+    var show = strengthEffortVisible(exercise, log);
+    return '<button type="button" class="ghost strength-rate-effort" data-open-strength-effort aria-controls="strength-effort-' + id +
+      '"' + (show ? ' hidden' : '') + '>Rate effort</button><div id="strength-effort-' + id + '" class="effort-buttons" data-strength-effort' +
+      (show ? '' : ' hidden') + ' aria-label="How did this exercise feel?">' + EFFORT_OPTIONS.map(function (option) {
       var active = log.loadFeel === option.value || (option.value === "slightly-easy" && log.loadFeel === "too-light") || (option.value === "too-hard" && log.loadFeel === "too-heavy");
-      return '<button type="button" data-load-feel="' + id + '" data-feel="' + option.value + '" class="' + (active ? "active" : "") + '">' + option.label + '</button>';
+      return '<button type="button" data-load-feel="' + id + '" data-feel="' + option.value + '" aria-pressed="' + active +
+        '" class="' + (active ? "active" : "") + '">' + strengthEffortLabel(option.value) + '</button>';
     }).join("") + '</div>';
   }
 
@@ -1135,42 +1182,84 @@
     return html + '</div>';
   }
 
-  function nextWorkoutSet(day, plan) {
+  function nextWorkoutSet(day, plan, afterId) {
     if (plan.type !== "Strength") return null;
-    for (var exercise of exercisesForPlan(plan)) {
+    var exercises = exercisesForPlan(plan);
+    if (afterId) {
+      var previous = exercises.findIndex(function (exercise) { return exerciseId(exercise.name) === afterId; });
+      exercises = exercises.slice(previous + 1).concat(exercises.slice(0, previous));
+    }
+    for (var exercise of exercises) {
       var id = exerciseId(exercise.name), log = day.exercises[id] || {};
-      if (log.done) continue;
+      if (log.done && !log.autoCompleted) continue;
+      var progress = strengthSetProgress(exercise, log), index = progress.nextIndex;
+      if (index < 0 && !progress.rated) return { id: id, index: -1, label: exercise.name + ", rate effort" };
+      if (index < 0) continue;
       var sidePlank = exercise.name === "Side Plank";
-      var sets = sidePlank ? sidePlankSets(log) : exerciseSets(log, exercise);
-      var required = sidePlank ? 4 : prescribedSetCount(exercise);
-      for (var index = 0; index < required; index++) {
-        if (number(sets[index]) <= 0) {
-          var label = sidePlank ? "set " + (Math.floor(index / 2) + 1) + (index % 2 ? " right" : " left") : "set " + (index + 1);
-          return { id: id, index: index, label: exercise.name + " · " + label };
-        }
-      }
+      var label = sidePlank ? "set " + (Math.floor(index / 2) + 1) + (index % 2 ? " right" : " left") : "set " + (index + 1);
+      return { id: id, index: index, label: exercise.name + ", " + label };
     }
     return null;
+  }
+
+  function showStrengthExercise(id) {
+    state.openStrengthExercise = id;
+    document.querySelectorAll("[data-strength-exercise]").forEach(function (card) {
+      var open = card.dataset.strengthExercise === id;
+      card.querySelector("[data-open-strength-exercise]").setAttribute("aria-expanded", String(open));
+      card.querySelector("[data-strength-details]").hidden = !open;
+      card.querySelector("[data-strength-prescription]").hidden = !open;
+      card.querySelector("[data-strength-summary]").hidden = open;
+    });
+  }
+
+  function focusStrengthRow(id) {
+    var button = document.querySelector('[data-open-strength-exercise="' + id + '"]');
+    button?.focus({ preventScroll: true });
+    button?.scrollIntoView({ block: "nearest" });
   }
 
   function highlightNextSet(scroll) {
     var plan = planForDate(state.selectedDate), day = getDay(state.selectedDate);
     var next = nextWorkoutSet(day, plan), target = null;
-    document.querySelectorAll("[data-exercise-set]").forEach(function (input) {
-      var isNext = next && input.dataset.exerciseSet === next.id && Number(input.dataset.setIndex) === next.index;
-      var row = input.closest(".workout-set-row");
-      var log = day.exercises[input.dataset.exerciseSet] || {};
-      var exercise = exercisesForPlan(plan).find(function (item) { return exerciseId(item.name) === input.dataset.exerciseSet; });
-      var values = exercise?.name === "Side Plank" ? sidePlankSets(log) : exerciseSets(log, exercise || {});
-      var logged = number(values[Number(input.dataset.setIndex)]) > 0;
-      row.toggleAttribute("data-next-set", Boolean(isNext));
-      row.toggleAttribute("data-logged-set", logged);
-      row.querySelector(".set-row-status").textContent = isNext ? "Up next" : logged ? "Logged" : "";
-      row.querySelector("[data-set-action]").textContent = logged ? "Update" : "Log set";
-      if (isNext) target = input;
+    var exercises = exercisesForPlan(plan);
+    document.querySelectorAll("[data-strength-log]").forEach(function (controls) {
+      var id = controls.dataset.strengthLog;
+      var exercise = exercises.find(function (item) { return exerciseId(item.name) === id; });
+      if (!exercise) return;
+      var log = day.exercises[id] || {};
+      var card = controls.closest("[data-strength-exercise]");
+      var summary = card.querySelector("[data-strength-summary]");
+      var progress = strengthSetProgress(exercise, log);
+      var finished = Boolean(strengthRowFinished(log, progress));
+      var newlyFinished = finished && !card.hasAttribute("data-strength-finished");
+      card.toggleAttribute("data-strength-finished", finished);
+      summary.textContent = strengthRowSummary(exercise, id, log, progress);
+      var values = exercise.name === "Side Plank" ? sidePlankSets(log) : exerciseSets(log, exercise);
+      var nextIndex = values.findIndex(function (value) { return !hasStrengthSet(value); });
+      controls.querySelectorAll("[data-exercise-set]").forEach(function (input) {
+        var index = Number(input.dataset.setIndex);
+        var isNext = index === nextIndex, logged = hasStrengthSet(values[index]);
+        var row = input.closest(".workout-set-row");
+        row.toggleAttribute("data-next-set", isNext);
+        row.toggleAttribute("data-logged-set", logged);
+        row.querySelector(".set-row-status").textContent = isNext ? "Up next" : logged ? "Logged" : "";
+        if (next && id === next.id && index === next.index) target = input;
+      });
+      controls.querySelector("[data-set-action]").disabled = nextIndex < 0;
+      var showEffort = controls.dataset.effortOpened === "true" || strengthEffortVisible(exercise, log);
+      controls.querySelector("[data-strength-effort]").hidden = !showEffort;
+      controls.querySelector("[data-open-strength-effort]").hidden = showEffort;
+      var details = card.querySelector("[data-strength-details]");
+      if (newlyFinished && !details.hidden) {
+        var moveFocus = details.contains(document.activeElement);
+        var nextId = nextWorkoutSet(day, plan, id)?.id ?? null;
+        showStrengthExercise(nextId);
+        if (moveFocus) focusStrengthRow(nextId ?? id);
+      }
     });
     var label = document.getElementById("next-workout-set");
-    if (label) label.textContent = next ? "Up next · " + next.label : "";
+    if (label) label.textContent = next ? "Up next: " + next.label : "";
     var count = document.getElementById("focused-workout-count");
     if (count) {
       var exercises = exercisesForPlan(plan);
@@ -1202,9 +1291,8 @@
     }
     html += renderDailyWeight(day, iso);
     html += renderPhotos(day, iso) + '</div>';
-    html += '<dialog id="workout-area" aria-labelledby="workout-dialog-title"><div class="focused-workout-nav"><div><h2 id="workout-dialog-title">' + esc(plan.title) + '</h2><span id="focused-workout-count"></span><span id="workout-sync" role="status">' + esc(state.sync) + '</span></div><button type="button" class="secondary" id="back-to-daily" autofocus>Close</button></div><p id="next-workout-set" class="notification-status"></p>';
-    html += '<p class="notification-status">' + esc(plan.subtitle) + '</p>';
-    if (plan.type === "Strength") html += '<p class="notification-status">Set entries save when you leave the field.</p>';
+    html += '<dialog id="workout-area"' + (plan.type === "Strength" ? ' class="strength-workout"' : "") + ' aria-labelledby="workout-dialog-title"><div class="focused-workout-nav"><div><h2 id="workout-dialog-title">' + esc(plan.title) + '</h2><span id="focused-workout-count"></span><span id="workout-sync" role="status"' + (plan.type === "Strength" ? ' class="visually-hidden"' : '') + '>' + esc(state.sync) + '</span></div><button type="button" class="secondary" id="back-to-daily" autofocus>Close</button></div><p id="next-workout-set" class="notification-status"></p>';
+    if (plan.type !== "Strength") html += '<p class="notification-status">' + esc(plan.subtitle) + '</p>';
     html += renderWorkout(day, plan, iso) + '</dialog>';
     html += '<section class="card"><div class="card-head"><div><h2>Day note</h2><p>Energy, sleep, soreness, schedule, or anything I should know</p></div></div>' +
       '<textarea id="day-note" placeholder="Optional note">' + esc(day.workout.notes) + '</textarea></section>';
@@ -1290,10 +1378,10 @@
     var todayExercises = exercisesForPlan(plan);
     var done = todayExercises.filter(function (exercise) { return day.exercises[exerciseId(exercise.name)] && day.exercises[exerciseId(exercise.name)].done; }).length;
     var total = todayExercises.length;
-    var html = '<section class="card"><div class="card-head workout-title"><div><p class="eyebrow">' + esc(plan.type) + '</p><h2>' + esc(plan.title) + '</h2><p>' + esc(plan.subtitle) + '</p></div><div class="stat" aria-label="' + done + ' of ' + total + '">' + done + '<small>/' + total + '</small></div></div>';
+    var openId = state.openStrengthExercise === undefined ? nextWorkoutSet(day, plan)?.id : state.openStrengthExercise;
+    var html = '<section class="card">' + (plan.type === "Strength" ? "" : '<div class="card-head workout-title"><div><p class="eyebrow">' + esc(plan.type) + '</p><h2>' + esc(plan.title) + '</h2><p>' + esc(plan.subtitle) + '</p></div><div class="stat" aria-label="' + done + ' of ' + total + '">' + done + '<small>/' + total + '</small></div></div>');
     if (plan.type === "Strength") {
       html += renderEquipmentPrep(day, plan);
-      html += '<div class="notice">Choose a load that leaves about 2–3 good reps in reserve. The plate setup is exact; total dumbbell weight is approximate.</div>';
       if (/Lower/.test(plan.title)) html += '<details class="recovery-option"><summary>Still very sore? Use the recovery version</summary><p>Use bench support, keep every load the same or lighter, and complete two controlled sets per lower-body exercise. Stop if soreness changes your normal movement or becomes sharp pain.</p></details>';
     }
     if (plan.type === "Cardio") html += renderCardioGuide(day, plan);
@@ -1308,8 +1396,29 @@
         var secondLabel = plan.type === "Strength" ? "Reps completed" : plan.type === "Cardio" ? "Minutes completed" : "Notes";
         var firstPlaceholder = plan.type === "Strength" ? "Choose below" : plan.type === "Cardio" ? (plan.outdoorTrial ? "Example: 4 jogs, effort 3/10" : "Example: incline 5 felt right") : "Optional";
         var secondPlaceholder = plan.type === "Strength" ? "Example: 12, 12, 11" : plan.type === "Cardio" ? (plan.outdoorTrial ? "Trail minutes, e.g. 20" : String(cardioDuration(plan))) : "Optional";
-        html += '<div class="exercise"><div class="exercise-main"><input type="checkbox" data-exercise-done="' + id + '" ' + (log.done ? "checked" : "") + ' aria-label="Complete ' + esc(exercise.displayName || exercise.name) + '"><div><div class="exercise-name-row"><div class="exercise-name">' + esc(exercise.displayName || exercise.name) + equipmentBadge(exercise) + '</div>' + (plan.type === "Strength" ? '<span class="exercise-count">' + exercisePosition + '/' + total + '</span>' : '') + '</div><div class="exercise-prescription">' + esc(exercise.prescription) + '</div></div></div>' +
-          renderTimedExerciseTimer(plan, exercise, id) + renderExerciseLog(plan, exercise, id, log, firstLabel, secondLabel, firstPlaceholder, secondPlaceholder) + exerciseGuide(exercise) + '</div>';
+        var strength = plan.type === "Strength";
+        var name = esc(exercise.displayName || exercise.name);
+        var doneCheckbox = '<input type="checkbox" data-exercise-done="' + id + '"' +
+          (log.done ? " checked" : "") + ' aria-label="Complete ' + name + '">';
+        var logHtml = renderExerciseLog(plan, exercise, id, log, firstLabel, secondLabel, firstPlaceholder, secondPlaceholder);
+        if (strength) {
+          var open = id === openId, progress = strengthSetProgress(exercise, log);
+          html += '<div class="exercise strength-exercise" data-strength-exercise="' + id + '"' +
+            (strengthRowFinished(log, progress) ? ' data-strength-finished' : '') + '><div class="exercise-main">' +
+            '<label class="strength-done-target">' + doneCheckbox + '</label>' +
+            '<button type="button" class="exercise-copy strength-exercise-toggle" data-open-strength-exercise="' + id +
+            '" aria-expanded="' + open + '" aria-controls="strength-details-' + id + '">' +
+            '<span class="exercise-name-row"><span class="exercise-name">' + name + '</span><span class="exercise-count">' +
+            exercisePosition + '/' + total + '</span></span><span class="exercise-prescription" data-strength-prescription' +
+            (open ? '' : ' hidden') + '>' + esc(exercise.prescription) + '</span><span class="exercise-prescription" data-strength-summary' +
+            (open ? ' hidden' : '') + '>' + esc(strengthRowSummary(exercise, id, log, progress)) + '</span></button></div>' +
+            '<div id="strength-details-' + id + '" data-strength-details' + (open ? '' : ' hidden') + '>' + logHtml + '</div></div>';
+        } else {
+          html += '<div class="exercise"><div class="exercise-main">' + doneCheckbox +
+            '<div class="exercise-copy"><div class="exercise-name-row"><div class="exercise-name">' + name +
+            equipmentBadge(exercise) + '</div></div><div class="exercise-prescription">' + esc(exercise.prescription) + '</div></div></div>' +
+            logHtml + exerciseGuide(exercise) + '</div>';
+        }
       });
     });
     if (plan.type === "Recovery" && plan.sections.some(function (section) { return section.exercises.some(function (exercise) { return exercise.name === "Easy Walk"; }); })) html += renderTreadmillResult(day);
@@ -1333,35 +1442,91 @@
       var option = loadOption(state.selectedDate >= "2026-11-18" ? recommendedLoad(exercise, id) : number(log.load) || recommendedLoad(exercise, id));
       if (option) option.plates.forEach(function (plate) { plates[plate] = true; });
     });
-    var plateList = Object.keys(plates).map(Number).sort(function (a, b) { return a - b; }).map(function (plate) { return plate + " lb"; }).join(" · ");
-    return '<div class="equipment-prep"><strong>Get these ready</strong><span>Plate sizes needed today: ' + esc(plateList || "none") + '</span></div>';
+    var plateList = Object.keys(plates).map(Number).sort(function (a, b) { return a - b; }).join(" · ");
+    return '<div class="equipment-prep"><strong>Plates:</strong> <span>' + esc(plateList ? plateList + " lb" : "none") + '</span></div>';
   }
 
-  function renderExerciseLog(plan, exercise, id, log, firstLabel, secondLabel, firstPlaceholder, secondPlaceholder) {
-    var history = renderExerciseHistory(plan, exercise, id) + renderExerciseCoaching(exercise);
-    if (plan.type === "Strength" && exercise.equipment && exercise.equipment.type === "dumbbell") {
+  function strengthHistoryEntries(exercise, id) {
+    return Object.keys(state.data.days || {}).filter(function (date) { return date < state.selectedDate; }).sort().reverse().flatMap(function (date) {
+      var logs = state.data.days[date].exercises || {};
+      var log = logs[id] || logs[exercise.historyAlias];
+      if (!log) return [];
+      var sets = exercise.name === "Side Plank" ? sidePlankSets(log) :
+        Array.isArray(log.sets) && log.sets.length ? log.sets : String(log.reps || "").split(/[,/]/);
+      var entered = sets.some(function (value) { return String(value ?? "").trim() !== ""; });
+      if (!entered && !log.done && !log.loadFeel) return [];
+      var parts = [];
+      var load = exercise.equipment?.type === "dumbbell" && number(log.load) > 0 ? number(log.load) : null;
+      if (exercise.equipment?.type === "dumbbell") parts.push(load != null ? load + " lb" : "load not logged");
+      if (entered) {
+        var values = sets.map(function (value) { return String(value ?? "").trim() || "blank"; });
+        parts.push(values.join("/") + (/sec|second/i.test(exercise.prescription) ? " sec" : ""));
+      } else parts.push("reps not logged");
+      var effort = log.loadFeel === "too-light" ? "slightly-easy" : log.loadFeel === "too-heavy" ? "too-hard" : log.loadFeel;
+      parts.push(strengthEffortLabel(effort) || "effort not rated");
+      return [{date: date, load: load, summary: parts.join(", ")}];
+    });
+  }
+
+  function renderStrengthMore(exercise, entries, reason, setup) {
+    var note = (exercise.coachingNote || "").split(/(?<=[.!?])\s+/).filter(function (sentence) {
+      return !/\d\s*lbs?\b/i.test(sentence);
+    }).join(" ").trim();
+    var url = "https://www.google.com/search?q=" + encodeURIComponent("site:acefitness.org " + exercise.name + " exercise demonstration");
+    var history = entries.length ? '<ul class="strength-history">' + entries.map(function (entry) {
+      return '<li><strong>' + esc(formatDate(entry.date, {month: "short", day: "numeric", year: "numeric"})) +
+        '</strong> · ' + esc(entry.summary) + '</li>';
+    }).join("") + '</ul>' : '<p>No earlier result recorded.</p>';
+    return '<details class="form-guide strength-more"><summary>More</summary>' +
+      (reason ? '<p class="strength-reason">' + esc(reason) + '</p>' : '') +
+      (setup ? '<p class="strength-setup">' + esc(setup) + '</p>' : '') +
+      (note ? '<div class="exercise-coaching"><strong>Coach note</strong><span>' + esc(note) + '</span></div>' : '') +
+      '<div class="strength-form-guide"><strong>Form guide</strong><p>' + esc(exercise.tip) +
+      '</p><a href="' + url + '" target="_blank" rel="noopener noreferrer">Find a verified ACE demonstration ↗</a></div>' +
+      '<div class="strength-form-guide"><strong>Full history</strong>' + history + '</div></details>';
+  }
+
+  function renderStrengthLog(plan, exercise, id, log) {
+    var entries = strengthHistoryEntries(exercise, id);
+    var recommendation = "", picker = "", reason = null, setup = null;
+    if (exercise.equipment?.type === "dumbbell") {
       var target = state.selectedDate >= "2026-11-18" ? strengthTarget(exercise, id, state.selectedDate) : null;
       var recommended = target ? target.adjustedLoadLb : recommendedLoad(exercise, id);
       var selected = number(log.load) || recommended;
       var displayedLoad = target ? recommended : selected;
-      var reason = target?.reason ? '<span class="notification-status">' + esc(target.reason) + '</span>' : '';
+      var both = exercise.equipment.dumbbells === 2;
+      var lastLoad = entries[0]?.load;
+      var direction = lastLoad != null && displayedLoad !== lastLoad
+        ? " (" + (displayedLoad > lastLoad ? "up" : "down") + " from " + lastLoad + ")" : "";
+      var plates = loadOption(displayedLoad)?.plates;
+      recommendation = '<div class="load-guide"><strong>' + displayedLoad + (both ? ' lb each' : ' lb, one dumbbell') +
+        '<small>' + esc(direction) + '</small></strong><span>Plates each end: ' + esc(plates?.join(" + ") || "none") + '</span></div>';
+      reason = target?.reason;
+      setup = (both ? "Make both dumbbells identical. " : "Use one dumbbell. ") + "Handle + collars assumed approximately 1 lb.";
       var options = LOAD_OPTIONS.filter(function (option) { return option.weight > 1; }).map(function (option) {
-        return '<option value="' + option.weight + '" ' + (option.weight === selected ? "selected" : "") + '>≈ ' + option.weight + ' lb ' + (exercise.equipment.dumbbells === 2 ? "each" : "total") + '</option>';
+        return '<option value="' + option.weight + '" ' + (option.weight === selected ? "selected" : "") +
+          '>' + option.weight + ' lb</option>';
       }).join("");
-      return history + '<div class="load-guide"><strong>Recommended: approximately ' + displayedLoad + ' lb ' + (exercise.equipment.dumbbells === 2 ? "per dumbbell" : "on one dumbbell") + '</strong><span>' + esc(plateText(displayedLoad, exercise.equipment.dumbbells)) + '</span>' + reason + '</div>' +
-        '<div class="exercise-log"><label class="field">Load used<select data-exercise-load="' + id + '">' + options + '</select></label></div>' +
-        renderSetInputs(exercise, id, log) + renderEffortButtons(id, log);
-    }
-    if (plan.type === "Strength" && exercise.equipment && exercise.equipment.type === "bodyweight") {
+      picker = '<label class="field strength-load-picker">Used:<select aria-label="Load used" data-exercise-load="' + id + '">' + options + '</select></label>';
+    } else if (exercise.equipment?.type === "bodyweight") {
       var variations = ["Floor push-up", "Incline push-up", "Knee push-up", "Weighted push-up"];
       var chosen = log.load || exercise.equipment.start;
-      return history + '<div class="exercise-log"><label class="field">Variation<select data-exercise-load="' + id + '">' + variations.map(function (variation) { return '<option ' + (variation === chosen ? "selected" : "") + '>' + variation + '</option>'; }).join("") + '</select></label></div>' +
-        renderSetInputs(exercise, id, log) + renderEffortButtons(id, log);
+      picker = '<label class="field strength-load-picker">Variation<select data-exercise-load="' + id + '">' + variations.map(function (variation) {
+        return '<option ' + (variation === chosen ? "selected" : "") + '>' + variation + '</option>';
+      }).join("") + '</select></label>';
     }
-    if (plan.type === "Strength") {
-      if (exercise.name === "Side Plank") return history + renderSidePlankInputs(id, log) + renderEffortButtons(id, log);
-      return history + renderSetInputs(exercise, id, log) + renderEffortButtons(id, log);
-    }
+    var addSet = '<button type="button" class="ghost add-set" ' +
+      (exercise.name === "Side Plank" ? "data-add-side-plank-set" : "data-add-set") + '="' + id + '">+ Add set</button>';
+    var lastTime = entries.length ? '<p class="strength-last-time"><strong>Last time:</strong> ' + esc(entries[0].summary) + '</p>' : '';
+    return recommendation + lastTime + '<div class="strength-log-row" data-strength-log="' + id + '">' +
+      renderTimedExerciseTimer(plan, exercise, id) + renderSetInputs(exercise, id, log) +
+      '<div class="strength-log-meta">' + picker + addSet + '</div>' + renderEffortButtons(exercise, id, log) +
+      '</div>' + renderStrengthMore(exercise, entries, reason, setup);
+  }
+
+  function renderExerciseLog(plan, exercise, id, log, firstLabel, secondLabel, firstPlaceholder, secondPlaceholder) {
+    if (plan.type === "Strength") return renderStrengthLog(plan, exercise, id, log);
+    var history = renderExerciseHistory(plan, exercise, id) + renderExerciseCoaching(exercise);
     if (plan.type === "Recovery") return history + '<div class="exercise-log">' + (log.load ? '<p class="previous-load">Earlier entry: ' + esc(log.load) + '</p>' : '') + '<label class="field">' + (exercise.name === "Easy Walk" ? "Walk notes (optional)" : "Notes (optional)") + '<input data-exercise-reps="' + id + '" value="' + esc(log.reps || "") + '" placeholder="Optional"></label></div>';
     return history + '<div class="exercise-log"><label class="field">' + firstLabel + '<input data-exercise-load="' + id + '" value="' + esc(log.load || "") + '" placeholder="' + firstPlaceholder + '"></label><label class="field">' + secondLabel + '<input data-exercise-reps="' + id + '" inputmode="numeric" value="' + esc(log.reps || "") + '" placeholder="' + secondPlaceholder + '"></label></div>';
   }
@@ -1386,13 +1551,6 @@
     } else if (log.reps) parts.push(String(log.reps) + (plan.type === "Cardio" ? " min" : ""));
     if (!parts.length) parts.push(log.done ? "Completed · amounts not recorded" : "Amounts not recorded");
     return '<div class="exercise-history"><strong>' + (lastWeek ? 'Last week' : 'No entry last week · Last recorded') + ' · ' + esc(formatDate(previous.iso, { month: "short", day: "numeric" })) + '</strong><span>' + esc(parts.join(" · ")) + '</span></div>';
-  }
-
-  function renderSidePlankInputs(id, log) {
-    return '<div class="set-entry"><div class="workout-set-rows">' + sidePlankSets(log).map(function (value, index) {
-      var label = "Set " + (Math.floor(index / 2) + 1) + (index % 2 ? " right" : " left");
-      return renderSetRow(id, index, label, "Sec", value, "Side Plank");
-    }).join("") + '</div><button type="button" class="ghost add-set" data-add-side-plank-set="' + id + '">+ Add set</button></div>';
   }
 
   function sidePlankSets(log) {
@@ -2240,6 +2398,7 @@
     document.getElementById("open-workout").addEventListener("click", function (event) {
       var resume = event.currentTarget.textContent === "Resume workout";
       state.workoutFocus = true;
+      state.openStrengthExercise = nextWorkoutSet(getDay(state.selectedDate), planForDate(state.selectedDate))?.id ?? null;
       render();
       if (resume) highlightNextSet(true);
     });
@@ -2317,20 +2476,67 @@
     });
     document.getElementById("day-note").addEventListener("change", function (event) { getDay(state.selectedDate).workout.notes = event.target.value; queueSave(); });
     document.getElementById("session-rating").addEventListener("change", function (event) { getDay(state.selectedDate).workout.rating = event.target.value; queueSave(); });
-    document.querySelectorAll("[data-exercise-done]").forEach(function (input) { input.addEventListener("change", function () { updateExercise(input.dataset.exerciseDone, "done", input.checked); }); });
+    document.querySelectorAll("[data-exercise-done]").forEach(function (input) {
+      input.addEventListener("change", function () {
+        var id = input.dataset.exerciseDone;
+        var advance = input.checked && id === state.openStrengthExercise && Boolean(input.closest("[data-strength-exercise]"));
+        if (advance) {
+          var day = getDay(state.selectedDate), plan = planForDate(state.selectedDate);
+          state.openStrengthExercise = nextWorkoutSet(day, plan, id)?.id ?? null;
+        }
+        updateExercise(id, "done", input.checked);
+        if (advance) focusStrengthRow(state.openStrengthExercise ?? id);
+      });
+    });
     document.querySelectorAll("[data-exercise-load]").forEach(function (input) { input.addEventListener("change", function () { updateExercise(input.dataset.exerciseLoad, "load", input.value); }); });
     document.querySelectorAll("[data-exercise-reps]").forEach(function (input) { input.addEventListener("change", function () { updateExercise(input.dataset.exerciseReps, "reps", input.value); }); });
     document.querySelectorAll("[data-exercise-set]").forEach(function (input) { input.addEventListener("change", function () { updateExerciseSet(input.dataset.exerciseSet, Number(input.dataset.setIndex), input.value); }); });
-    document.querySelectorAll("[data-set-action]").forEach(function (button) {
+    document.querySelectorAll("[data-open-strength-exercise]").forEach(function (button) {
       button.addEventListener("click", function () {
-        var input = button.closest(".workout-set-row").querySelector("[data-exercise-set]");
-        if (!input.value.trim()) { input.focus(); return; }
+        if (document.activeElement?.matches("[data-exercise-set]")) document.activeElement.blur();
+        showStrengthExercise(button.dataset.openStrengthExercise);
+      });
+    });
+    document.querySelectorAll("[data-set-action]").forEach(function (button) {
+      var controls = button.closest("[data-strength-log]");
+      var nextInput = function () { return controls.querySelector("[data-next-set] [data-exercise-set]"); };
+      button.addEventListener("pointerdown", function (event) {
+        if (document.activeElement === nextInput()) event.preventDefault();
+      });
+      button.addEventListener("click", function () {
+        var input = nextInput();
+        if (!input) return;
+        if (!hasStrengthSet(input.value)) { input.focus(); return; }
         updateExerciseSet(input.dataset.exerciseSet, Number(input.dataset.setIndex), input.value);
+      });
+    });
+    document.querySelectorAll("[data-open-strength-effort]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var controls = button.closest("[data-strength-log]");
+        controls.dataset.effortOpened = "true";
+        var panel = controls.querySelector("[data-strength-effort]");
+        panel.hidden = false;
+        button.hidden = true;
+        panel.querySelector("button")?.focus({preventScroll: true});
       });
     });
     document.querySelectorAll("[data-add-set]").forEach(function (button) { button.addEventListener("click", function () { addExerciseSet(button.dataset.addSet); }); });
     document.querySelectorAll("[data-add-side-plank-set]").forEach(function (button) { button.addEventListener("click", function () { addSidePlankSet(button.dataset.addSidePlankSet); }); });
-    document.querySelectorAll("[data-load-feel]").forEach(function (button) { button.addEventListener("click", function () { updateExercise(button.dataset.loadFeel, "loadFeel", button.dataset.feel); }); });
+    document.querySelectorAll("[data-load-feel]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var id = button.dataset.loadFeel, day = getDay(state.selectedDate), plan = planForDate(state.selectedDate);
+        var card = button.closest("[data-strength-exercise]");
+        var advance = false;
+        if (card && !card.hasAttribute("data-strength-finished") && !card.querySelector("[data-strength-details]").hidden) {
+          var exercise = exercisesForPlan(plan).find(function (item) { return exerciseId(item.name) === id; });
+          var progress = strengthSetProgress(exercise, day.exercises[id] || {});
+          advance = progress.logged === progress.required;
+          if (advance) state.openStrengthExercise = nextWorkoutSet(day, plan, id)?.id ?? null;
+        }
+        updateExercise(id, "loadFeel", button.dataset.feel);
+        if (advance) focusStrengthRow(state.openStrengthExercise ?? id);
+      });
+    });
     document.querySelectorAll("[data-timer-start]").forEach(function (button) { button.addEventListener("click", function () { toggleExerciseTimer(button.dataset.timerStart); }); });
     document.querySelectorAll("[data-timer-reset]").forEach(function (button) { button.addEventListener("click", function () { resetExerciseTimer(button.dataset.timerReset); }); });
     document.querySelectorAll("[data-timer-duration]").forEach(function (select) { select.addEventListener("change", function () { setExerciseTimerDuration(select.dataset.timerDuration, Number(select.value)); }); });
