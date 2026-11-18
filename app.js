@@ -1293,7 +1293,7 @@
     html += renderDailyWeight(day, iso);
     html += renderPhotos(day, iso) + '</div>';
     html += '<dialog id="workout-area"' + (plan.type === "Strength" ? ' class="strength-workout"' : "") + ' aria-labelledby="workout-dialog-title"><div class="focused-workout-nav"><div><h2 id="workout-dialog-title">' + esc(plan.title) + '</h2><span id="focused-workout-count"></span><span id="workout-sync" role="status"' + (plan.type === "Strength" ? ' class="visually-hidden"' : '') + '>' + esc(state.sync) + '</span></div><button type="button" class="secondary" id="back-to-daily" autofocus>Close</button></div><p id="next-workout-set" class="notification-status"></p>';
-    if (plan.type !== "Strength") html += '<p class="notification-status">' + esc(plan.subtitle) + '</p>';
+    if (plan.type !== "Strength" && plan.type !== "Cardio") html += '<p class="notification-status">' + esc(plan.subtitle) + '</p>';
     html += renderWorkout(day, plan, iso) + '</dialog>';
     html += '<section class="card"><div class="card-head"><div><h2>Day note</h2><p>Energy, sleep, soreness, schedule, or anything I should know</p></div></div>' +
       '<textarea id="day-note" placeholder="Optional note">' + esc(day.workout.notes) + '</textarea></section>';
@@ -1380,7 +1380,7 @@
     var done = todayExercises.filter(function (exercise) { return day.exercises[exerciseId(exercise.name)] && day.exercises[exerciseId(exercise.name)].done; }).length;
     var total = todayExercises.length;
     var openId = state.openStrengthExercise === undefined ? nextWorkoutSet(day, plan)?.id : state.openStrengthExercise;
-    var html = '<section class="card">' + (plan.type === "Strength" ? "" : '<div class="card-head workout-title"><div><p class="eyebrow">' + esc(plan.type) + '</p><h2>' + esc(plan.title) + '</h2><p>' + esc(plan.subtitle) + '</p></div><div class="stat" aria-label="' + done + ' of ' + total + '">' + done + '<small>/' + total + '</small></div></div>');
+    var html = '<section class="card">' + (plan.type === "Strength" ? "" : '<div class="card-head workout-title"><div><p class="eyebrow">' + esc(plan.type) + '</p><h2>' + esc(plan.title) + '</h2>' + (plan.type === "Cardio" ? "" : '<p>' + esc(plan.subtitle) + '</p>') + '</div><div class="stat" aria-label="' + done + ' of ' + total + '">' + done + '<small>/' + total + '</small></div></div>');
     if (plan.type === "Strength") {
       html += renderEquipmentPrep(day, plan);
       if (/Lower/.test(plan.title)) html += '<details class="recovery-option"><summary>Still very sore? Use the recovery version</summary><p>Use bench support, keep every load the same or lighter, and complete two controlled sets per lower-body exercise. Stop if soreness changes your normal movement or becomes sharp pain.</p></details>';
@@ -1411,9 +1411,10 @@
             (open ? ' hidden' : '') + '>' + esc(strengthRowSummary(exercise, id, log, progress)) + '</span></button></div>' +
             '<div id="strength-details-' + id + '" data-strength-details' + (open ? '' : ' hidden') + '>' + logHtml + '</div></div>';
         } else {
+          var showPrescription = plan.type !== "Cardio" || plan.outdoorTrial;
           html += '<div class="exercise"><div class="exercise-main">' + doneCheckbox +
             '<div class="exercise-copy"><div class="exercise-name-row"><div class="exercise-name">' + name +
-            equipmentBadge(exercise) + '</div></div><div class="exercise-prescription">' + esc(exercise.prescription) + '</div></div></div>' +
+            equipmentBadge(exercise) + '</div></div>' + (showPrescription ? '<div class="exercise-prescription">' + esc(exercise.prescription) + '</div>' : '') + '</div></div>' +
             logHtml + exerciseGuide(exercise) + '</div>';
         }
       });
@@ -1593,49 +1594,24 @@
     var duration = cardioDuration(plan);
     var active = day.cardio && day.cardio.status === "active";
     var complete = day.cardio && day.cardio.status === "complete";
-    var fullDuration = plan.cardioSegments && plan.cardioSegments.length ? plan.cardioSegments[plan.cardioSegments.length - 1].end : duration;
-    var expressDuration = plan.expressSegments && plan.expressSegments.length ? plan.expressSegments[plan.expressSegments.length - 1].end : 0;
-    var durations = Domain.cardioDurations(cardioSegmentsFor(plan), day.cardio && day.cardio.result);
-    var html = '<p class="notification-status">Planned work ' + (durations.plannedWorkMinutes ?? "unknown") + ' min · Cooldown ' + (durations.plannedCooldownMinutes ?? "unknown") + ' min · Planned total ' + (durations.plannedTotalMinutes ?? "unknown") + ' min</p>';
+    var segments = cardioSegmentsFor(plan), html = "";
+    if (segments.length) {
+      html += '<p class="cardio-summary">' + esc(cardioWorkoutSummary(segments, plan.outdoorTrial)) +
+        '</p><details class="cardio-steps"><summary class="button secondary"><span>Show all steps</span><span>Hide all steps</span></summary>';
+      if (plan.walkOnlyAvailable) html += '<p class="notice cardio-coaching">Keep full-sentence conversation, around 3–4/10 effort. Starting speeds are suggestions; slow down as needed. Stop jogging for pain or a changed stride. If unusually tired, use walking or rest.</p>';
+      html += '<div class="cardio-timeline">';
+      segments.forEach(function (segment) {
+        html += '<div class="cardio-step' + (segment.automatic ? ' automatic' : '') + '"><time>' + cardioMinuteLabel(segment.start) + '–' + cardioMinuteLabel(segment.end) + ' min</time><div><strong>' + esc(cardioSettingLabel(segment, plan.outdoorTrial)) + '</strong><span>' + esc(plan.outdoorTrial ? "Keep full-sentence conversation; walk more slowly whenever needed." : segment.cue) + '</span></div></div>';
+      });
+      html += '</div></details>';
+    }
     html += plan.locationChoice ? '<div class="cardio-mode" role="group" aria-label="Cardio location">' + [
       { value: "treadmill", label: "Treadmill" }, { value: "outdoors", label: "Outdoors" }
     ].map(function (choice) {
       var selected = choice.value === (plan.outdoorTrial ? "outdoors" : "treadmill");
       return '<button type="button" data-cardio-location="' + choice.value + '" aria-pressed="' + selected + '" class="' + (selected ? "active" : "") + '" ' + (cardioLocationLocked(state.selectedDate) ? "disabled" : "") + '>' + choice.label + '</button>';
-    }).join("") + '</div><p class="notification-status">Choose before starting. This choice saves for this day.</p>' : '';
-    html += plan.expressSegments ? '<div class="cardio-mode"><button type="button" data-cardio-mode="full" class="' + (state.cardioMode === "full" ? "active" : "") + '">Full · ' + fullDuration + ' min</button><button type="button" data-cardio-mode="express" class="' + (state.cardioMode === "express" ? "active" : "") + '">Express · ' + expressDuration + ' min</button></div>' : '';
-    if (plan.scheduledRunWalkTarget) {
-      html += '<p class="notification-status"><strong>Scheduled target:</strong> ' + esc(plan.scheduledRunWalkTarget.label) +
-        ' · subject to recovery checks</p>';
-    }
-    if (plan.progressionConfirmation) {
-      html += '<label class="check-row"><input id="cardio-progression-ready" type="checkbox" ' + (plan.progressionConfirmation.ready ? 'checked ' : '') + (cardioLocationLocked(state.selectedDate) ? 'disabled ' : '') + '> ' + esc(plan.progressionConfirmation.label) + '</label>';
-    }
-    if (plan.runWalkProgression) {
-      var progression = plan.runWalkProgression;
-      html += '<label class="field">Confirmed run/walk step<select id="cardio-run-walk-step" ' +
-        (cardioLocationLocked(state.selectedDate) ? 'disabled' : '') + '>' + progression.options.map(function (option, index) {
-          var locked = index > progression.maxAvailableStep;
-          return '<option value="' + index + '"' + (progression.selected === index ? ' selected' : '') + (locked ? ' disabled' : '') + '>' +
-            esc(option) + (locked ? ' (locked)' : '') + '</option>';
-        }).join("") + '</select></label><p class="notification-status">' + esc(progression.note) + '</p>';
-    }
-    if (plan.walkOnlyAvailable) {
-      var walkOnlyLocked = cardioLocationLocked(state.selectedDate);
-      html += '<div class="notice"><p>Keep full-sentence conversation, around 3–4/10 effort. Starting speeds are suggestions; slow down as needed. Stop jogging for pain or a changed stride. If unusually tired, use walking or rest.</p><label class="check-row"><input id="cardio-walk-only" type="checkbox" ' + (plan.walkOnlyEnabled ? 'checked ' : '') + (walkOnlyLocked ? 'disabled ' : '') + '> Walk only today · same ' + duration + ' minutes' + (plan.outdoorTrial ? '' : ', level incline') + '</label><p>Choose before starting.</p></div>';
-    }
-    if (!plan.outdoorTrial && plan.shortTrialAvailable && state.cardioMode !== "express") {
-      var shortTrialLocked = active || complete || Boolean(state.cardioCountdown && state.cardioCountdown.date === state.selectedDate);
-      html += '<details class="form-guide cardio-speed-option"><summary>Saturday five-minute trial · ' + (plan.shortTrialEnabled ? 'recommended plan' : 'standard plan') + '</summary><p>October 21 review: try 3.5 mph at incline setting 8 only during minutes 25–30, then return to 3.3 mph at setting 9. All other blocks and the 65-minute duration stay steady. Aim for about 6/10 effort with a smooth walk; reduce settings if form changes. Before starting, uncheck to use the standard plan if readiness is poor. Your interval alerts will match the choice.</p><label class="check-row"><input id="cardio-short-trial" type="checkbox" ' + (plan.shortTrialEnabled ? 'checked ' : '') + (shortTrialLocked ? 'disabled ' : '') + '> Use the five-minute trial · October 24 only</label></details>';
-    }
-    if (!plan.outdoorTrial && plan.speedTrialAvailable && state.cardioMode !== "express") {
-      var trialLocked = active || complete || Boolean(state.cardioCountdown && state.cardioCountdown.date === state.selectedDate);
-      html += '<details class="form-guide cardio-speed-option"><summary>Saturday speed option · ' + (plan.speedTrialEnabled ? '+0.1 mph selected' : 'standard plan') + '</summary><p>Use the extra speed only after Wednesday’s review, with acceptable recovery and work blocks still below about 6/10 without holding the rails. Incline and the 65-minute duration stay the same. Choose before starting; your interval alerts will match.</p><label class="check-row"><input id="cardio-speed-trial" type="checkbox" ' + (plan.speedTrialEnabled ? 'checked ' : '') + (trialLocked ? 'disabled ' : '') + '> Add 0.1 mph during minutes 15–45</label></details>';
-    }
-    html += '<div class="cardio-timeline">';
-    cardioSegmentsFor(plan).forEach(function (segment) {
-      html += '<div class="cardio-step' + (segment.automatic ? ' automatic' : '') + '"><time>' + cardioMinuteLabel(segment.start) + '–' + cardioMinuteLabel(segment.end) + ' min</time><div><strong>' + esc(cardioSettingLabel(segment, plan.outdoorTrial)) + '</strong><span>' + esc(plan.outdoorTrial ? "Keep full-sentence conversation; walk more slowly whenever needed." : segment.cue) + '</span></div></div>';
-    });
+    }).join("") + '</div>' : '';
+    html += renderCardioStartChoices(plan, duration, active, complete);
     if (plan.outdoorTrial) {
       var result = day.cardio && day.cardio.result || {};
       var savedRoute = day.cardio?.priorOutdoorRoute;
@@ -1644,20 +1620,113 @@
         var route = savedRoute ? '<p>Previously recorded route · ' + esc(savedRoute.durationMinutes ?? "Unknown") +
           ' min · ' + esc(savedRoute.distanceMiles ?? "Unknown") + ' mi</p>' : '';
         var logButton = state.selectedDate <= TODAY ? '<button type="button" class="secondary" data-log-outdoor-cardio>Log cardio</button>' : '';
-        return html + '</div><p class="notice">Use your own timer outdoors and follow the times above.</p>' + route + logButton;
+        return html + '<p class="notice">Use your own timer outdoors and follow the times above.</p>' + route + logButton;
       }
-      return html + '</div>' + renderCardioWarnings(result) + '<p class="notice">Use your own timer outdoors and follow the times above. Choose a route you can shorten and turn back when needed.</p><div class="treadmill-result"><strong>Route result</strong><div class="treadmill-fields"><label>Recorded total, min<input data-cardio-result="durationMinutes" type="number" min="0.1" step="0.1" value="' + esc(result.durationMinutes == null ? "" : result.durationMinutes) + '"></label><label>Distance, mi<input data-cardio-result="distanceMiles" type="number" min="0" step="0.01" value="' + esc(result.distanceMiles == null ? "" : result.distanceMiles) + '"></label></div><small>Record elapsed time, including walk intervals and pauses. Keep travel to the route separate.</small></div>';
+      return html + renderCardioWarnings(result) + '<p class="notice">Use your own timer outdoors and follow the times above. Choose a route you can shorten and turn back when needed.</p><div class="treadmill-result"><strong>Route result</strong><div class="treadmill-fields"><label>Recorded total, min<input data-cardio-result="durationMinutes" type="number" min="0.1" step="0.1" value="' + esc(result.durationMinutes == null ? "" : result.durationMinutes) + '"></label><label>Distance, mi<input data-cardio-result="distanceMiles" type="number" min="0" step="0.01" value="' + esc(result.distanceMiles == null ? "" : result.distanceMiles) + '"></label></div><small>Record elapsed time, including walk intervals and pauses. Keep travel to the route separate.</small></div>';
     }
-    html += '</div>';
     if (!complete) {
       html += '<div class="cardio-controls"><button class="primary" id="start-cardio" ' + (active ? "disabled" : "") + '>' + (active ? "Session alerts active" : "Start " + duration + "-minute session") + '</button>';
       if (active) html += '<button class="secondary" id="cancel-cardio">Cancel alerts</button>';
-      html += '</div>';
+      html += '</div><p class="notification-status">' + (state.notificationEnabled ? "You can switch to YouTube—push alerts will tell you every incline and speed change." : "Enable notifications first so alerts can reach you while YouTube is open.") + '</p>';
     }
-    html += '<p class="notification-status">' + (complete ? "Timer complete · " + number(day.cardio.durationMinutes || duration) + " planned minutes. Recorded total is shown separately." : state.notificationEnabled ? "You can switch to YouTube—push alerts will tell you every incline and speed change." : "Enable notifications first so alerts can reach you while YouTube is open.") + '</p>';
     if (state.cardioCountdown && state.cardioCountdown.date === state.selectedDate) html += renderCardioCountdown();
     html += renderTreadmillResult(day, plan);
     return html;
+  }
+
+  function cardioChecklistRow(id, label, checked, disabled) {
+    return '<label class="cardio-check-row"><input id="' + id + '" type="checkbox"' +
+      (checked ? ' checked' : '') + (disabled ? ' disabled' : '') + '><span>' + label + '</span></label>';
+  }
+
+  function renderCardioStartChoices(plan, duration, active, complete) {
+    var html = "", locked = cardioLocationLocked(state.selectedDate);
+    if (plan.expressSegments) {
+      var fullDuration = plan.cardioSegments?.at(-1)?.end ?? duration;
+      var expressDuration = plan.expressSegments.at(-1)?.end ?? 0;
+      html += '<div class="cardio-mode"><button type="button" data-cardio-mode="full" class="' + (state.cardioMode === "full" ? "active" : "") + '">Full · ' + fullDuration + ' min</button><button type="button" data-cardio-mode="express" class="' + (state.cardioMode === "express" ? "active" : "") + '">Express · ' + expressDuration + ' min</button></div>';
+    }
+    var target = plan.scheduledRunWalkTarget ? '<span class="cardio-check-target"><strong>Scheduled target:</strong> ' +
+      esc(plan.scheduledRunWalkTarget.label) + ' · subject to recovery checks</span>' : "";
+    if (plan.progressionConfirmation) {
+      html += cardioChecklistRow("cardio-progression-ready", esc(plan.progressionConfirmation.label) + target,
+        plan.progressionConfirmation.ready, locked);
+    } else if (target) html += target;
+    if (plan.runWalkProgression) {
+      var progression = plan.runWalkProgression;
+      html += '<label class="field">Confirmed run/walk step<select id="cardio-run-walk-step" ' +
+        (locked ? 'disabled ' : '') + '>' + progression.options.map(function (option, index) {
+          var stepLocked = index > progression.maxAvailableStep;
+          return '<option value="' + index + '"' + (progression.selected === index ? ' selected' : '') + (stepLocked ? ' disabled' : '') + '>' +
+            esc(option) + (stepLocked ? ' (locked)' : '') + '</option>';
+        }).join("") + '</select></label><p class="notification-status">' + esc(progression.note) + '</p>';
+    }
+    if (plan.walkOnlyAvailable) {
+      html += cardioChecklistRow("cardio-walk-only", "Walk only today", plan.walkOnlyEnabled, locked);
+    }
+    if (!plan.outdoorTrial && state.cardioMode !== "express") {
+      var trialLocked = active || complete || Boolean(state.cardioCountdown && state.cardioCountdown.date === state.selectedDate);
+      if (plan.shortTrialAvailable) {
+        html += cardioChecklistRow("cardio-short-trial", "Saturday five-minute trial · " + (plan.shortTrialEnabled ? "recommended plan" : "standard plan"), plan.shortTrialEnabled, trialLocked);
+        html += '<details class="cardio-option-details"><summary>Details</summary><p>October 21 review: try 3.5 mph at incline setting 8 only during minutes 25–30, then return to 3.3 mph at setting 9. All other blocks and the 65-minute duration stay steady. Aim for about 6/10 effort with a smooth walk; reduce settings if form changes. Uncheck to use the standard plan if readiness is poor. Your interval alerts will match the choice.</p></details>';
+      }
+      if (plan.speedTrialAvailable) {
+        html += cardioChecklistRow("cardio-speed-trial", "Saturday speed option · " + (plan.speedTrialEnabled ? "+0.1 mph selected" : "standard plan"), plan.speedTrialEnabled, trialLocked);
+        html += '<details class="cardio-option-details"><summary>Details</summary><p>Add 0.1 mph during minutes 15–45. Use the extra speed only after Wednesday’s review, with acceptable recovery and work blocks still below about 6/10 without holding the rails. Incline and the 65-minute duration stay the same. Your interval alerts will match.</p></details>';
+      }
+    }
+    return html ? '<section class="cardio-before-start" aria-labelledby="cardio-before-start-title"><h3 id="cardio-before-start-title">Before you start</h3>' +
+      (complete ? "" : '<p class="notification-status">Choose before starting.</p>') + html + '</section>' : "";
+  }
+
+  function cardioWorkoutSummary(segments, outdoors) {
+    function kind(segment) {
+      if (segment.automatic) return "automatic";
+      if (/^Jog\b/i.test(segment.cue)) return "jog";
+      if (/\bwarm[ -]?up\b/i.test(segment.cue)) return "warmup";
+      if (/^(?:cool[ -]?down\b|walk gently for .*cooldown\b|[\w-]+ (?:easy )?walking cooldown\b)/i.test(segment.cue)) return "cooldown";
+      return "walk";
+    }
+    function seconds(segment) { return Math.round((segment.end - segment.start) * 60); }
+    function duration(totalSeconds) { return totalSeconds % 60 ? totalSeconds + " sec" : totalSeconds / 60 + " min"; }
+    function sameInterval(first, next) {
+      return seconds(first) === seconds(next) && (outdoors || first.speed === next.speed && first.incline === next.incline);
+    }
+    function settings(group) {
+      if (outdoors) return "";
+      function range(key) {
+        var values = group.map(function (segment) { return segment[key]; }).filter(Number.isFinite);
+        if (!values.length) return "";
+        var min = Math.min.apply(Math, values), max = Math.max.apply(Math, values);
+        return min === max ? String(min) : min + " to " + max;
+      }
+      var speed = range("speed"), incline = range("incline");
+      return (speed ? " at " + speed + " mph" : "") + (incline && incline !== "0" ? ", incline " + incline : "");
+    }
+    var phases = [], types = segments.map(kind);
+    for (var i = 0; i < segments.length;) {
+      var first = segments[i], type = types[i], end = i + 1;
+      if (type === "jog" && types[end] === "walk") {
+        var recovery = segments[end++];
+        while (types[end] === "jog" && types[end + 1] === "walk" &&
+            sameInterval(first, segments[end]) && sameInterval(recovery, segments[end + 1])) end += 2;
+        var count = (end - i) / 2;
+        phases.push(count + (count === 1 ? " jog of " : " jogs of ") + duration(seconds(first)) + settings([first]) +
+          " with " + duration(seconds(recovery)) + (count === 1 ? " walk" : " walks") + settings([recovery]));
+      } else {
+        while (type !== "jog" && types[end] === type) end++;
+        var group = segments.slice(i, end), last = group[group.length - 1];
+        var time = duration(group.reduce(function (sum, segment) { return sum + seconds(segment); }, 0));
+        if (type === "warmup") phases.push("warm up " + time + settings(group));
+        else if (type === "automatic") phases.push((outdoors ? "cool down " : "automatic cooldown ") + time);
+        else if (type === "cooldown") phases.push("cool down " + time + settings(group));
+        else if (type === "jog") phases.push("jog " + time + settings(group));
+        else phases.push("walk " + (i ? "to " + cardioMinuteLabel(last.end) + " min" : time) + settings(group));
+      }
+      i = end;
+    }
+    var summary = phases.length > 1 ? phases[0] + ", then " + phases.slice(1).join(", ") : phases[0];
+    return summary.charAt(0).toUpperCase() + summary.slice(1) + ".";
   }
 
   function recordedMinutesInput(value) {

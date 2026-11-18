@@ -39,8 +39,6 @@ h3 { font-size: 14px; margin: 0; }
 .waist-history li, .checkpoint-list li { display: grid; gap: 5px; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .waist-history li:last-child, .checkpoint-list li:last-child { border-bottom: 0; }
 .waist-history span, .checkpoint-list span { color: var(--muted); font-size: 13px; line-height: 1.5; }
-.cardio-speed-option .check-row { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; line-height: 1.5; }
-.cardio-speed-option input[type="checkbox"] { flex: 0 0 20px; width: 20px; height: 20px; margin-top: 1px; padding: 0; }
 .midweek-card .form-guide { margin-bottom: 16px; }
 .midweek-card .form-guide .grid { margin-top: 14px; }
 p { color: var(--muted); line-height: 1.45; }
@@ -259,6 +257,26 @@ textarea { resize: vertical; min-height: 74px; }
 .photo-source-actions button { flex: 1 1 140px; }
 .visually-hidden { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
 .cardio-timeline { display: grid; gap: 8px; margin: 12px 0; }
+.cardio-summary { margin: 14px 0 8px; font-size: 14px; line-height: 1.45; }
+.cardio-steps { margin: 0 0 12px; }
+.cardio-steps > summary {
+  display: inline-flex; align-items: center; min-height: 44px; cursor: pointer;
+  font-size: 14px; user-select: none; -webkit-tap-highlight-color: transparent;
+}
+.cardio-steps > summary::-webkit-details-marker { display: none; }
+.cardio-steps:not([open]) > summary span:last-child, .cardio-steps[open] > summary span:first-child { display: none; }
+.cardio-before-start { margin: 14px 0 10px; }
+.cardio-before-start > p { margin: 3px 0 8px; }
+.cardio-check-row {
+  display: grid; grid-template-columns: 20px minmax(0, 1fr); align-items: start;
+  gap: 10px; min-height: 44px; padding: 11px 0; font-size: 14px; line-height: 1.45; cursor: pointer;
+}
+.cardio-check-row input[type="checkbox"] { width: 20px; height: 20px; margin: 0; padding: 0; }
+.cardio-check-row:has(input:disabled) { color: var(--muted); cursor: default; }
+.cardio-check-target { display: block; margin-top: 3px; color: var(--muted); font-size: 13px; }
+.cardio-option-details { margin-left: 30px; font-size: 13px; }
+.cardio-option-details > summary { width: fit-content; color: var(--blue); cursor: pointer; padding: 6px 0; }
+.cardio-coaching { margin: 12px 0; }
 .cardio-step { display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 11px; background: var(--panel-2); }
 .cardio-step time { color: var(--accent-2); font-weight: 800; font-size: 13px; }
 .cardio-step strong, .cardio-step span { display: block; }
