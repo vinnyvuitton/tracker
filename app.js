@@ -920,6 +920,28 @@
           coachingNote: datedCardio.note
         })] }]
       };
+      var ladder = state.coaching.runWalkLadder;
+      var runWalkProgression = null;
+      if (ladder && iso >= ladder.from && (key === "Wed" || key === "Sat") && plan.type === "Cardio") {
+        var days = state.data.days || {};
+        var steps = ladder.steps.filter(function (step) { return step.from <= iso; });
+        var selected = days[iso]?.cardio?.runWalkStep;
+        var nov25Ready = days["2026-11-25"]?.cardio?.progressionReady && !days["2026-11-25"]?.cardio?.walkOnly;
+        var previous = nov25Ready ? 1 : 0;
+        var stepSince = "2026-11-25";
+        Object.keys(days).filter(function (date) { return date >= ladder.from && date < iso; }).sort().forEach(function (date) {
+          var savedStep = days[date]?.cardio?.runWalkStep;
+          if (!Number.isInteger(savedStep) || savedStep < 0 || savedStep >= steps.length || savedStep === previous) return;
+          previous = savedStep;
+          stepSince = date;
+        });
+        var canAdvance = iso >= addDays(stepSince, 7);
+        var maxStep = Math.min(steps.length - 1, previous + (canAdvance ? 1 : 0));
+        if (!Number.isInteger(selected) || selected < 0 || selected >= steps.length) selected = iso === ladder.from ? 0 : previous;
+        var options = steps.slice(0, Math.max(maxStep, selected) + 1).map(function (step) { return step.label; });
+        runWalkProgression = {selected: selected, options: options, note: ladder.note};
+        datedCardio = Object.assign({}, steps[selected], {walkSegments: ladder.walkSegments, walkPrescription: ladder.walkPrescription, note: ladder.note});
+      }
       if (datedCardio && plan.type === "Cardio" && Array.isArray(datedCardio.segments) && datedCardio.segments.length) {
         var savedSession = state.data.days && state.data.days[iso] && state.data.days[iso].cardio;
         var condition = datedCardio.conditionalProgression;
@@ -930,6 +952,7 @@
           speedTrialAvailable: false, shortTrialAvailable: false, expressSegments: null,
           walkOnlyAvailable: true, walkOnlyEnabled: walkOnly,
           progressionConfirmation: condition ? {label: condition.label, ready: progressionReady} : null,
+          ...(runWalkProgression ? {runWalkProgression: runWalkProgression} : {}),
           cardioSegments: walkOnly ? datedCardio.walkSegments : datedCardio.segments,
           completionMessage: datedCardio.completionMessage,
           sections: [{ label: "Treadmill", exercises: [Object.assign({}, plan.sections[0].exercises[0], {
@@ -1410,6 +1433,13 @@
     html += plan.expressSegments ? '<div class="cardio-mode"><button type="button" data-cardio-mode="full" class="' + (state.cardioMode === "full" ? "active" : "") + '">Full · ' + fullDuration + ' min</button><button type="button" data-cardio-mode="express" class="' + (state.cardioMode === "express" ? "active" : "") + '">Express · ' + expressDuration + ' min</button></div>' : '';
     if (plan.progressionConfirmation) {
       html += '<label class="check-row"><input id="cardio-progression-ready" type="checkbox" ' + (plan.progressionConfirmation.ready ? 'checked ' : '') + (cardioLocationLocked(state.selectedDate) ? 'disabled ' : '') + '> ' + esc(plan.progressionConfirmation.label) + '</label>';
+    }
+    if (plan.runWalkProgression) {
+      var progression = plan.runWalkProgression;
+      html += '<label class="field">Confirmed run/walk step<select id="cardio-run-walk-step" ' +
+        (cardioLocationLocked(state.selectedDate) ? 'disabled' : '') + '>' + progression.options.map(function (option, index) {
+          return '<option value="' + index + '"' + (progression.selected === index ? ' selected' : '') + '>' + esc(option) + '</option>';
+        }).join("") + '</select></label><p class="notification-status">' + esc(progression.note) + '</p>';
     }
     if (plan.walkOnlyAvailable) {
       var walkOnlyLocked = cardioLocationLocked(state.selectedDate);
@@ -2335,6 +2365,14 @@
       day = getDay(state.selectedDate);
       day.cardio.shortSpeedInclineTrial = shortTrial.checked;
       day.cardio.workSpeedTrial = false;
+      queueSave(true);
+    });
+    var runWalkStep = document.getElementById("cardio-run-walk-step");
+    if (runWalkStep) runWalkStep.addEventListener("change", function () {
+      var progression = planForDate(state.selectedDate).runWalkProgression;
+      var step = Number(runWalkStep.value);
+      if (cardioLocationLocked(state.selectedDate) || !progression?.options[step]) return;
+      getDay(state.selectedDate).cardio.runWalkStep = step;
       queueSave(true);
     });
     var progressionReady = document.getElementById("cardio-progression-ready");
