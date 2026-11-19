@@ -878,7 +878,7 @@
     if (strengthRowFinished(log, progress)) {
       return count + " sets · " + (strengthEffortLabel(log.loadFeel) || log.loadFeel || "Done");
     }
-    if (exercise.equipment?.type === "dumbbell") return recommendedLoad(exercise, id) + " lb · " + count + " sets";
+    if (exercise.equipment?.type === "dumbbell") return (number(log.load) || recommendedLoad(exercise, id)) + " lb · " + count + " sets";
     return exercise.prescription + " · " + count;
   }
 
@@ -1432,16 +1432,29 @@
     return '<span class="equipment-badge" aria-label="' + count + ' dumbbell' + (count === 1 ? '' : 's') + '">' + (count === 1 ? '🏋️ ×1' : '🏋️ 🏋️') + '</span>';
   }
 
-  function renderEquipmentPrep(day, plan) {
-    var plates = {};
+  function strengthHandleWeight(exercise) {
+    return Domain.numeric(exercise.equipment.handleWeightLb) ?? DUMBBELL_HANDLE_WEIGHT;
+  }
+
+  function strengthPlateOption(exercise, weight) {
+    var handle = strengthHandleWeight(exercise);
+    var equivalent = number(weight) - handle + DUMBBELL_HANDLE_WEIGHT;
+    return LOAD_OPTIONS.find(function (option) { return Math.abs(option.weight - equivalent) < 0.000001; });
+  }
+
+  function renderEquipmentPrep(day, plan, previewId, previewWeight) {
+    var plates = {}, unavailable = [];
     exercisesForPlan(plan).forEach(function (exercise) {
       if (!exercise.equipment || exercise.equipment.type !== "dumbbell") return;
       var id = exerciseId(exercise.name), log = day.exercises[id] || {};
-      var option = loadOption(state.selectedDate >= "2026-11-18" ? recommendedLoad(exercise, id) : number(log.load) || recommendedLoad(exercise, id));
+      var weight = id === previewId ? previewWeight : number(log.load) || recommendedLoad(exercise, id);
+      var option = strengthPlateOption(exercise, weight);
       if (option) option.plates.forEach(function (plate) { plates[plate] = true; });
+      else unavailable.push(exercise.displayName || exercise.name);
     });
     var plateList = Object.keys(plates).map(Number).sort(function (a, b) { return a - b; }).join(" · ");
-    return '<div class="equipment-prep"><strong>Plates:</strong> <span>' + esc(plateList ? plateList + " lb" : "none") + '</span></div>';
+    return '<div class="equipment-prep"><strong>Plates:</strong> <span>' + esc(plateList ? plateList + " lb" : "none") +
+      '</span>' + (unavailable.length ? ' <span>Cannot build the selected weight for ' + esc(unavailable.join(", ")) + ' with your plates.</span>' : '') + '</div>';
   }
 
   function strengthHistoryEntries(exercise, id) {
@@ -1467,9 +1480,12 @@
   }
 
   function renderStrengthMore(exercise, entries, reason, setup) {
-    var note = (exercise.coachingNote || "").split(/(?<=[.!?])\s+/).filter(function (sentence) {
-      return !/\d\s*lbs?\b/i.test(sentence);
-    }).join(" ").trim();
+    var weightWords = /\d\s*[-–—]?\s*(?:lbs?|pounds?)\b/i;
+    var note = (exercise.coachingNote || "").split(/(?<=[.!?])\s+/).map(function (sentence) {
+      if (!weightWords.test(sentence)) return sentence;
+      var cue = sentence.match(/(?:[,;]\s*|\s+and\s+)((?:keep|use|avoid|pause|lower|lift|stop|brace|focus|stay|finish)\b.*)$/i)?.[1];
+      return cue && !weightWords.test(cue) ? cue.charAt(0).toUpperCase() + cue.slice(1) : "";
+    }).filter(Boolean).join(" ").trim();
     var url = "https://www.google.com/search?q=" + encodeURIComponent("site:acefitness.org " + exercise.name + " exercise demonstration");
     var history = entries.length ? '<ul class="strength-history">' + entries.map(function (entry) {
       return '<li><strong>' + esc(formatDate(entry.date, {month: "short", day: "numeric", year: "numeric"})) +
@@ -1484,6 +1500,16 @@
       '<div class="strength-form-guide"><strong>Full history</strong>' + history + '</div></details>';
   }
 
+  function renderStrengthLoadGuide(exercise, weight, lastLoad) {
+    var both = exercise.equipment.dumbbells === 2;
+    var direction = lastLoad != null && weight !== lastLoad
+      ? " (" + (weight > lastLoad ? "up" : "down") + " from " + lastLoad + ")" : "";
+    var option = strengthPlateOption(exercise, weight);
+    var plates = option ? "Plates each end: " + (option.plates.join(" + ") || "none") : "Cannot build this weight with your plates.";
+    return '<div class="load-guide"><strong>' + esc(weight) + (both ? ' lb each' : ' lb, one dumbbell') +
+      '<small>' + esc(direction) + '</small></strong><span>' + esc(plates) + '</span></div>';
+  }
+
   function renderStrengthLog(plan, exercise, id, log) {
     var entries = strengthHistoryEntries(exercise, id);
     var recommendation = "", picker = "", reason = null, setup = null;
@@ -1491,21 +1517,25 @@
       var target = state.selectedDate >= "2026-11-18" ? strengthTarget(exercise, id, state.selectedDate) : null;
       var recommended = target ? target.adjustedLoadLb : recommendedLoad(exercise, id);
       var selected = number(log.load) || recommended;
-      var displayedLoad = target ? recommended : selected;
       var both = exercise.equipment.dumbbells === 2;
       var lastLoad = entries[0]?.load;
-      var direction = lastLoad != null && displayedLoad !== lastLoad
-        ? " (" + (displayedLoad > lastLoad ? "up" : "down") + " from " + lastLoad + ")" : "";
-      var plates = loadOption(displayedLoad)?.plates;
-      recommendation = '<div class="load-guide"><strong>' + displayedLoad + (both ? ' lb each' : ' lb, one dumbbell') +
-        '<small>' + esc(direction) + '</small></strong><span>Plates each end: ' + esc(plates?.join(" + ") || "none") + '</span></div>';
-      reason = target?.reason;
-      setup = (both ? "Make both dumbbells identical. " : "Use one dumbbell. ") + "Handle + collars assumed approximately 1 lb.";
-      var options = LOAD_OPTIONS.filter(function (option) { return option.weight > 1; }).map(function (option) {
-        return '<option value="' + option.weight + '" ' + (option.weight === selected ? "selected" : "") +
-          '>' + option.weight + ' lb</option>';
+      recommendation = renderStrengthLoadGuide(exercise, selected, lastLoad);
+      if (selected === recommended && target) {
+        reason = target.reason || (selected === lastLoad && selected !== (target.publishedLoadLb ?? exercise.equipment.start)
+          ? "Carried over from your last session." : null);
+      }
+      var handle = strengthHandleWeight(exercise);
+      setup = (both ? "Make both dumbbells identical. " : "Use one dumbbell. ") + "Handle + collars assumed approximately " + handle + " lb.";
+      var weights = LOAD_OPTIONS.filter(function (option) { return option.plates.length; }).map(function (option) {
+        return option.weight - DUMBBELL_HANDLE_WEIGHT + handle;
+      });
+      if (!weights.includes(selected)) weights.push(selected);
+      var options = weights.map(function (weight) {
+        return '<option value="' + esc(weight) + '" ' + (weight === selected ? "selected" : "") +
+          '>' + esc(weight) + ' lb</option>';
       }).join("");
-      picker = '<label class="field strength-load-picker">Used:<select aria-label="Load used" data-exercise-load="' + id + '">' + options + '</select></label>';
+      picker = '<label class="field strength-load-picker">Used:<select aria-label="Load used" data-exercise-load="' + id +
+        '" data-strength-weight>' + options + '<option value="custom">Enter weight…</option></select></label>';
     } else if (exercise.equipment?.type === "bodyweight") {
       var variations = ["Floor push-up", "Incline push-up", "Knee push-up", "Weighted push-up"];
       var chosen = log.load || exercise.equipment.start;
@@ -1520,6 +1550,51 @@
       renderTimedExerciseTimer(plan, exercise, id) + renderSetInputs(exercise, id, log) +
       '<div class="strength-log-meta">' + picker + addSet + '</div>' + renderEffortButtons(exercise, id, log) +
       '</div>' + renderStrengthMore(exercise, entries, reason, setup);
+  }
+
+  function editStrengthWeight(select) {
+    var id = select.dataset.exerciseLoad, date = state.selectedDate;
+    var plan = planForDate(date), day = getDay(date);
+    var exercise = exercisesForPlan(plan).find(function (item) { return exerciseId(item.name) === id; });
+    var lastLoad = strengthHistoryEntries(exercise, id)[0]?.load;
+    var selected = number(day.exercises[id]?.load) || recommendedLoad(exercise, id);
+    var card = select.closest(".strength-exercise");
+    var dialog = card.closest("dialog");
+    var input = document.createElement("input");
+    input.type = "number";
+    input.inputMode = "decimal";
+    input.step = "any";
+    input.setAttribute("aria-label", "Enter weight used in pounds");
+    select.hidden = true;
+    select.after(input);
+    function preview(weight) {
+      card.querySelector(".load-guide").outerHTML = renderStrengthLoadGuide(exercise, weight, lastLoad);
+      dialog.querySelector(".equipment-prep").outerHTML = renderEquipmentPrep(day, plan, id, weight);
+      var reason = card.querySelector(".strength-reason");
+      if (reason) reason.hidden = weight !== selected;
+    }
+    input.addEventListener("input", function () {
+      var weight = Domain.numeric(input.value);
+      preview(weight > 0 ? weight : selected);
+    });
+    input.addEventListener("blur", function () {
+      var weight = Domain.numeric(input.value);
+      if (weight > 0 && weight !== selected && date === state.selectedDate) {
+        updateExercise(id, "load", String(weight));
+      } else {
+        input.remove();
+        select.value = String(selected);
+        select.hidden = false;
+        preview(selected);
+      }
+    }, {once: true});
+    input.addEventListener("keydown", function (event) {
+      if (event.key !== "Enter" && event.key !== "Escape") return;
+      event.preventDefault();
+      if (event.key === "Escape") input.value = "";
+      input.blur();
+    });
+    input.focus();
   }
 
   function renderExerciseLog(plan, exercise, id, log) {
@@ -2592,7 +2667,12 @@
         if (advance) focusStrengthRow(state.openStrengthExercise ?? id);
       });
     });
-    document.querySelectorAll("[data-exercise-load]").forEach(function (input) { input.addEventListener("change", function () { updateExercise(input.dataset.exerciseLoad, "load", input.value); }); });
+    document.querySelectorAll("[data-exercise-load]").forEach(function (input) {
+      input.addEventListener("change", function () {
+        if (input.dataset.strengthWeight !== undefined && input.value === "custom") editStrengthWeight(input);
+        else updateExercise(input.dataset.exerciseLoad, "load", input.value);
+      });
+    });
     document.querySelectorAll("[data-exercise-reps]").forEach(function (input) { input.addEventListener("change", function () { updateExercise(input.dataset.exerciseReps, "reps", input.value); }); });
     document.querySelectorAll("[data-exercise-set]").forEach(function (input) { input.addEventListener("change", function () { updateExerciseSet(input.dataset.exerciseSet, Number(input.dataset.setIndex), input.value); }); });
     document.querySelectorAll("[data-open-strength-exercise]").forEach(function (button) {

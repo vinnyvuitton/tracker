@@ -445,7 +445,8 @@ dialog label { display: grid; gap: 6px; color: var(--muted); font-size: 12px; }
 .strength-log-row { display: grid; gap: 6px; margin: 10px 0 0; }
 .strength-log-meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .strength-load-picker { display: flex; align-items: center; gap: 6px; font-size: 14px; letter-spacing: normal; text-transform: none; }
-.strength-load-picker select { width: auto; min-height: 44px; padding: 5px 8px; font-size: 14px; }
+.strength-load-picker select, .strength-load-picker input { width: auto; min-height: 44px; padding: 5px 8px; font-size: 14px; }
+.strength-load-picker input { width: 88px; }
 .strength-log-row .set-entry { min-width: 0; margin: 0; }
 .strength-log-row .workout-set-rows { display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto; padding: 1px; }
 .strength-log-row .workout-set-row { flex: 1 0 48px; min-width: 0; display: flex; flex-direction: column; align-items: stretch; gap: 4px; padding: 0; border: 0; }
