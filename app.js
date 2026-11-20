@@ -1286,9 +1286,15 @@
     html += renderTodayTotals(day, t);
 
     html += renderMeals(day, t) + renderPendingMeals(iso);
-    if (iso <= TODAY) {
-      html += '<section class="card"><button type="button" id="log-outdoor-cardio" data-log-outdoor-cardio class="secondary">Log cardio</button>' +
-        Domain.outdoorActivities(day.cardio).map(function (entry) { return '<p>' + esc(outdoorLabel(entry)) + '</p>'; }).join("") + '</section>';
+    if (iso <= TODAY || plan.type === "Strength") {
+      var savedActivities = Domain.outdoorActivities(day.cardio).map(outdoorLabel);
+      var addCardio = plan.type !== "Strength";
+      if (!addCardio) savedActivities.push(...savedStrengthDayActivities(day));
+      if (addCardio || savedActivities.length) {
+        html += '<section class="card">' +
+          (addCardio ? '<button type="button" id="log-outdoor-cardio" data-log-outdoor-cardio class="secondary">Log cardio</button>' : '') +
+          savedActivities.map(function (label) { return '<p>' + esc(label) + '</p>'; }).join("") + '</section>';
+      }
     }
     html += renderDailyWeight(day, iso);
     html += renderPhotos(day, iso) + '</div>';
@@ -3600,6 +3606,31 @@
     var activity = entry.activity === "run" ? "Outdoor run" : "Outdoor walk";
     return activity + " · " + entry.time + " Chicago · " + entry.distanceMiles + " mi · " + entry.durationMinutes +
       " min · " + outdoorPaceLabel(entry.paceSecondsPerMile) + (entry.notes ? " · " + entry.notes : "");
+  }
+
+  function savedStrengthDayActivities(day) {
+    var cardio = day.cardio, labels = [];
+    var result = cardio?.result;
+    if (result || cardio?.status === "complete") {
+      var location = Domain.cardioResultLocation(cardio);
+      var label = location === "outdoors" ? "Outdoor cardio" : location === "treadmill" ? "Treadmill result" : "Saved cardio";
+      var minutes = Domain.numeric(result?.durationMinutes);
+      labels.push([label, minutes != null ? minutes + " min" : "",
+        result?.distanceMiles != null ? result.distanceMiles + " mi" : "",
+        result?.calories != null ? result.calories + " screen cal" : "",
+        result?.averageSpeedMph != null ? result.averageSpeedMph + " mph avg" : "",
+        !result && cardio.durationMinutes > 0 ? cardio.durationMinutes + " min (timer)" : ""
+      ].filter(Boolean).join(" · "));
+    }
+    if (cardio?.priorOutdoorRoute) {
+      var route = cardio.priorOutdoorRoute;
+      labels.push("Previously recorded route · " + (route.durationMinutes ?? "Unknown") + " min · " + (route.distanceMiles ?? "Unknown") + " mi");
+    }
+    return labels.concat((day.extraActivities || []).filter(Boolean).map(function (entry) {
+      return [entry.label || entry.name || entry.type || "Extra activity",
+        entry.durationMinutes != null ? entry.durationMinutes + " min" : "", entry.rating, entry.note || entry.notes
+      ].filter(Boolean).join(" · ");
+    }));
   }
 
   function cardioTotalsLabel(minutes) {
