@@ -211,12 +211,62 @@
     };
   }
 
+  function applyStrengthUpdate(plan, date, update) {
+    if (!update || date < update.from || plan.type !== "Strength") return plan;
+    return {
+      ...plan,
+      subtitle: "Up to 60 minutes of strength work · 5-minute cooldown",
+      sections: plan.sections.map(section => ({
+        ...section,
+        exercises: section.exercises.map(exercise => {
+          const change = update.exercises?.[exercise.name];
+          return change ? {...exercise, ...change, strengthUpdateFrom: update.from} : exercise;
+        })
+      }))
+    };
+  }
+
+  function prepareStrengthPlan(plan, date, days, rawPlanForDate, loadOptions) {
+    if (!plan.sections.some(section => section.exercises.some(exercise => exercise.strengthUpdateFrom))) return plan;
+    days = days || {};
+    return {
+      ...plan,
+      sections: plan.sections.map(section => ({
+        ...section,
+        exercises: section.exercises.map(exercise => {
+          if (!exercise.strengthUpdateFrom) return exercise;
+          const id = exercise.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+          const target = strengthLoad(exercise, id, date, days, rawPlanForDate, loadOptions);
+          if (exercise.loadCap && target.adjustedLoadLb === exercise.loadCap) {
+            const prescription = exercise.prescription.replace(/^(\d+ sets of \d+)(?: to \d+)?/, "$1 to 15");
+            return {...exercise, prescription, strengthTempo: "3-second lowering · 1-second pause at the bottom", strengthRecommendation: target,
+              coachingNote: "Lower for 3 seconds, pause for 1 second at the bottom, then lift smoothly. Build toward 15 clean reps while keeping this tempo. " + exercise.coachingNote};
+          }
+          if (exercise.repFirst && target.reason?.endsWith("hit the top of the range on every set")) {
+            return {...exercise, prescription: exercise.prescription.replace(/ to \d+/, ""), strengthRecommendation: target};
+          }
+          if (exercise.tempoPushUp) {
+            const latest = Object.keys(days).filter(iso => iso >= exercise.strengthUpdateFrom && iso < date)
+              .sort().reverse().map(iso => days[iso].exercises?.[id]).find(log => log && (log.done || log.loadFeel));
+            const ready = latest && (latest.load === "Feet on bench" || (
+              (!latest.load || latest.load === "Floor push-up") && strengthRepOutcome(latest, {...exercise, prescription: exercise.prescription.replace("up to ", "")}).hit &&
+              ["slightly-easy", "much-too-easy", "too-light"].includes(latest.loadFeel)
+            ));
+            return {...exercise, strengthTempo: "3-second lowering", equipment: {...exercise.equipment, start: ready ? "Feet on bench" : exercise.equipment.start}};
+          }
+          return {...exercise, strengthRecommendation: target};
+        })
+      }))
+    };
+  }
+
   function strengthLoad(exercise, id, date, days, planForDate, loadOptions) {
-    if (exercise?.equipment?.type !== "dumbbell") return {publishedLoadLb: null, adjustedLoadLb: null, reason: null};
+    if (!["dumbbell", "barbell", "kettlebell"].includes(exercise?.equipment?.type)) return {publishedLoadLb: null, adjustedLoadLb: null, reason: null};
     var published = numeric(exercise.weeklyLoad), start = numeric(exercise.equipment.start);
     var fallback = {publishedLoadLb: published, adjustedLoadLb: published ?? start, reason: null};
+    if (exercise.equipment.type !== "dumbbell" || exercise.fixedLoad) return fallback;
     var sessions = Object.keys(days || {}).filter(function (iso) {
-      if (iso >= date) return false;
+      if (iso >= date || (exercise.repFirst && iso < exercise.strengthUpdateFrom)) return false;
       var log = days[iso]?.exercises?.[id];
       return log && (log.done || log.loadFeel || (Array.isArray(log.sets) && log.sets.some(function (rep) { return numeric(rep) != null; })) ||
         String(log.reps || "").split(/[,/]/).some(function (rep) { return numeric(rep) != null; }));
@@ -233,12 +283,23 @@
     var latest = sessions[0], prior = sessions[1];
     if (!latest?.comparable) return fallback;
     var weight = numeric(latest.log.load);
-    var weights = loadOptions.filter(function (option) { return option.weight > 1; }).map(function (option) { return option.weight; });
+    var weights = loadOptions.filter(function (option) {
+      return option.weight > 1 && (!exercise.loadCap || option.weight <= exercise.loadCap);
+    }).map(function (option) { return option.weight; });
+    if (exercise.loadCap && weight >= exercise.loadCap) {
+      return {...fallback, adjustedLoadLb: exercise.loadCap, reason: null};
+    }
     var index = weights.indexOf(weight);
     if (index < 0) return fallback;
     var sameLoad = prior?.comparable && numeric(prior.log.load) === weight;
     var feel = latest.log.loadFeel;
     var easy = function (session) { return ["slightly-easy", "much-too-easy", "too-light"].includes(session?.log.loadFeel); };
+    if (exercise.repFirst) {
+      const advance = latest.reps.hit && !["too-hard", "too-heavy"].includes(feel);
+      const target = weights[Math.min(weights.length - 1, index + Number(advance))];
+      return {...fallback, adjustedLoadLb: target, reason: target > weight
+        ? "Up from " + weight + ": hit the top of the range on every set" : null};
+    }
     var step = 0, why = "";
     if (feel === "too-hard" || feel === "too-heavy") {
       step = -1; why = "rated too hard";
@@ -252,7 +313,7 @@
       }
     }
     var candidate = weights[Math.min(weights.length - 1, Math.max(0, index + step))];
-    var target = step < 0 || published == null ? candidate : Math.max(published, candidate);
+    var target = step < 0 || published == null ? candidate : Math.min(exercise.loadCap ?? Infinity, Math.max(published, candidate));
     var reason = null;
     if (target !== weight) {
       reason = (target > weight ? "Up" : "Down") + " from " + weight + ": " +
@@ -262,7 +323,7 @@
   }
 
   root.WorkoutDomain = Object.freeze({
-    strengthLoad: strengthLoad, numeric: numeric, plainText: plainText, raceGoal: raceGoal,
+    strengthLoad: strengthLoad, applyStrengthUpdate, prepareStrengthPlan, numeric: numeric, plainText: plainText, raceGoal: raceGoal,
     migrateNutritionTargets: migrateNutritionTargets, inclineValid: inclineValid,
     cardioIssues: cardioIssues, normalizeCardioOcr: normalizeCardioOcr,
     cardioDurations: cardioDurations, nutritionTotals: nutritionTotals,

@@ -784,7 +784,7 @@
   }
 
   function strengthTarget(exercise, id, date) {
-    return Domain.strengthLoad(exercise, id, date, state.data.days, planForDate, LOAD_OPTIONS);
+    return exercise.strengthRecommendation || Domain.strengthLoad(exercise, id, date, state.data.days, scheduledPlanForDate, LOAD_OPTIONS);
   }
 
   function recommendedLoad(exercise, id, date) {
@@ -879,6 +879,7 @@
       return count + " sets · " + (strengthEffortLabel(log.loadFeel) || log.loadFeel || "Done");
     }
     if (exercise.equipment?.type === "dumbbell") return (number(log.load) || recommendedLoad(exercise, id)) + " lb · " + count + " sets";
+    if (isTotalLoad(exercise)) return (number(log.load) || exercise.equipment.start) + " lb total · " + count + " sets";
     return exercise.prescription + " · " + count;
   }
 
@@ -928,6 +929,7 @@
 
   function planForDate(iso) {
     var plan = scheduledPlanForDate(iso);
+    if (plan.type === "Strength") return Domain.prepareStrengthPlan(plan, iso, state.data.days, scheduledPlanForDate, LOAD_OPTIONS);
     if (iso < "2026-11-10" || plan.type !== "Cardio" || plan.outdoorTrial) return plan;
     var session = state.data.days[iso] && state.data.days[iso].cardio;
     var outdoors = Boolean(session && session.location === "outdoors");
@@ -1022,7 +1024,7 @@
       var reviewed = weekSixStrengthPlan(key), changes = state.coaching.plan[key];
       var progression = state.coaching.strengthProgression;
       var progressions = progression && iso >= progression.from && progression.plan?.[key];
-      if (reviewed && changes) return Object.assign({}, reviewed, { subtitle: progressions ? "Progress selected lifts · keep two clean reps in reserve" : "Hold this week’s loads · controlled reps and manageable recovery", sections: reviewed.sections.map(function (section) {
+      if (reviewed && changes) return Domain.applyStrengthUpdate(Object.assign({}, reviewed, { subtitle: progressions ? "Progress selected lifts · keep two clean reps in reserve" : "Hold this week’s loads · controlled reps and manageable recovery", sections: reviewed.sections.map(function (section) {
         return Object.assign({}, section, { exercises: section.exercises.map(function (exercise) {
           var updated = Object.assign({}, exercise, changes[exercise.name] || {});
           var noteUpdates = state.coaching.exerciseNotes;
@@ -1031,7 +1033,7 @@
           if (updated.equipment && updated.equipment.type === "bodyweight") delete updated.weeklyLoad;
           return updated;
         }) });
-      }) });
+      }) }), iso, state.coaching.strengthUpdate);
       if (key === "Wed" || key === "Sat") {
         var first = key === "Wed" ? 20 : 15, last = key === "Wed" ? 50 : 45;
         var segments = weekFiveCardio(weekFourCardio(weekThreeCardio(key === "Wed" ? cardioOneProgressed() : cardioTwoProgressed(), first, last, 6), first, last), first, last, key === "Wed" ? 1 : 2).map(function (segment, index) {
@@ -1413,7 +1415,7 @@
             '" aria-expanded="' + open + '" aria-controls="strength-details-' + id + '">' +
             '<span class="exercise-name-row"><span class="exercise-name">' + name + '</span><span class="exercise-count">' +
             exercisePosition + '/' + total + '</span></span><span class="exercise-prescription" data-strength-prescription' +
-            (open ? '' : ' hidden') + '>' + esc(exercise.prescription) + '</span><span class="exercise-prescription" data-strength-summary' +
+            (open ? '' : ' hidden') + '>' + esc(exercise.prescription + (exercise.strengthTempo ? ' · ' + exercise.strengthTempo : '')) + '</span><span class="exercise-prescription" data-strength-summary' +
             (open ? ' hidden' : '') + '>' + esc(strengthRowSummary(exercise, id, log, progress)) + '</span></button></div>' +
             '<div id="strength-details-' + id + '" data-strength-details' + (open ? '' : ' hidden') + '>' + logHtml + '</div></div>';
         } else {
@@ -1473,8 +1475,9 @@
       var entered = sets.some(function (value) { return String(value ?? "").trim() !== ""; });
       if (!entered && !log.done && !log.loadFeel) return [];
       var parts = [];
-      var load = exercise.equipment?.type === "dumbbell" && number(log.load) > 0 ? number(log.load) : null;
-      if (exercise.equipment?.type === "dumbbell") parts.push(load != null ? load + " lb" : "load not logged");
+      var weighted = exercise.equipment?.type === "dumbbell" || isTotalLoad(exercise);
+      var load = weighted && number(log.load) > 0 ? number(log.load) : null;
+      if (weighted) parts.push(load != null ? load + " lb" : "load not logged");
       if (entered) {
         var values = sets.map(function (value) { return String(value ?? "").trim() || "blank"; });
         parts.push(values.join("/") + (/sec|second/i.test(exercise.prescription) ? " sec" : ""));
@@ -1516,6 +1519,15 @@
       '<small>' + esc(direction) + '</small></strong><span>' + esc(plates) + '</span></div>';
   }
 
+  function isTotalLoad(exercise) {
+    return ["barbell", "kettlebell"].includes(exercise?.equipment?.type);
+  }
+
+  function initialExerciseLoad(exercise, id, date) {
+    if (exercise?.equipment?.type === "dumbbell") return recommendedLoad(exercise, id, date);
+    return isTotalLoad(exercise) ? null : exercise?.equipment?.start;
+  }
+
   function renderStrengthLog(plan, exercise, id, log) {
     var entries = strengthHistoryEntries(exercise, id);
     var recommendation = "", picker = "", reason = null, setup = null;
@@ -1534,7 +1546,7 @@
       setup = (both ? "Make both dumbbells identical. " : "Use one dumbbell. ") + "Handle + collars assumed approximately " + handle + " lb.";
       var weights = LOAD_OPTIONS.filter(function (option) { return option.plates.length; }).map(function (option) {
         return option.weight - DUMBBELL_HANDLE_WEIGHT + handle;
-      });
+      }).filter(function (weight) { return !exercise.loadCap || weight <= exercise.loadCap; });
       if (!weights.includes(selected)) weights.push(selected);
       var options = weights.map(function (weight) {
         return '<option value="' + esc(weight) + '" ' + (weight === selected ? "selected" : "") +
@@ -1542,8 +1554,15 @@
       }).join("");
       picker = '<label class="field strength-load-picker">Used:<select aria-label="Load used" data-exercise-load="' + id +
         '" data-strength-weight>' + options + '<option value="custom">Enter weight…</option></select></label>';
+    } else if (isTotalLoad(exercise)) {
+      var total = Domain.numeric(log.load);
+      recommendation = '<div class="load-guide"><strong>' + esc(total ?? exercise.equipment.start) + ' lb total' +
+        (total == null ? ' starting point' : '') + '</strong></div>';
+      picker = '<label class="field strength-load-picker">Used:<input type="number" inputmode="decimal" min="0.1" step="any" max="' +
+        esc(exercise.equipment.max) + '" aria-label="Total load used in pounds" data-exercise-load="' + esc(id) + '" placeholder="' + esc(exercise.equipment.start) + '" value="' + esc(total) + '"></label>';
     } else if (exercise.equipment?.type === "bodyweight") {
       var variations = ["Floor push-up", "Incline push-up", "Knee push-up", "Weighted push-up"];
+      if (exercise.tempoPushUp) variations.push("Feet on bench");
       var chosen = log.load || exercise.equipment.start;
       picker = '<label class="field strength-load-picker">Variation<select data-exercise-load="' + id + '">' + variations.map(function (variation) {
         return '<option ' + (variation === chosen ? "selected" : "") + '>' + variation + '</option>';
@@ -1585,7 +1604,7 @@
     });
     input.addEventListener("blur", function () {
       var weight = Domain.numeric(input.value);
-      if (weight > 0 && weight !== selected && date === state.selectedDate) {
+      if (weight > 0 && (!exercise.loadCap || weight <= exercise.loadCap) && weight !== selected && date === state.selectedDate) {
         updateExercise(id, "load", String(weight));
       } else {
         input.remove();
@@ -2207,13 +2226,14 @@
       plan.sections.forEach(function (section) {
         html += '<div class="section-label">' + esc(section.label) + '</div>';
         section.exercises.forEach(function (exercise) {
-          html += '<div class="exercise"><div class="exercise-name">' + esc(exercise.displayName || exercise.name) + equipmentBadge(exercise) + '</div><div class="exercise-prescription">' + esc(exercise.prescription) + '</div>';
+          html += '<div class="exercise"><div class="exercise-name">' + esc(exercise.displayName || exercise.name) + equipmentBadge(exercise) + '</div><div class="exercise-prescription">' + esc(exercise.prescription + (exercise.strengthTempo ? ' · ' + exercise.strengthTempo : '')) + '</div>';
           if (exercise.equipment && exercise.equipment.type === "dumbbell") {
             var suggestedLoad = planDate >= "2026-11-18"
               ? strengthTarget(exercise, exerciseId(exercise.name), planDate).adjustedLoadLb
               : exercise.weeklyLoad || exercise.equipment.start;
             html += '<p class="exercise-tip">Starting point: ≈ ' + suggestedLoad + ' lb ' + (exercise.equipment.dumbbells === 2 ? "per dumbbell. " : "on one dumbbell. ") + esc(plateText(suggestedLoad, exercise.equipment.dumbbells)) + '</p>';
           }
+          if (isTotalLoad(exercise)) html += '<p class="exercise-tip">' + esc(exercise.equipment.start) + ' lb total starting point</p>';
           html += renderExerciseCoaching(exercise, true);
           html += '</div>';
         });
@@ -2676,7 +2696,9 @@
     document.querySelectorAll("[data-exercise-load]").forEach(function (input) {
       input.addEventListener("change", function () {
         if (input.dataset.strengthWeight !== undefined && input.value === "custom") editStrengthWeight(input);
-        else updateExercise(input.dataset.exerciseLoad, "load", input.value);
+        else if (input.type !== "number" || Number(input.value) > 0 && input.reportValidity()) {
+          updateExercise(input.dataset.exerciseLoad, "load", input.value);
+        }
       });
     });
     document.querySelectorAll("[data-exercise-reps]").forEach(function (input) { input.addEventListener("change", function () { updateExercise(input.dataset.exerciseReps, "reps", input.value); }); });
@@ -2837,8 +2859,8 @@
     var planned = exercisesForPlan(planForDate(state.selectedDate));
     if ((field === "done" || field === "loadFeel" && state.selectedDate >= "2026-11-18") && value && !day.exercises[id].load) {
       var exercise = planned.find(function (item) { return exerciseId(item.name) === id; });
-      if (exercise && exercise.equipment && exercise.equipment.type === "dumbbell") day.exercises[id].load = recommendedLoad(exercise, id);
-      if (exercise && exercise.equipment && exercise.equipment.type === "bodyweight") day.exercises[id].load = exercise.equipment.start;
+      var initialLoad = initialExerciseLoad(exercise, id, state.selectedDate);
+      if (initialLoad != null) day.exercises[id].load = initialLoad;
     }
     var wasComplete = day.workout.completed;
     day.workout.completed = planned.every(function (exercise) { return day.exercises[exerciseId(exercise.name)] && day.exercises[exerciseId(exercise.name)].done; });
@@ -2855,8 +2877,9 @@
     if (String(sets[index] ?? "") === String(value)) return;
     sets[index] = value;
     day.exercises[id].sets = sets;
-    if (date >= "2026-11-18" && number(value) > 0 && !day.exercises[id].load && exercise?.equipment?.type === "dumbbell") {
-      day.exercises[id].load = recommendedLoad(exercise, id, date);
+    if (date >= "2026-11-18" && number(value) > 0 && !day.exercises[id].load &&
+      (exercise?.equipment?.type === "dumbbell" || exercise?.tempoPushUp)) {
+      day.exercises[id].load = initialExerciseLoad(exercise, id, date);
     }
     day.exercises[id].reps = sets.filter(function (item) { return item !== ""; }).join(", ");
     var requiredEntries = exercise && exercise.name === "Side Plank" ? 4 : prescribedSetCount(exercise || { prescription: "1 set" });
@@ -2867,8 +2890,10 @@
     if (prescribedSetsComplete && !day.exercises[id].done) {
       day.exercises[id].done = true;
       day.exercises[id].autoCompleted = true;
-      if (!day.exercises[id].load && exercise && exercise.equipment && exercise.equipment.type === "dumbbell") day.exercises[id].load = recommendedLoad(exercise, id, date);
-      if (!day.exercises[id].load && exercise && exercise.equipment && exercise.equipment.type === "bodyweight") day.exercises[id].load = exercise.equipment.start;
+      if (!day.exercises[id].load) {
+        var initialLoad = initialExerciseLoad(exercise, id, date);
+        if (initialLoad != null) day.exercises[id].load = initialLoad;
+      }
       completionChanged = true;
     } else if (!prescribedSetsComplete && day.exercises[id].done && day.exercises[id].autoCompleted) {
       day.exercises[id].done = false;
