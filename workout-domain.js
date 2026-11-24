@@ -211,16 +211,20 @@
     };
   }
 
-  function applyStrengthUpdate(plan, date, update) {
-    if (!update || date < update.from || plan.type !== "Strength") return plan;
+  function applyStrengthUpdate(plan, date, update, datedOverrides) {
+    const active = update && date >= update.from;
+    const overrides = datedOverrides?.[date];
+    if (plan.type !== "Strength" || (!active && !overrides)) return plan;
     return {
       ...plan,
-      subtitle: "Up to 60 minutes of strength work · 5-minute cooldown",
+      subtitle: active ? "Up to 60 minutes of strength work · 5-minute cooldown" : plan.subtitle,
       sections: plan.sections.map(section => ({
         ...section,
         exercises: section.exercises.map(exercise => {
-          const change = update.exercises?.[exercise.name];
-          return change ? {...exercise, ...change, strengthUpdateFrom: update.from} : exercise;
+          const change = active && update.exercises?.[exercise.name];
+          const updated = change ? {...exercise, ...change, strengthUpdateFrom: update.from} : exercise;
+          const override = overrides?.[updated.name];
+          return override ? {...updated, ...override, fixedLoad: true} : updated;
         })
       }))
     };

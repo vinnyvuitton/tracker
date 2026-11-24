@@ -1033,7 +1033,7 @@
           if (updated.equipment && updated.equipment.type === "bodyweight") delete updated.weeklyLoad;
           return updated;
         }) });
-      }) }), iso, state.coaching.strengthUpdate);
+      }) }), iso, state.coaching.strengthUpdate, state.coaching.datedStrengthOverrides);
       if (key === "Wed" || key === "Sat") {
         var first = key === "Wed" ? 20 : 15, last = key === "Wed" ? 50 : 45;
         var segments = weekFiveCardio(weekFourCardio(weekThreeCardio(key === "Wed" ? cardioOneProgressed() : cardioTwoProgressed(), first, last, 6), first, last), first, last, key === "Wed" ? 1 : 2).map(function (segment, index) {
