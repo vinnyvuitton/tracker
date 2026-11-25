@@ -2032,8 +2032,12 @@
   function renderFavoritePicker() {
     var tiles = favoritesByRecentMeals().map(function (favorite) {
       var protein = optionalNumber(favorite.protein), sugar = optionalNumber(favorite.addedSugar);
-      return '<button type="button" class="food-favorite-tile" data-food-favorite="' + esc(favorite.id) + '"><strong>' + esc(foodUiText(favorite.name)) + '</strong><span>' + Math.round(number(favorite.calories)) + ' cal · ' +
-        (protein == null ? 'Protein unknown' : protein + ' g protein') + (sugar == null ? '' : ' · ' + sugar + ' g sugar') + '</span></button>';
+      var nutrients = [Math.round(number(favorite.calories)) + " cal", protein == null ? "Protein unknown" : protein + " g protein"];
+      if (sugar != null) nutrients.push(sugar + " g sugar");
+      return '<button type="button" class="food-favorite-tile" data-food-favorite="' + esc(favorite.id) + '"><strong>' +
+        esc(foodUiText(favorite.name)) + '</strong><span class="food-favorite-nutrients">' + nutrients.map(function (nutrient, index) {
+          return '<span>' + (index ? ' · ' : '') + esc(nutrient) + '</span>';
+        }).join("") + '</span></button>';
     }).join("");
     return '<div class="food-favorite-grid">' + (tiles || '<p class="food-empty">No favorites here yet. Describe a food or enter it manually.</p>') + '</div>';
   }
