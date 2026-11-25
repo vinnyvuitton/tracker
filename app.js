@@ -2364,6 +2364,12 @@
     var change = weighIn?.weight != null && priorWeighIn?.weight != null ? weighIn.weight - priorWeighIn.weight : null;
     var notes = [], nutrition = [], calorieTotal = 0, proteinTotal = 0, nutritionDays = 0, proteinDays = 0, partialProtein = false;
     var training = [];
+    var extraNutrients = midweek ? [] : [["fiber", "fiber"], ["addedSugar", "added sugar"]].map(function ([key, label]) {
+      return {key: key, label: label, total: 0, days: 0, partial: false};
+    });
+    function nutrientText(label, amount, partial) {
+      return amount == null ? label + " unknown" : Math.round(amount * 10) / 10 + " g " + label + (partial ? " (partial)" : "");
+    }
     for (var iso = startIso; iso <= endIso; iso = addDays(iso, 1)) {
       var day = state.data.days[iso];
       var t = day ? totals(day) : { calories: 0, protein: 0 };
@@ -2374,7 +2380,14 @@
       if (hasProtein) { proteinTotal += t.protein; proteinDays++; }
       if (proteinMissing) partialProtein = true;
       var proteinText = hasProtein ? Math.round(t.protein) + " g protein" + (proteinMissing ? " (partial)" : "") : "protein unknown";
-      nutrition.push(formatDate(iso, { weekday: "short", month: "short", day: "numeric" }) + ": " + (hasNutrition ? Math.round(t.calories) + " calories · " + proteinText : "No nutrition data logged") + " · weight " + (day && number(day.weight) ? number(day.weight).toFixed(1) + " lb" : "not logged") + " · water " + (day ? number(day.water) : 0) + " glasses");
+      var extraText = hasNutrition ? extraNutrients.map(function (metric) {
+        var known = t.known[metric.key];
+        var value = known ? t[metric.key] : null;
+        if (known) { metric.total += value; metric.days++; }
+        if (known < day.meals.length) metric.partial = true;
+        return " · " + nutrientText(metric.label, value, known < day.meals.length);
+      }).join("") : "";
+      nutrition.push(formatDate(iso, { weekday: "short", month: "short", day: "numeric" }) + ": " + (hasNutrition ? Math.round(t.calories) + " calories · " + proteinText + extraText : "No nutrition data logged") + " · weight " + (day && number(day.weight) ? number(day.weight).toFixed(1) + " lb" : "not logged") + " · water " + (day ? number(day.water) : 0) + " glasses");
       if (!day) continue;
       if (day.workout && day.workout.notes) notes.push(formatDate(iso, { weekday: "short" }) + ": " + day.workout.notes);
       var exerciseLines = Domain.outdoorActivities(day.cardio).map(function (entry) { return "  " + outdoorLabel(entry); });
@@ -2397,6 +2410,13 @@
         training.push(formatDate(iso, { weekday: "short", month: "short", day: "numeric" }) + " · " + plan.title + (day.workout.rating ? " · " + day.workout.rating : "") + (day.cardio && day.cardio.location ? "\n  Location: " + (day.cardio.location === "outdoors" ? "Outdoors" : "Treadmill") : "") + "\n" + exerciseLines.join("\n") + resultLine + cardioChoiceLine);
       }
     }
+    function extraTotals(average) {
+      return extraNutrients.map(function (metric) {
+        var amount = metric.days ? (average ? metric.total / metric.days : metric.total) : null;
+        return " · " + nutrientText(metric.label, amount, metric.partial) +
+          (average && metric.days ? " (known values across " + metric.days + " " + (metric.days === 1 ? "day" : "days") + ")" : "");
+      }).join("");
+    }
     var checkin = midweek ? readMidweekCheckin(startIso) : readWeeklyCheckin(startIso);
     return [
       "VINNY WORKOUT 2.0 " + (midweek ? "MIDWEEK CHECK-IN" : "WEEKLY CHECK-IN") + (inProgress ? " · IN PROGRESS" : ""),
@@ -2414,8 +2434,8 @@
       "",
       "Daily summary:",
       nutrition.join("\n"),
-      "Weekly nutrition totals: " + (nutritionDays ? Math.round(calorieTotal) + " calories · " + (proteinDays ? Math.round(proteinTotal) + " g protein" + (partialProtein ? " (partial)" : "") : "protein unknown") : "not available"),
-      "Logged-day averages: " + (nutritionDays ? Math.round(calorieTotal / nutritionDays) + " calories · " + (proteinDays ? Math.round(proteinTotal / proteinDays) + " g protein" + (partialProtein ? " (known values across " + proteinDays + " days)" : "") : "protein unknown") : "not available"),
+      "Weekly nutrition totals: " + (nutritionDays ? Math.round(calorieTotal) + " calories · " + (proteinDays ? Math.round(proteinTotal) + " g protein" + (partialProtein ? " (partial)" : "") : "protein unknown") + extraTotals(false) : "not available"),
+      "Logged-day averages: " + (nutritionDays ? Math.round(calorieTotal / nutritionDays) + " calories · " + (proteinDays ? Math.round(proteinTotal / proteinDays) + " g protein" + (partialProtein ? " (known values across " + proteinDays + " days)" : "") : "protein unknown") + extraTotals(true) : "not available"),
       "Current target zones: " + state.data.targets.calorieMin + " to " + state.data.targets.calorieMax + " calories (target " + state.data.targets.calories + ") · " + state.data.targets.proteinMin + " to " + state.data.targets.proteinMax + " g protein (target " + state.data.targets.protein + " g)",
       "",
       measurementCheckin(startIso, endIso),
