@@ -199,7 +199,6 @@
     mealSheetTab: "favorites",
     mealTimeIsNow: true,
     selectedFavoriteId: null,
-    favoriteFilter: "all",
     favoritesOpen: false,
     favoriteManagerOpen: false,
     editingMeal: null,
@@ -1972,9 +1971,57 @@
     return Math.abs(calculated - number(meal.calories)) > Math.max(100, number(meal.calories) * 0.2);
   }
 
-  function sortedFavorites(filter) {
-    return (state.data.favorites || []).filter(function (favorite) { return filter === "all" || favorite.category === filter; }).slice().sort(function (a, b) {
+  function sortedFavorites() {
+    return (state.data.favorites || []).slice().sort(function (a, b) {
       return number(b.useCount) - number(a.useCount) || String(b.lastUsedAt || "").localeCompare(String(a.lastUsedAt || "")) || String(a.name || "").localeCompare(String(b.name || ""));
+    });
+  }
+
+  function favoritesByRecentMeals() {
+    var favorites = (state.data.favorites || []).slice();
+    var byName = new Map(), byId = new Map(), usage = new Map();
+    var today = chicagoToday(), start = addDays(today, -29);
+    var chicagoOffset = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Chicago", timeZoneName: "longOffset"
+    });
+    function nameKey(name) { return String(name || "").trim().toLowerCase(); }
+
+    function recency(meal, date) {
+      var loggedAt = Date.parse(meal.logTiming?.loggedAt);
+      if (Number.isFinite(loggedAt)) return loggedAt;
+      var time = meal.occurredAt?.time;
+      if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time || "")) time = "00:00";
+      var local = date + "T" + time + ":00";
+      var nearChicagoTime = Date.parse(local + "-06:00");
+      var offset = chicagoOffset.formatToParts(nearChicagoTime).find(function (part) { return part.type === "timeZoneName"; }).value;
+      return Date.parse(local + offset.slice(3));
+    }
+
+    favorites.forEach(function (favorite) {
+      var key = nameKey(favorite.name);
+      if (!byName.has(key)) byName.set(key, []);
+      byName.get(key).push(favorite);
+      if (favorite.id) byId.set(favorite.id, [favorite]);
+      usage.set(favorite, { count: 0, latest: 0 });
+    });
+
+    for (var date = start; date <= today; date = addDays(date, 1)) {
+      (state.data.days?.[date]?.meals || []).forEach(function (meal) {
+        var matches = byId.get(meal.favoriteId) || byName.get(nameKey(meal.name));
+        if (!matches) return;
+        var latest = recency(meal, date);
+        matches.forEach(function (favorite) {
+          var stats = usage.get(favorite);
+          stats.count++;
+          if (latest > stats.latest) stats.latest = latest;
+        });
+      });
+    }
+
+    return favorites.sort(function (a, b) {
+      var first = usage.get(a), second = usage.get(b);
+      return second.count - first.count || second.latest - first.latest ||
+        String(a.name || "").localeCompare(String(b.name || ""));
     });
   }
 
@@ -1983,21 +2030,16 @@
   }
 
   function renderFavoritePicker() {
-    var all = sortedFavorites("all");
-    var categories = ["all"].concat(Array.from(new Set(all.map(function (favorite) { return favorite.category; }).filter(Boolean))));
-    if (!categories.includes(state.favoriteFilter)) state.favoriteFilter = "all";
-    var chips = categories.map(function (category) {
-      return '<button type="button" class="food-chip" data-food-category="' + esc(category) + '" aria-pressed="' + (state.favoriteFilter === category) + '">' + esc(category === "all" ? "All" : categoryLabel(category)) + '</button>';
+    var tiles = favoritesByRecentMeals().map(function (favorite) {
+      var protein = optionalNumber(favorite.protein), sugar = optionalNumber(favorite.addedSugar);
+      return '<button type="button" class="food-favorite-tile" data-food-favorite="' + esc(favorite.id) + '"><strong>' + esc(foodUiText(favorite.name)) + '</strong><span>' + Math.round(number(favorite.calories)) + ' cal · ' +
+        (protein == null ? 'Protein unknown' : protein + ' g protein') + (sugar == null ? '' : ' · ' + sugar + ' g sugar') + '</span></button>';
     }).join("");
-    var tiles = sortedFavorites(state.favoriteFilter).map(function (favorite) {
-      var protein = optionalNumber(favorite.protein);
-      return '<button type="button" class="food-favorite-tile" data-food-favorite="' + esc(favorite.id) + '"><strong>' + esc(foodUiText(favorite.name)) + '</strong><span>' + Math.round(number(favorite.calories)) + ' cal · ' + (protein == null ? 'Protein unknown' : protein + ' g protein') + '</span></button>';
-    }).join("");
-    return '<div class="food-category-chips" aria-label="Favorite categories">' + chips + '</div><div class="food-favorite-grid">' + (tiles || '<p class="food-empty">No favorites here yet. Describe a food or enter it manually.</p>') + '</div>';
+    return '<div class="food-favorite-grid">' + (tiles || '<p class="food-empty">No favorites here yet. Describe a food or enter it manually.</p>') + '</div>';
   }
 
   function renderFavoriteManager() {
-    return sortedFavorites("all").map(function (favorite) {
+    return sortedFavorites().map(function (favorite) {
       var options = MEAL_CATEGORIES.map(function (category) { return '<option value="' + category + '" ' + (favorite.category === category ? "selected" : "") + '>' + categoryLabel(category) + '</option>'; }).join("");
       return '<div class="food-favorite-edit"><label>Name<input data-favorite-name="' + esc(favorite.id) + '" value="' + esc(favorite.name) + '"></label><div><label>Category<select data-favorite-category="' + esc(favorite.id) + '">' + options + '</select></label><button type="button" class="food-neutral" data-remove-favorite="' + esc(favorite.id) + '">Delete</button></div></div>';
     }).join("") || '<p class="food-empty">No saved favorites.</p>';
@@ -3136,14 +3178,6 @@
   }
 
   function bindFavoritePickerEvents() {
-    document.querySelectorAll("[data-food-category]").forEach(function (button) {
-      button.addEventListener("click", function () {
-        state.favoriteFilter = button.dataset.foodCategory;
-        document.getElementById("meal-favorites-slot").innerHTML = renderFavoritePicker();
-        bindFavoritePickerEvents();
-        document.querySelector('[data-food-category="' + state.favoriteFilter + '"]')?.focus({ preventScroll: true });
-      });
-    });
     document.querySelectorAll("[data-food-favorite]").forEach(function (button) {
       button.addEventListener("click", function () { useSelectedFavorite(button.dataset.foodFavorite); });
     });
