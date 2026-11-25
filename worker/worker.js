@@ -532,7 +532,8 @@ function isValidSubscription(subscription) {
 async function startCardioAlerts(request, env, cors) {
   if (!env.ALERT_QUEUE) return json({ error: "Workout alerts are temporarily unavailable" }, 503, cors);
   const body = await request.json();
-  const alerts = Array.isArray(body && body.alerts) ? body.alerts.slice(0, 20).map((alert) => ({
+  // Eight jogs with a ramped warmup need 20 transitions and a completion alert.
+  const alerts = Array.isArray(body && body.alerts) ? body.alerts.slice(0, 21).map((alert) => ({
     atMinutes: Math.max(1, Math.min(90, Number(alert.atMinutes) || 0)),
     title: String(alert.title || "Treadmill update").slice(0, 90),
     body: String(alert.body || "Check your next treadmill setting.").slice(0, 240)
