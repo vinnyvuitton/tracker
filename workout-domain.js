@@ -215,18 +215,24 @@
     const active = update && date >= update.from;
     const overrides = datedOverrides?.[date];
     if (plan.type !== "Strength" || (!active && !overrides)) return plan;
+    const finisher = active && update.finisher;
+    const sections = plan.sections.map(section => ({
+      ...section,
+      exercises: section.exercises.map(exercise => {
+        const change = active && update.exercises?.[exercise.name];
+        const updated = change ? {...exercise, ...change, strengthUpdateFrom: update.from} : exercise;
+        const override = overrides?.[updated.name];
+        return override ? {...updated, ...override, fixedLoad: true} : updated;
+      })
+    }));
+    if (finisher && date >= finisher.from && plan.title === finisher.planTitle && sections.length) {
+      const last = sections.at(-1);
+      last.exercises.push(finisher.exercise);
+    }
     return {
       ...plan,
       subtitle: active ? "Up to 60 minutes of strength work · 5-minute cooldown" : plan.subtitle,
-      sections: plan.sections.map(section => ({
-        ...section,
-        exercises: section.exercises.map(exercise => {
-          const change = active && update.exercises?.[exercise.name];
-          const updated = change ? {...exercise, ...change, strengthUpdateFrom: update.from} : exercise;
-          const override = overrides?.[updated.name];
-          return override ? {...updated, ...override, fixedLoad: true} : updated;
-        })
-      }))
+      sections
     };
   }
 

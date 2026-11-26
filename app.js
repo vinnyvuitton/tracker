@@ -806,7 +806,7 @@
   }
 
   function prescribedSetCount(exercise) {
-    var match = String(exercise.prescription || "").match(/(\d+)\s+sets?/i);
+    var match = String(exercise.prescription || "").match(/(\d+)\s+(?:sets?|rounds?)\b/i);
     return match ? Math.max(1, Number(match[1])) : 1;
   }
 
@@ -1112,8 +1112,9 @@
   }
 
   function renderExerciseCoaching(exercise, inPlan, cardioScreen) {
-    if (!exercise.coachingNote) return "";
-    var note = cardioScreen ? exercise.coachingNote.replace(/ for this first test\b/i, "") : exercise.coachingNote;
+    var note = [exercise.coachingNote, exercise.progressionNote].filter(Boolean).join(" ");
+    if (!note) return "";
+    if (cardioScreen) note = note.replace(/ for this first test\b/i, "");
     return '<div class="exercise-coaching' + (inPlan ? ' in-plan' : '') + '"><strong>Coach note</strong><span>' + esc(note) + '</span></div>';
   }
 
@@ -1494,6 +1495,7 @@
       var cue = sentence.match(/(?:[,;]\s*|\s+and\s+)((?:keep|use|avoid|pause|lower|lift|stop|brace|focus|stay|finish)\b.*)$/i)?.[1];
       return cue && !weightWords.test(cue) ? cue.charAt(0).toUpperCase() + cue.slice(1) : "";
     }).filter(Boolean).join(" ").trim();
+    note = [note, exercise.progressionNote].filter(Boolean).join(" ");
     var url = "https://www.google.com/search?q=" + encodeURIComponent("site:acefitness.org " + exercise.name + " exercise demonstration");
     var history = entries.length ? '<ul class="strength-history">' + entries.map(function (entry) {
       return '<li><strong>' + esc(formatDate(entry.date, {month: "short", day: "numeric", year: "numeric"})) +
@@ -1667,6 +1669,7 @@
   }
 
   function timedExerciseOptions(exercise) {
+    if (exercise?.timerSeconds?.length) return exercise.timerSeconds;
     if (!exercise || !/sec|second/i.test(exercise.prescription || "")) return [];
     var values = (exercise.prescription.match(/\d+/g) || []).map(Number).filter(function (value) { return value >= 10 && value <= 180; });
     if (!values.length) return [30];
